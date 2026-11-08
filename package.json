@@ -1,0 +1,93 @@
+{
+  "name": "sanity-plugin-writing-room",
+  "version": "0.0.0",
+  "description": "A calm, full-screen place to write long-form Posts inside Sanity Studio.",
+  "keywords": [
+    "sanity",
+    "sanity-plugin",
+    "portable-text",
+    "editor",
+    "writing"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mematthew123/calm-editor.git",
+    "directory": "packages/writing-room"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepack": "tsdown"
+  },
+  "dependencies": {
+    "@portabletext/plugin-input-rule": "^7.0.26",
+    "@portabletext/plugin-markdown-shortcuts": "^9.0.26",
+    "@portabletext/plugin-paste-link": "^5.0.25",
+    "@portabletext/plugin-sdk-value": "^8.1.20",
+    "@portabletext/plugin-typeahead-picker": "^7.0.26",
+    "@portabletext/sanity-bridge": "^5.0.0",
+    "@portabletext/toolbar": "^9.0.26",
+    "@sanity/icons": "^5.3.0",
+    "@sanity/preview-url-secret": "^4.1.5"
+  },
+  "peerDependencies": {
+    "@portabletext/editor": "^8.2.12",
+    "@sanity/sdk-react": "^3.12.0",
+    "react": "^19.2",
+    "react-dom": "^19.2",
+    "sanity": "^6.22.0",
+    "styled-components": "^6.1.18"
+  },
+  "devDependencies": {
+    "@calm/content": "workspace:*",
+    "@calm/tokens": "workspace:*",
+    "@portabletext/editor": "^8.2.12",
+    "@sanity/eslint-config-studio": "^7",
+    "@sanity/sdk-react": "^3.12.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.8.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sanity": "^6.22.0",
+    "styled-components": "^6.1.18",
+    "tsdown": "^0.23.3",
+    "typescript": "~6.0",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
+  "prettier": {
+    "bracketSpacing": false,
+    "printWidth": 100,
+    "semi": false,
+    "singleQuote": true
+  }
+}
