@@ -4,6 +4,16 @@ A calm, full-screen place to write long-form Posts inside Sanity Studio.
 
 Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a Post's title and body, and gets out of the way while you type. Everything else about a Post (slug, excerpt, cover image, tags) stays in the standard form, one click away.
 
+- **The Lobby**: start a new Post or pick up a recent one.
+- **Controls that recede**: Leave, Details, Preview, Publish and save state fade after a few keystrokes and return when you pause.
+- **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
+- **An insert menu**: type `+` or `/` on an empty line for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
+- **Markdown as you type**: `##`, `>`, `-`, `1.`, `---` and code fences.
+- **Room settings**: text size, typewriter scrolling and focus dimming, kept per Writer in the browser.
+- **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
+- **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
+- **Preview** opens the Post on your site in draft mode, exactly as readers will see it.
+
 > **Status: pre-release.** This package is being extracted from the [Calm Editor template](https://github.com/mematthew123/calm-editor) and isn't on npm yet. The API below may change before 1.0. See [`docs/plugin-roadmap.md`](../../docs/plugin-roadmap.md).
 
 ## Requirements
