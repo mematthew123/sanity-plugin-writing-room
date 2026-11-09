@@ -43,7 +43,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "prepack": "tsdown"
+    "prepack": "tsdown",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@portabletext/plugin-input-rule": "^7.0.26",
@@ -59,8 +60,8 @@
   "peerDependencies": {
     "@portabletext/editor": "^8.2.12",
     "@sanity/sdk-react": "^3.12.0",
-    "react": "^19.2",
-    "react-dom": "^19.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "sanity": "^6.22.0",
     "styled-components": "^6.1.18"
   },
