@@ -1,6 +1,6 @@
 {
   "name": "sanity-plugin-writing-room",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "A calm, full-screen place to write long-form content inside Sanity Studio.",
   "keywords": [
     "sanity",

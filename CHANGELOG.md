@@ -1,5 +1,11 @@
 # sanity-plugin-writing-room
 
+## 0.1.0
+
+### Minor Changes
+
+- [`2590bb1`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/2590bb1fc4fc5e05d373d33fe1c984150e2594cb) Thanks [@mematthew123](https://github.com/mematthew123)! - The plugin now lives in its own repository, [mematthew123/sanity-plugin-writing-room](https://github.com/mematthew123/sanity-plugin-writing-room), and is published from there with npm provenance. Nothing about the plugin's API or behaviour changes.
+
 ## 0.0.2
 
 ### Patch Changes
