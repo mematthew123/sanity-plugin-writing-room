@@ -13,7 +13,13 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   focusDimming: false,
 }
 
-const STORAGE_KEY = 'calm-editor:room-settings'
+/**
+ * One key for every Studio: these are the Writer's preferences, not a Studio's, and storage is
+ * already per origin (each deployed Studio has its own). Nothing for a Studio to configure.
+ */
+const STORAGE_KEY = 'sanity-plugin-writing-room:settings'
+/** Where the template kept them before the plugin, so a Writer's settings carry over. */
+const LEGACY_STORAGE_KEY = 'calm-editor:room-settings'
 const TEXT_SIZES = new Set(['small', 'medium', 'large'])
 
 export function parseRoomSettings(raw: string | null): RoomSettings {
@@ -43,7 +49,10 @@ const listeners = new Set<() => void>()
 function read(): RoomSettings {
   let raw: string | null
   try {
-    raw = window.localStorage.getItem(STORAGE_KEY) ?? sessionOnly
+    raw =
+      window.localStorage.getItem(STORAGE_KEY) ??
+      sessionOnly ??
+      window.localStorage.getItem(LEGACY_STORAGE_KEY)
   } catch {
     raw = sessionOnly
   }

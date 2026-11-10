@@ -9,7 +9,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
 - **An insert menu**: type `+` or `/` on an empty line for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
 - **Markdown as you type**: `##`, `>`, `-`, `1.`, `---` and code fences.
-- **Room settings**: text size, typewriter scrolling and focus dimming, kept per Writer in the browser.
+- **Room settings**: text size, typewriter scrolling and focus dimming, kept per Writer in the browser (no setup).
 - **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
 - **Preview** opens the Post on your site in draft mode, exactly as readers will see it.
@@ -132,11 +132,25 @@ If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content'
 
 The editor is built from the body field's own type, so the room only offers what that type can store. A `blockContent` with headings, quotes, bullets, links and images gets exactly those: no code blocks, embeds or numbered lists in the Insert Menu, selection bubble or markdown shortcuts. Image description and caption inputs appear only when your image type has `alt` and `caption` fields.
 
-The room's extra blocks (embeds, code blocks, section breaks) come with `writingRoomSchemaTypes`. Add `embed`, `codeBlock` or `sectionBreak` to your body type's `of` to offer them.
+To offer the room's own blocks (YouTube/Vimeo/Spotify embeds, code blocks, section breaks), add them to your body type. The plugin registers them for you, under prefixed names that can't clash with yours:
+
+```ts
+import {writingRoomBlocks} from 'sanity-plugin-writing-room'
+
+defineType({
+  name: 'blockContent',
+  type: 'array',
+  of: [{type: 'block'}, {type: 'image'}, ...writingRoomBlocks],
+})
+```
+
+Your site then renders them as `writingRoomEmbed`, `writingRoomCodeBlock` and `writingRoomSectionBreak`. (The starter `writingRoomSchemaTypes` uses the original names, `embed`, `codeBlock` and `sectionBreak`; the room handles both.)
+
+Blocks of your own that the room doesn't know (a `callout`, a product card…) keep their place in the text as a quiet placeholder: the Writer can move or delete them, and **Edit in Details** opens that block in the standard form.
 
 ### Labels and URLs
 
-The Lobby gets a **Start a new …** button and an **All …** link for each type, and Recent lists them together. The room names each type with its schema `title` ("Case Study", "Case Studies"). If the plural comes out wrong, set it yourself:
+The Lobby gets a **Start a new …** button and an **All …** link for each type, and Recent lists them together. **All …** opens the type's most recent document in Structure, wherever your Structure keeps that list. The room names each type with its schema `title` ("Case Study", "Case Studies"). If the plural comes out wrong, set it yourself:
 
 ```ts
 writingRoom({
@@ -205,6 +219,12 @@ The room creates a one-hour preview secret and opens `<origin><enablePath>?sanit
 - **Anything else** (Astro, Nuxt, SvelteKit, Remix…): call `validatePreviewUrl(client, request.url)` from `@sanity/preview-url-secret`, turn on your framework's draft or preview mode, and redirect to the `redirectTo` it returns.
 
 Either way the site needs a Viewer token to check the secret, and its origin must be a CORS origin of your Sanity project.
+
+## Troubleshooting
+
+**"The Writing Room can't start in this Studio yet."** The room and the Studio are using different copies of Sanity's App SDK. On a deployed Studio, turn off auto-updates ([step 3](#3-turn-off-studio-auto-updates)) and deploy again. In `sanity dev`, run `npm ls @sanity/sdk-react`: it should appear at a single version. If you've linked the plugin (`npm link`, `file:`, a workspace) instead of installing it, add `sanity`, `react`, `react-dom`, `styled-components`, `@sanity/sdk-react` and `@portabletext/editor` to Vite's `resolve.dedupe` in `sanity.cli.ts`.
+
+**A type is missing from the Lobby.** Open the browser console: the room says why it left a type out (not in the schema, or no title or body it could find). Name the field with `fields` if it guessed wrong.
 
 ## Compatibility
 

@@ -34,21 +34,21 @@ export const INSERT_COMMANDS: InsertCommand[] = [
     label: 'Embed',
     icon: PlayIcon,
     keywords: ['video', 'youtube', 'vimeo', 'spotify'],
-    allowed: (a) => a.block('embed'),
+    allowed: (a) => !!a.roomBlock('embed'),
   },
   {
     id: 'codeBlock',
     label: 'Code block',
     icon: CodeBlockIcon,
     keywords: ['code', 'snippet'],
-    allowed: (a) => a.block('codeBlock'),
+    allowed: (a) => !!a.roomBlock('codeBlock'),
   },
   {
     id: 'sectionBreak',
     label: 'Section break',
     icon: AsteriskIcon,
     keywords: ['divider', 'break'],
-    allowed: (a) => a.block('sectionBreak'),
+    allowed: (a) => !!a.roomBlock('sectionBreak'),
   },
   {id: 'quote', label: 'Quote', icon: BlockquoteIcon, keywords: ['blockquote'], allowed: (a) => a.style('blockquote')},
   {id: 'bulletList', label: 'Bulleted list', icon: UlistIcon, keywords: ['list', 'bullet'], allowed: (a) => a.list('bullet')},
@@ -74,17 +74,19 @@ export const PICK_IMAGE_EVENT = 'custom.pick image'
  * The editor events that carry out a command on the current (empty) line. Images are the
  * exception: they need a file first, so they raise {@link PICK_IMAGE_EVENT} instead.
  */
-export function commandEvents(id: InsertCommandId) {
+export function commandEvents(id: InsertCommandId, allows: BodyAllows) {
   switch (id) {
     case 'image':
       return [{type: PICK_IMAGE_EVENT} as const]
     case 'embed':
-      return [{type: 'insert.block', block: {_type: 'embed'}, placement: 'auto', select: 'start'} as const]
+      return [
+        {type: 'insert.block', block: {_type: allows.roomBlock('embed')!}, placement: 'auto', select: 'start'} as const,
+      ]
     case 'codeBlock':
       return [
         {
           type: 'insert.block',
-          block: {_type: 'codeBlock', language: 'text'},
+          block: {_type: allows.roomBlock('codeBlock')!, language: 'text'},
           placement: 'auto',
           select: 'start',
         } as const,
@@ -94,7 +96,7 @@ export function commandEvents(id: InsertCommandId) {
       return [
         {
           type: 'insert.block',
-          block: {_type: 'sectionBreak', kind: 'break'},
+          block: {_type: allows.roomBlock('sectionBreak')!, kind: 'break'},
           placement: 'before',
           select: 'none',
         } as const,

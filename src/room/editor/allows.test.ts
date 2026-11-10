@@ -2,13 +2,17 @@ import {sanitySchemaToPortableTextSchema} from '@portabletext/sanity-bridge'
 import {type ArraySchemaType, createSchema} from 'sanity'
 import {describe, expect, it} from 'vitest'
 import {schemaTypes} from '../../schema'
+import {roomBlockTypes, writingRoomBlocks} from '../../schema/room-blocks'
 import {bodyAllows} from './allows'
-import {matchCommands} from './commands'
+import {commandEvents, matchCommands} from './commands'
 
 const compiled = createSchema({
   name: 'test',
   types: [
     ...schemaTypes,
+    ...roomBlockTypes,
+    // A Studio's own body that opts into the room's blocks, as the README shows.
+    {name: 'optedIn', type: 'array', of: [{type: 'block'}, ...writingRoomBlocks]},
     // Chipter's blockContent: no embeds, code blocks, section breaks or numbered lists.
     {
       name: 'blockContent',
@@ -64,5 +68,24 @@ describe('bodyAllows', () => {
     expect(allows.blockField('image', 'alt')).toBe(false)
     expect(matchCommands('', allows).map((command) => command.id)).toEqual(['image', 'quote', 'bulletList'])
     expect(matchCommands('list', allows).map((command) => command.id)).toEqual(['bulletList'])
+  })
+
+  it('offers the room’s blocks to a body that opts in, under the plugin’s prefixed names', () => {
+    const allows = allowsFor('optedIn')
+    // A plain `{type: 'block'}` also has Sanity's default quote and lists.
+    expect(matchCommands('', allows).map((command) => command.id)).toEqual([
+      'embed',
+      'codeBlock',
+      'sectionBreak',
+      'quote',
+      'bulletList',
+      'numberList',
+    ])
+    expect(commandEvents('embed', allows)[0]).toMatchObject({block: {_type: 'writingRoomEmbed'}})
+    expect(commandEvents('sectionBreak', allows)[0]).toMatchObject({block: {_type: 'writingRoomSectionBreak'}})
+  })
+
+  it('keeps the starter schema’s original names', () => {
+    expect(commandEvents('codeBlock', allowsFor('body'))[0]).toMatchObject({block: {_type: 'codeBlock'}})
   })
 })

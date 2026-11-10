@@ -26,7 +26,7 @@ const slashPicker = (allows: BodyAllows) =>
     onSelect: [
       ({event}) => [
         raise({type: 'delete', at: event.patternSelection}),
-        ...commandEvents(event.match.id).map((commandEvent) => raise(commandEvent)),
+        ...commandEvents(event.match.id, allows).map((commandEvent) => raise(commandEvent)),
       ],
     ],
   })
@@ -78,9 +78,9 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
     (id: InsertCommandId) => {
       setMenuOpen(false)
       editor.send({type: 'focus'})
-      for (const event of commandEvents(id)) editor.send(event)
+      for (const event of commandEvents(id, allows)) editor.send(event)
     },
-    [editor],
+    [editor, allows],
   )
 
   if (!picker.snapshot.matches('idle')) {
