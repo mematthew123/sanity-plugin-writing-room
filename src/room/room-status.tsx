@@ -20,8 +20,9 @@ import {
 } from 'sanity'
 import styled from 'styled-components'
 import {API_VERSION} from '../lib/api-version'
-import {detailsForPublish, type PublishablePost} from '../lib/publish-details'
+import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
+import {addImageLabel, detailsPatch, readPublishable} from './fields'
 import {goToProblem} from './go-to-problem'
 import {useWritingKind} from './kinds'
 import {useOpenDetails} from './navigation'
@@ -128,10 +129,6 @@ export function ThemeToggle() {
   )
 }
 
-interface PostForPublish extends PublishablePost {
-  coverImage?: {asset?: unknown}
-}
-
 const SETTLE_TIMEOUT_MS = 4000
 
 /**
@@ -153,7 +150,7 @@ export function PublishButton({
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
   const apply = useApplyDocumentActions()
-  const {data: post} = useDocument<PostForPublish>(handle)
+  const {data: post} = useDocument<Record<string, unknown>>(handle)
   const isSynced = useDocumentSyncStatus(handle) ?? true
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
   const openDetails = useOpenDetails(handle)
@@ -179,7 +176,7 @@ export function PublishButton({
       return
     }
 
-    const problems = publishProblems(validation.validation as Marker[])
+    const problems = publishProblems(validation.validation as Marker[], kind.fields)
     const [first, ...rest] = problems
     if (first) {
       setPhase('idle')
@@ -191,18 +188,21 @@ export function PublishButton({
     setPhase('publishing')
     void (async () => {
       try {
+        const {fields} = kind
         const details = await detailsForPublish({
-          post: post ?? {},
+          post: readPublishable(post, fields),
           isFirstPublish,
-          isTaken: slugTakenByAnother(client, handle.documentType, handle.documentId),
+          isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
         })
-        const edit = Object.keys(details).length > 0 ? [editDocument(handle, {set: {...details}})] : []
+        const patch = detailsPatch(details, fields)
+        const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
         await apply([...edit, publishDocument(handle)])
         onProblem(null)
+        const image = fields.image ? (post?.[fields.image] as {asset?: unknown} | undefined) : undefined
         onNotice(
-          !kind.hasCoverImage || post?.coverImage?.asset
+          !fields.image || image?.asset
             ? {text: 'Published'}
-            : {text: 'Published', action: {label: 'Add a cover image', onClick: openDetails}},
+            : {text: 'Published', action: {label: addImageLabel(kind.imageTitle), onClick: openDetails}},
         )
       } catch {
         onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)

@@ -2,12 +2,19 @@ import {sanitySchemaToPortableTextSchema} from '@portabletext/sanity-bridge'
 import {useMemo} from 'react'
 import {type ArraySchemaType, useSchema} from 'sanity'
 
-/** The editor's schema, derived from the Studio's `body` type so the two can never drift apart. */
-export function useBodySchema() {
+/**
+ * The editor's schema, derived from the document's own body field, so the room can only write
+ * what that field allows: a Studio's `blockContent` gets its own styles, lists and blocks.
+ */
+export function useBodySchema(documentType: string, bodyField: string) {
   const schema = useSchema()
   return useMemo(() => {
-    const body = schema.get('body')
-    if (!body) throw new Error('The `body` schema type is missing.')
-    return sanitySchemaToPortableTextSchema(body as ArraySchemaType<unknown>)
-  }, [schema])
+    const documentSchema = schema.get(documentType)
+    const field =
+      documentSchema && 'fields' in documentSchema
+        ? documentSchema.fields.find((candidate) => candidate.name === bodyField)
+        : undefined
+    if (!field) throw new Error(`"${documentType}" has no "${bodyField}" field for the Writing Room to write in.`)
+    return sanitySchemaToPortableTextSchema(field.type as ArraySchemaType<unknown>)
+  }, [schema, documentType, bodyField])
 }

@@ -1,4 +1,4 @@
-import {useEditor} from '@portabletext/editor'
+import {type EditorSchema, useEditor} from '@portabletext/editor'
 import {getFocusBlock} from '@portabletext/editor/selectors'
 import {useEditorSelector} from '@portabletext/editor'
 import {BehaviorPlugin, NodePlugin} from '@portabletext/editor/plugins'
@@ -19,6 +19,7 @@ import {
   pasteLinkAsEmbed,
   pickImageBehavior,
 } from './behaviors'
+import {type BodyAllows, bodyAllows} from './allows'
 import {InsertMenu} from './InsertMenu'
 import {LinkPopover} from './LinkPopover'
 import {nodes} from './nodes'
@@ -26,13 +27,25 @@ import {SelectionBubble} from './SelectionBubble'
 
 const inputRules = [codeFenceRule]
 
-/** The body of a Post, synced live with the Content Lake. Must sit inside an `EditorProvider`. */
+/** `value` when the body type allows it, for the markdown shortcuts. */
+function allowed<T>(
+  context: {schema: EditorSchema},
+  test: (allows: BodyAllows) => boolean,
+  value: T,
+): T | undefined {
+  return test(bodyAllows(context.schema)) ? value : undefined
+}
+
+/** The body of a document, synced live with the Content Lake. Must sit inside an `EditorProvider`. */
 export function BodyEditor({
   handle,
+  path,
   scheme,
   onUploadFailed,
 }: {
   handle: DocumentHandle
+  /** The document's portable text field. */
+  path: string
   scheme: string
   onUploadFailed: (message: string) => void
 }) {
@@ -71,16 +84,22 @@ export function BodyEditor({
       {/* Mounted before PasteLinkPlugin so pasted Embed links win over plain links. */}
       <BehaviorPlugin behaviors={behaviors} />
       <InputRulePlugin rules={inputRules} />
+      {/* Each shortcut does nothing when the body type can't store what it makes. */}
       <MarkdownShortcutsPlugin
-        defaultStyle={() => 'normal'}
-        headingStyle={({props}) => (props.level === 2 ? 'h2' : props.level === 3 ? 'h3' : undefined)}
-        blockquoteStyle={() => 'blockquote'}
-        unorderedList={() => 'bullet'}
-        orderedList={() => 'number'}
-        boldDecorator={() => 'strong'}
-        italicDecorator={() => 'em'}
-        horizontalRuleObject={() => ({_type: 'sectionBreak', kind: 'break'})}
-        linkObject={({props}) => ({_type: 'link', href: props.href})}
+        defaultStyle={({context}) => allowed(context, (a) => a.style('normal'), 'normal')}
+        headingStyle={({context, props}) => {
+          const style = props.level === 2 ? 'h2' : props.level === 3 ? 'h3' : undefined
+          return style && allowed(context, (a) => a.style(style), style)
+        }}
+        blockquoteStyle={({context}) => allowed(context, (a) => a.style('blockquote'), 'blockquote')}
+        unorderedList={({context}) => allowed(context, (a) => a.list('bullet'), 'bullet')}
+        orderedList={({context}) => allowed(context, (a) => a.list('number'), 'number')}
+        boldDecorator={({context}) => allowed(context, (a) => a.decorator('strong'), 'strong')}
+        italicDecorator={({context}) => allowed(context, (a) => a.decorator('em'), 'em')}
+        horizontalRuleObject={({context}) =>
+          allowed(context, (a) => a.block('sectionBreak'), {_type: 'sectionBreak', kind: 'break'})
+        }
+        linkObject={({context, props}) => allowed(context, (a) => a.annotation('link'), {_type: 'link', href: props.href})}
       />
       <PasteLinkPlugin />
       {dimming && (
@@ -88,7 +107,7 @@ export function BodyEditor({
       )}
       <Prose
         {...handle}
-        path="body"
+        path={path}
         renderCursor={null}
         spellCheck
         aria-label="Body"

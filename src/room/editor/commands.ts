@@ -6,6 +6,7 @@ import {ImageIcon} from '@sanity/icons/Image'
 import {OlistIcon} from '@sanity/icons/Olist'
 import {PlayIcon} from '@sanity/icons/Play'
 import {UlistIcon} from '@sanity/icons/Ulist'
+import {type BodyAllows} from './allows'
 
 export type InsertCommandId =
   | 'image'
@@ -21,23 +22,45 @@ export interface InsertCommand {
   label: string
   icon: ComponentType
   keywords: string[]
+  /** Whether the body type can store what this command adds. */
+  allowed: (allows: BodyAllows) => boolean
 }
 
-/** Everything in the Insert Menu, in the order the Writer sees it. */
+/** Everything the Insert Menu can offer, in the order the Writer sees it. */
 export const INSERT_COMMANDS: InsertCommand[] = [
-  {id: 'image', label: 'Image', icon: ImageIcon, keywords: ['picture', 'photo']},
-  {id: 'embed', label: 'Embed', icon: PlayIcon, keywords: ['video', 'youtube', 'vimeo', 'spotify']},
-  {id: 'codeBlock', label: 'Code block', icon: CodeBlockIcon, keywords: ['code', 'snippet']},
-  {id: 'sectionBreak', label: 'Section break', icon: AsteriskIcon, keywords: ['divider', 'break']},
-  {id: 'quote', label: 'Quote', icon: BlockquoteIcon, keywords: ['blockquote']},
-  {id: 'bulletList', label: 'Bulleted list', icon: UlistIcon, keywords: ['list', 'bullet']},
-  {id: 'numberList', label: 'Numbered list', icon: OlistIcon, keywords: ['list', 'ordered']},
+  {id: 'image', label: 'Image', icon: ImageIcon, keywords: ['picture', 'photo'], allowed: (a) => a.block('image')},
+  {
+    id: 'embed',
+    label: 'Embed',
+    icon: PlayIcon,
+    keywords: ['video', 'youtube', 'vimeo', 'spotify'],
+    allowed: (a) => a.block('embed'),
+  },
+  {
+    id: 'codeBlock',
+    label: 'Code block',
+    icon: CodeBlockIcon,
+    keywords: ['code', 'snippet'],
+    allowed: (a) => a.block('codeBlock'),
+  },
+  {
+    id: 'sectionBreak',
+    label: 'Section break',
+    icon: AsteriskIcon,
+    keywords: ['divider', 'break'],
+    allowed: (a) => a.block('sectionBreak'),
+  },
+  {id: 'quote', label: 'Quote', icon: BlockquoteIcon, keywords: ['blockquote'], allowed: (a) => a.style('blockquote')},
+  {id: 'bulletList', label: 'Bulleted list', icon: UlistIcon, keywords: ['list', 'bullet'], allowed: (a) => a.list('bullet')},
+  {id: 'numberList', label: 'Numbered list', icon: OlistIcon, keywords: ['list', 'ordered'], allowed: (a) => a.list('number')},
 ]
 
-export function matchCommands(keyword: string): InsertCommand[] {
+/** The commands this body allows that match what the Writer typed after `/` (all of them for none). */
+export function matchCommands(keyword: string, allows: BodyAllows): InsertCommand[] {
   const query = keyword.trim().toLowerCase()
-  if (!query) return INSERT_COMMANDS
-  return INSERT_COMMANDS.filter(
+  const available = INSERT_COMMANDS.filter((command) => command.allowed(allows))
+  if (!query) return available
+  return available.filter(
     (command) =>
       command.label.toLowerCase().includes(query) ||
       command.keywords.some((word) => word.startsWith(query)),

@@ -51,4 +51,15 @@ describe('isEmptyPost', () => {
   ])('is not empty when Details hold %s', (_, details) => {
     expect(isEmptyPost(details)).toBe(false)
   })
+
+  it('ignores a schema’s initial values, like Chipter’s likes and comments switches', () => {
+    expect(isEmptyPost({likesEnabled: true, likeCount: 0, commentsEnabled: true})).toBe(true)
+  })
+
+  it('reads the title and body from the type’s own fields', () => {
+    const fields = {title: 'headline', body: 'content'}
+    expect(isEmptyPost({headline: '', content: [block('')]}, fields)).toBe(true)
+    expect(isEmptyPost({headline: 'Notes'}, fields)).toBe(false)
+    expect(isEmptyPost({content: [block('A')]}, fields)).toBe(false)
+  })
 })

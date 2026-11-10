@@ -255,10 +255,16 @@ const RowMeta = styled.span`
 function PostRow({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
-  const {data} = useDocumentProjection<{title?: string}>({...handle, ref, projection: '{title}'})
+  const ownKind = kinds.find((option) => option.type === handle.documentType)
+  const titleField = ownKind?.fields.title ?? 'title'
+  const {data} = useDocumentProjection<{title?: string}>({
+    ...handle,
+    ref,
+    projection: `{"title": ${titleField}}`,
+  })
   const status = describePostStatus(data?._status)
   // Name the kind only when there's more than one to tell apart.
-  const kind = kinds.length > 1 ? kinds.find((option) => option.type === handle.documentType) : undefined
+  const kind = kinds.length > 1 ? ownKind : undefined
 
   return (
     <div ref={ref}>

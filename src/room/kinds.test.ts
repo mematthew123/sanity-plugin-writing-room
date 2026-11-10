@@ -1,11 +1,29 @@
-import {type SchemaType} from 'sanity'
+import {createSchema, type SchemaType} from 'sanity'
 import {afterEach, describe, expect, it, vi} from 'vitest'
 import {resolveConfig} from '../config'
+import {schemaTypes} from '../schema'
 import {pluralize, resolveKinds} from './kinds'
 
-function schemaType(title: string | undefined, fields: string[] = []): SchemaType {
-  return {title, fields: fields.map((name) => ({name}))} as unknown as SchemaType
-}
+const compiled = createSchema({
+  name: 'test',
+  types: [
+    ...schemaTypes,
+    {
+      name: 'caseStudy',
+      title: 'Case Study',
+      type: 'document',
+      fields: [
+        {name: 'title', type: 'string'},
+        {name: 'body', type: 'body'},
+        {name: 'slug', type: 'slug'},
+      ],
+    },
+    {name: 'newsItem', type: 'document', fields: [{name: 'title', type: 'string'}, {name: 'body', type: 'body'}]},
+    {name: 'tag', type: 'document', fields: [{name: 'title', type: 'string'}]},
+  ],
+})
+const get = (name: string) => compiled.get(name) as SchemaType | undefined
+const POST_FIELDS = {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt', image: 'coverImage'}
 
 describe('pluralize', () => {
   it.each([
@@ -22,35 +40,33 @@ describe('pluralize', () => {
 describe('resolveKinds', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  const schema: Record<string, SchemaType> = {
-    post: schemaType('Post', ['title', 'body', 'coverImage']),
-    caseStudy: schemaType('Case Study', ['title', 'body']),
-    newsItem: schemaType(undefined),
-  }
-  const get = (name: string) => schema[name]
-
-  it('names each type from its schema title, in the order given', () => {
+  it('names each type and finds its fields, in the order given', () => {
     expect(resolveKinds(resolveConfig({types: ['post', 'caseStudy']}).types, get)).toEqual([
-      {type: 'post', singular: 'Post', plural: 'Posts', hasCoverImage: true},
-      {type: 'caseStudy', singular: 'Case Study', plural: 'Case Studies', hasCoverImage: false},
+      {type: 'post', singular: 'Post', plural: 'Posts', fields: POST_FIELDS, imageTitle: 'Cover Image'},
+      {
+        type: 'caseStudy',
+        singular: 'Case Study',
+        plural: 'Case Studies',
+        fields: {title: 'title', body: 'body', slug: 'slug', publishedAt: undefined, image: undefined},
+        imageTitle: undefined,
+      },
     ])
   })
 
   it('prefers the names given in the options', () => {
     const types = resolveConfig({types: [{type: 'newsItem', title: 'News', pluralTitle: 'News'}]}).types
-    expect(resolveKinds(types, get)).toEqual([
-      {type: 'newsItem', singular: 'News', plural: 'News', hasCoverImage: false},
-    ])
+    expect(resolveKinds(types, get)[0]).toMatchObject({singular: 'News', plural: 'News'})
   })
 
   it('falls back to the type name when the schema type has no title', () => {
     expect(resolveKinds([{type: 'newsItem'}], get)[0]?.singular).toBe('News Item')
   })
 
-  it('leaves out a type the schema doesn’t have', () => {
+  it('leaves out a type the schema doesn’t have, or one with no body to write in', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    expect(resolveKinds([{type: 'post'}, {type: 'missing'}], get).map((kind) => kind.type)).toEqual(['post'])
-    expect(warn).toHaveBeenCalledOnce()
+    const kinds = resolveKinds([{type: 'post'}, {type: 'missing'}, {type: 'tag'}], get)
+    expect(kinds.map((kind) => kind.type)).toEqual(['post'])
+    expect(warn).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -39,4 +39,14 @@ describe('publishProblems', () => {
     ])
     expect(problems.map((p) => p.message)).toEqual(['first', 'second'])
   })
+
+  it('finds the title and body under the type’s own field names', () => {
+    const fields = {title: 'headline', body: 'content'}
+    expect(publishProblems([error(['headline'], 'Needs a headline.')], fields)[0]?.target).toEqual({kind: 'title'})
+    expect(publishProblems([error(['content', {_key: 'p1'}], 'Too long.')], fields)[0]?.target).toEqual({
+      kind: 'block',
+      key: 'p1',
+    })
+    expect(publishProblems([error(['body'], 'Unrelated.')], fields)[0]?.target).toEqual({kind: 'details'})
+  })
 })

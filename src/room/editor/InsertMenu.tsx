@@ -4,33 +4,32 @@ import {getFocusTextBlock, isSelectionCollapsed} from '@portabletext/editor/sele
 import {getTextBlockText, isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineTypeaheadPicker, useTypeaheadPicker} from '@portabletext/plugin-typeahead-picker'
 import {AddIcon} from '@sanity/icons/Add'
-import {useCallback, useEffect, useLayoutEffect, useState} from 'react'
+import {useCallback, useEffect, useLayoutEffect, useMemo, useState} from 'react'
 import styled from 'styled-components'
-import {
-  commandEvents,
-  type InsertCommand,
-  INSERT_COMMANDS,
-  type InsertCommandId,
-  matchCommands,
-} from './commands'
+import {type BodyAllows, useBodyAllows} from './allows'
+import {commandEvents, type InsertCommand, type InsertCommandId, matchCommands} from './commands'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 
-/** `/` at the start of an empty line opens the Insert Menu. */
-const slashPicker = defineTypeaheadPicker<InsertCommand & {key: string}>({
-  trigger: /^\//,
-  keyword: /\w*/,
-  guard: ({snapshot}) => {
-    const focus = getFocusTextBlock(snapshot)
-    return !!focus && !focus.node.listItem && getTextBlockText(focus.node) === '/'
-  },
-  getMatches: ({keyword}) => matchCommands(keyword).map((command) => ({...command, key: command.id})),
-  onSelect: [
-    ({event}) => [
-      raise({type: 'delete', at: event.patternSelection}),
-      ...commandEvents(event.match.id).map((commandEvent) => raise(commandEvent)),
+/**
+ * `/` at the start of an empty line opens the Insert Menu. Built per editor, since what it offers
+ * depends on the body type (and the picker's matcher only sees what was typed).
+ */
+const slashPicker = (allows: BodyAllows) =>
+  defineTypeaheadPicker<InsertCommand & {key: string}>({
+    trigger: /^\//,
+    keyword: /\w*/,
+    guard: ({snapshot}) => {
+      const focus = getFocusTextBlock(snapshot)
+      return !!focus && !focus.node.listItem && getTextBlockText(focus.node) === '/'
+    },
+    getMatches: ({keyword}) => matchCommands(keyword, allows).map((command) => ({...command, key: command.id})),
+    onSelect: [
+      ({event}) => [
+        raise({type: 'delete', at: event.patternSelection}),
+        ...commandEvents(event.match.id).map((commandEvent) => raise(commandEvent)),
+      ],
     ],
-  ],
-})
+  })
 
 /** True when the caret sits alone on an empty plain paragraph: the place to insert things. */
 function useOnEmptyLine() {
@@ -55,12 +54,14 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
   const editor = useEditor()
   const onEmptyLine = useOnEmptyLine()
   const selection = useEditorSelector(editor, (snapshot) => snapshot.context.selection)
-  const picker = useTypeaheadPicker(slashPicker)
+  const allows = useBodyAllows()
+  const commands = useMemo(() => matchCommands('', allows), [allows])
+  const picker = useTypeaheadPicker(useMemo(() => slashPicker(allows), [allows]))
   const [lineRect, setLineRect] = useState<DOMRect | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
 
-  const showPlus = editorFocused && onEmptyLine && picker.snapshot.matches('idle')
+  const showPlus = editorFocused && onEmptyLine && commands.length > 0 && picker.snapshot.matches('idle')
 
   const measure = useCallback(() => {
     const block = showPlus || menuOpen ? editor.dom.getStartBlockElement(editor.getSnapshot()) : null
@@ -132,14 +133,14 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
           }}
         >
           <Menu
-            commands={INSERT_COMMANDS}
+            commands={commands}
             activeIndex={activeIndex}
             onHover={setActiveIndex}
-            onChoose={(index) => runCommand(INSERT_COMMANDS[index ?? activeIndex]!.id)}
+            onChoose={(index) => runCommand(commands[index ?? activeIndex]!.id)}
             keyboard={{
-              next: () => setActiveIndex((i) => (i + 1) % INSERT_COMMANDS.length),
+              next: () => setActiveIndex((i) => (i + 1) % commands.length),
               previous: () =>
-                setActiveIndex((i) => (i - 1 + INSERT_COMMANDS.length) % INSERT_COMMANDS.length),
+                setActiveIndex((i) => (i - 1 + commands.length) % commands.length),
             }}
           />
         </Floating>

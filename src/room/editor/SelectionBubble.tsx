@@ -20,6 +20,7 @@ import {
   useState,
 } from 'react'
 import styled from 'styled-components'
+import {useBodyAllows} from './allows'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {normalizeHref} from './link'
 
@@ -38,6 +39,18 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
   const subheading = useEditorSelector(editor, isActiveStyle('h3'))
   const quote = useEditorSelector(editor, isActiveStyle('blockquote'))
   const linked = useEditorSelector(editor, isActiveAnnotation('link', {mode: 'partial'}))
+  // Only what the body type can store: a Studio's blockContent may have no subheadings or links.
+  const allows = useBodyAllows()
+  const can = {
+    bold: allows.decorator('strong'),
+    italic: allows.decorator('em'),
+    link: allows.annotation('link'),
+    heading: allows.style('h2'),
+    subheading: allows.style('h3'),
+    quote: allows.style('blockquote'),
+  }
+  const hasMarks = can.bold || can.italic || can.link
+  const hasStyles = can.heading || can.subheading || can.quote
 
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const [linkDraft, setLinkDraft] = useState<string | null>(null)
@@ -46,7 +59,10 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
   const surface = useRef<HTMLDivElement>(null)
 
   const visible =
-    expanded && !onBlockObject && (editorFocused || toolbarFocused || linkDraft !== null)
+    (hasMarks || hasStyles) &&
+    expanded &&
+    !onBlockObject &&
+    (editorFocused || toolbarFocused || linkDraft !== null)
 
   const measure = useCallback(() => {
     setAnchor(visible ? editor.dom.getSelectionRect(editor.getSnapshot()) : null)
@@ -103,9 +119,13 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
       >
         {linkDraft === null ? (
           <Row>
-            <BubbleButton label="Bold" icon={BoldIcon} active={bold} onPress={() => run({type: 'decorator.toggle', decorator: 'strong'})} />
-            <BubbleButton label="Italic" icon={ItalicIcon} active={italic} onPress={() => run({type: 'decorator.toggle', decorator: 'em'})} />
-            {linked ? (
+            {can.bold && (
+              <BubbleButton label="Bold" icon={BoldIcon} active={bold} onPress={() => run({type: 'decorator.toggle', decorator: 'strong'})} />
+            )}
+            {can.italic && (
+              <BubbleButton label="Italic" icon={ItalicIcon} active={italic} onPress={() => run({type: 'decorator.toggle', decorator: 'em'})} />
+            )}
+            {!can.link ? null : linked ? (
               <BubbleButton label="Remove link" icon={UnlinkIcon} active onPress={() => run({type: 'annotation.remove', annotation: {name: 'link'}})} />
             ) : (
               <BubbleButton
@@ -117,16 +137,22 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
                 }}
               />
             )}
-            <Divider aria-hidden />
-            <BubbleButton label="Heading" active={heading} onPress={() => run({type: 'style.toggle', style: 'h2'})}>
-              Heading
-            </BubbleButton>
-            <BubbleButton label="Subheading" active={subheading} onPress={() => run({type: 'style.toggle', style: 'h3'})}>
-              Subheading
-            </BubbleButton>
-            <BubbleButton label="Quote" active={quote} onPress={() => run({type: 'style.toggle', style: 'blockquote'})}>
-              Quote
-            </BubbleButton>
+            {hasMarks && hasStyles && <Divider aria-hidden />}
+            {can.heading && (
+              <BubbleButton label="Heading" active={heading} onPress={() => run({type: 'style.toggle', style: 'h2'})}>
+                Heading
+              </BubbleButton>
+            )}
+            {can.subheading && (
+              <BubbleButton label="Subheading" active={subheading} onPress={() => run({type: 'style.toggle', style: 'h3'})}>
+                Subheading
+              </BubbleButton>
+            )}
+            {can.quote && (
+              <BubbleButton label="Quote" active={quote} onPress={() => run({type: 'style.toggle', style: 'blockquote'})}>
+                Quote
+              </BubbleButton>
+            )}
           </Row>
         ) : (
           <LinkInput
