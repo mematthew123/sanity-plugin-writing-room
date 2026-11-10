@@ -1,10 +1,10 @@
 # sanity-plugin-writing-room
 
-A calm, full-screen place to write long-form Posts inside Sanity Studio.
+A calm, full-screen place to write long-form content inside Sanity Studio: Posts, articles, case studies, whatever your Studio writes.
 
-Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a Post's title and body, and gets out of the way while you type. Everything else about a Post (slug, excerpt, cover image, tags) stays in the standard form, one click away.
+Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags) stays in the standard form, one click away. It works with the document types you already have.
 
-- **The Lobby**: start a new Post or pick up a recent one.
+- **The Lobby**: start something new or pick up recent work.
 - **Controls that recede**: Leave, Details, Preview, Publish and save state fade after a few keystrokes and return when you pause.
 - **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
 - **An insert menu**: type `+` or `/` on an empty line for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
@@ -12,9 +12,9 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Room settings**: text size, typewriter scrolling and focus dimming, kept per Writer in the browser (no setup).
 - **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
-- **Preview** opens the Post on your site in draft mode, exactly as readers will see it.
+- **Preview** opens the document on your site in draft mode, exactly as readers will see it.
 
-> **Status: pre-release.** This package is being extracted from the [Calm Editor template](https://github.com/mematthew123/calm-editor) and isn't on npm yet. The API below may change before 1.0. See [`docs/plugin-roadmap.md`](../../docs/plugin-roadmap.md).
+> **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](CHANGELOG.md). The plugin comes from the [Calm Editor template](https://github.com/mematthew123/calm-editor), which uses it. See the [roadmap](../../docs/plugin-roadmap.md).
 
 ## Requirements
 
@@ -26,63 +26,47 @@ The plugin runs inside Sanity Studio. It doesn't care what your website is built
 | React | 19.3.1 or newer | Required by `@portabletext/editor` 8. |
 | `styled-components` | 6.1.18 or newer | The room's styling, as in the Studio itself. |
 | Node.js | 22.12 or newer | Required by Sanity Studio v6 to run `sanity dev` and `sanity build`. |
-| Studio auto-updates | **Off** | See [Turn off auto-updates](#3-turn-off-studio-auto-updates). |
+| Studio auto-updates | **Off** | See [Why auto-updates off?](#install). |
 
 **Do I need Next.js?** No. The room only needs a Studio. Next.js matters only if you turn on **Preview**, and even then any site can do it (see [Preview on your site](#preview-on-your-site)).
 
 ## Install
 
-### 1. Add the package
+Three steps, from your Studio's folder.
 
-From your Studio's folder:
+**1. Add the package.**
 
 ```sh
 npm install sanity-plugin-writing-room
 ```
 
-npm (7+) and pnpm install peer dependencies automatically. The plugin shares two of them with Sanity, `@sanity/sdk-react` and `@portabletext/editor`, and needs the *same copy* Sanity uses. That happens by itself when your `sanity` version is in range. To check, run:
-
-```sh
-npm ls @sanity/sdk-react @portabletext/editor
-```
-
-Each package should appear at a single version. Yarn doesn't install peers for you; add `@sanity/sdk-react@^3.12.0` and `@portabletext/editor@^8.2.12` yourself.
-
-### 2. Add the plugin
+**2. Add the plugin, with the document types you write in.**
 
 ```ts
 // sanity.config.ts
-import {defineConfig} from 'sanity'
-import {structureTool} from 'sanity/structure'
 import {writingRoom} from 'sanity-plugin-writing-room'
 
 export default defineConfig({
-  // …projectId, dataset, schema
+  // …
   plugins: [structureTool(), writingRoom({types: ['post']})],
 })
 ```
 
-List the document types you write in: your own `post`, `article`, `caseStudy`… The room finds their title, body, slug and published date by itself (see [Document types](#document-types)), and only offers what each body can store.
-
-No Post type yet? Register the starter one: `schema: {types: writingRoomSchemaTypes}` (see [Schema](#schema)).
-
-### 3. Turn off Studio auto-updates
+**3. Turn off Studio auto-updates.**
 
 ```ts
 // sanity.cli.ts
-import {defineCliConfig} from 'sanity/cli'
-
 export default defineCliConfig({
-  // …api
+  // …
   deployment: {autoUpdates: false},
 })
 ```
 
-The room uses the App SDK (`@sanity/sdk-react`). An auto-updating Studio loads `sanity` from a CDN but bundles its own copy of the SDK, so the two never share a React context and the room crashes with "SanityInstance context not found". This only shows up in a **deployed** Studio, not in `sanity dev`. To upgrade later, bump `sanity` and redeploy.
+That's all. Run `sanity dev`: **Writing Room** appears in the Studio's navigation, and each of those documents gets an **Open in Writing Room** action.
 
-### 4. Open it
+**Which types?** Your own `post`, `article`, `caseStudy`… The room finds each one's title, body, slug and published date by itself (see [Document types](#document-types)) and only offers what its body can store. No Post type yet? Register the starter one: `schema: {types: writingRoomSchemaTypes}` (see [Schema](#schema)).
 
-Run `sanity dev`. **Writing Room** appears in the Studio's navigation, and every Post has an **Open in Writing Room** action.
+**Why auto-updates off?** The room uses Sanity's App SDK (`@sanity/sdk-react`). An auto-updating Studio loads `sanity` from a CDN but bundles its own copy of the SDK, so the two never share a React context and the room can't start. This only shows up in a **deployed** Studio, not in `sanity dev`. To upgrade later, bump `sanity` and deploy again.
 
 ## Look and feel
 
@@ -243,7 +227,9 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 
 ## Troubleshooting
 
-**"The Writing Room can't start in this Studio yet."** The room and the Studio are using different copies of Sanity's App SDK. On a deployed Studio, turn off auto-updates ([step 3](#3-turn-off-studio-auto-updates)) and deploy again. In `sanity dev`, run `npm ls @sanity/sdk-react`: it should appear at a single version. If you've linked the plugin (`npm link`, `file:`, a workspace) instead of installing it, add `sanity`, `react`, `react-dom`, `styled-components`, `@sanity/sdk-react` and `@portabletext/editor` to Vite's `resolve.dedupe` in `sanity.cli.ts`.
+**"The Writing Room can't start in this Studio yet."** The room and the Studio are using different copies of Sanity's App SDK. On a deployed Studio, turn off auto-updates ([Install](#install), step 3) and deploy again. In `sanity dev`, run `npm ls @sanity/sdk-react`: it should appear at a single version. If you've linked the plugin (`npm link`, `file:`, a workspace) instead of installing it, add `sanity`, `react`, `react-dom`, `styled-components`, `@sanity/sdk-react` and `@portabletext/editor` to Vite's `resolve.dedupe` in `sanity.cli.ts`.
+
+**Yarn, or two copies of the SDK.** npm (7+) and pnpm install the plugin's peer dependencies for you, and share `@sanity/sdk-react` and `@portabletext/editor` with Sanity when your `sanity` version is in range. Yarn doesn't install peers: add `@sanity/sdk-react@^3.12.0` and `@portabletext/editor@^8.2.12` yourself. To check, run `npm ls @sanity/sdk-react @portabletext/editor`: each should appear at a single version.
 
 **A type is missing from the Lobby.** Open the browser console: the room says why it left a type out (not in the schema, or no title or body it could find). Name the field with `fields` if it guessed wrong.
 

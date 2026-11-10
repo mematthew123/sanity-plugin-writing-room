@@ -1,7 +1,7 @@
 {
   "name": "sanity-plugin-writing-room",
-  "version": "0.0.0",
-  "description": "A calm, full-screen place to write long-form Posts inside Sanity Studio.",
+  "version": "0.0.1",
+  "description": "A calm, full-screen place to write long-form content inside Sanity Studio.",
   "keywords": [
     "sanity",
     "sanity-plugin",
@@ -10,6 +10,11 @@
     "writing"
   ],
   "license": "MIT",
+  "author": "Matthew R <hello@zephyrpixels.dev> (https://zephyrpixels.dev)",
+  "homepage": "https://github.com/mematthew123/calm-editor/tree/main/packages/writing-room#readme",
+  "bugs": {
+    "url": "https://github.com/mematthew123/calm-editor/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mematthew123/calm-editor.git",
@@ -45,6 +50,7 @@
     "dist",
     "!dist/fonts-*.js.map",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
