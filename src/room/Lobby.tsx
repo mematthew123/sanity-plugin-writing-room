@@ -107,10 +107,19 @@ const StartButton = styled.button`
   font-weight: var(--calm-weight-title);
   text-align: start;
   cursor: pointer;
-  transition: box-shadow var(--calm-motion-gentle) var(--calm-motion-easing);
+  transition:
+    box-shadow var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover {
     box-shadow: inset 0 0 0 1px var(--calm-color-rule);
+  }
+
+  /* 0.98, not 0.97: across the full measure, 0.97 pulls each edge in ~9px. */
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.98);
+    }
   }
 
   &:focus-visible {
@@ -222,10 +231,19 @@ const RowLink = styled(StateLink)`
   border-radius: var(--calm-radius-large);
   color: inherit;
   text-decoration: none;
-  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
+  transition:
+    background-color var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover {
     background: var(--calm-color-surface);
+  }
+
+  /* Barely: any more and the title and meta read as moving text. */
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.99);
+    }
   }
 
   &:focus-visible {

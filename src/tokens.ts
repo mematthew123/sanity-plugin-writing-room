@@ -123,6 +123,8 @@ export const layout = {
 } as const
 
 export const motion = {
+  /** A button giving under a press. Quicker than `gentle`, so the click feels received at once. */
+  press: '150ms',
   /** Small responses: hover, the Selection Bubble appearing. */
   gentle: '200ms',
   /** Room Controls returning or receding. Slow enough to feel unhurried. */

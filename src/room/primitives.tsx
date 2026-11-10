@@ -108,7 +108,8 @@ const QuietButtonRoot = styled.button`
   cursor: pointer;
   transition:
     background-color var(--calm-motion-gentle) var(--calm-motion-easing),
-    color var(--calm-motion-gentle) var(--calm-motion-easing);
+    color var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover,
   &:focus-visible {
@@ -124,6 +125,12 @@ const QuietButtonRoot = styled.button`
   svg {
     flex-shrink: 0;
     font-size: 1.25rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.97);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
