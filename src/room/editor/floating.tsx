@@ -44,6 +44,7 @@ export function Floating({
   return createPortal(
     <Root
       ref={ref}
+      data-calm-floating=""
       data-scheme={scheme}
       style={position ? {top: position.top, left: position.left} : {visibility: 'hidden'}}
       {...props}

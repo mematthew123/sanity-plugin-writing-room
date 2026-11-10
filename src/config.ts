@@ -1,3 +1,4 @@
+import {type Palette, palette} from '@calm/tokens'
 import {createContext, createElement, type ReactNode, useContext} from 'react'
 import {type WritingFields} from './room/fields'
 
@@ -32,6 +33,42 @@ export interface WritingRoomPreviewOptions {
   pathname?: (slug: string, documentType: string) => string
 }
 
+export type WritingRoomScheme = 'light' | 'dark'
+
+/**
+ * The room's colours for one scheme. Change only what you need, e.g. `{accent: '#2F6FA8'}`; keep
+ * text readable against `paper` and `surface` (the defaults meet WCAG AA).
+ */
+export interface WritingRoomColors {
+  /** The page. */
+  paper?: string
+  /** Raised things on the page: the Lobby's Start buttons, hovered rows. */
+  surface?: string
+  /** Hairlines and outlines. */
+  rule?: string
+  /** Text. */
+  ink?: string
+  /** Secondary text: status, hints. */
+  inkMuted?: string
+  /** Ornaments and placeholders. */
+  inkFaint?: string
+  /** Links, focus rings, the Publish button. */
+  accent?: string
+  /** Text on the accent. */
+  onAccent?: string
+  /** Selected text. */
+  selection?: string
+  /** Problems the Writer needs to fix. */
+  caution?: string
+  /** Popovers' shadow (a CSS box-shadow). */
+  floatingShadow?: string
+}
+
+/** Fails to compile if the palette gains or loses a colour that `WritingRoomColors` doesn't. */
+type SameKeys<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never
+const colorsMatchPalette: SameKeys<Required<WritingRoomColors>, Palette> = true
+void colorsMatchPalette
+
 /** Options for `writingRoom()`. Every one is optional. */
 export interface WritingRoomOptions {
   /**
@@ -48,12 +85,18 @@ export interface WritingRoomOptions {
    * will see it, unpublished changes included. Leave it out and Preview is hidden.
    */
   preview?: WritingRoomPreviewOptions
+  /**
+   * The room's colours, over the defaults, per scheme: `{light: {accent: '#2F6FA8'}, dark: {…}}`.
+   * They apply inside the room only, never to the rest of the Studio.
+   */
+  colors?: Partial<Record<WritingRoomScheme, WritingRoomColors>>
 }
 
 /** The options with every default filled in, as the room reads them. */
 export interface WritingRoomConfig {
   /** Never empty. */
   types: WritingRoomTypeOptions[]
+  colors: Record<WritingRoomScheme, Required<WritingRoomColors>>
   preview: Required<WritingRoomPreviewOptions> | null
 }
 
@@ -78,6 +121,10 @@ export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConf
   const {preview} = options
   return {
     types: resolveTypes(options.types),
+    colors: {
+      light: {...palette.light, ...options.colors?.light},
+      dark: {...palette.dark, ...options.colors?.dark},
+    },
     preview: preview
       ? {
           origin: preview.origin,

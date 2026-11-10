@@ -80,23 +80,44 @@ export default defineCliConfig({
 
 The room uses the App SDK (`@sanity/sdk-react`). An auto-updating Studio loads `sanity` from a CDN but bundles its own copy of the SDK, so the two never share a React context and the room crashes with "SanityInstance context not found". This only shows up in a **deployed** Studio, not in `sanity dev`. To upgrade later, bump `sanity` and redeploy.
 
-### 4. Load the fonts (optional)
+### 4. Open it
 
-The room is set in Newsreader (prose) and Figtree (controls), falling back to Georgia and the system UI font. To get the intended look:
+Run `sanity dev`. **Writing Room** appears in the Studio's navigation, and every Post has an **Open in Writing Room** action.
+
+## Look and feel
+
+The room brings its own look, and none of it reaches the rest of your Studio:
+
+- **Fonts.** Newsreader (prose, with a true italic) and Figtree (controls) come with the plugin, Latin and Latin Extended, and load the first time the room opens. Nothing to install. Other scripts fall back to Georgia and the system UI font.
+- **Colours.** The room's paper, warm neutrals and clay accent apply inside the room only. To change them, pass the ones you want per scheme; the rest keep their defaults:
+
+  ```ts
+  writingRoom({
+    types: ['post'],
+    colors: {light: {accent: '#2F6FA8'}, dark: {accent: '#8DB8E0'}},
+  })
+  ```
+
+  The colours are `paper`, `surface`, `rule`, `ink`, `inkMuted`, `inkFaint`, `accent`, `onAccent`, `selection`, `caution` and `floatingShadow`. Keep text readable against `paper` and `surface`; the defaults meet WCAG AA.
+
+### A matching Studio theme (optional)
+
+To give the rest of the Studio the room's colours and Figtree, so moving in and out of the room isn't a jolt, use the theme. It needs `@sanity/themer`:
 
 ```sh
-npm install @fontsource-variable/newsreader @fontsource-variable/figtree
+npm install @sanity/themer
 ```
 
 ```ts
-// top of sanity.config.ts
-import '@fontsource-variable/newsreader'
-import '@fontsource-variable/figtree'
+import {writingRoomTheme} from 'sanity-plugin-writing-room/theme'
+
+export default defineConfig({
+  // …
+  theme: writingRoomTheme,
+})
 ```
 
-### 5. Open it
-
-Run `sanity dev`. **Writing Room** appears in the Studio's navigation, and every Post has an **Open in Writing Room** action.
+If you changed the room's colours, build the theme from the same ones: `theme: createWritingRoomTheme({colors})`.
 
 ## What the plugin adds
 

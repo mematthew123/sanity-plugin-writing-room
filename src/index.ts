@@ -1,5 +1,11 @@
 export {writingRoom} from './plugin'
-export type {WritingRoomOptions, WritingRoomPreviewOptions, WritingRoomTypeOptions} from './config'
+export type {
+  WritingRoomColors,
+  WritingRoomScheme,
+  WritingRoomOptions,
+  WritingRoomPreviewOptions,
+  WritingRoomTypeOptions,
+} from './config'
 
 export {schemaTypes as writingRoomSchemaTypes} from './schema'
 export {writingRoomBlocks} from './schema/room-blocks'
