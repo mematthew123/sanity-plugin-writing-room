@@ -3,6 +3,7 @@ import {definePlugin} from 'sanity'
 import {route} from 'sanity/router'
 import {withPostDetailsOnPublish} from './actions/publish-post'
 import {resolveConfig, type WritingRoomOptions} from './config'
+import {roomBlockTypes} from './schema/room-blocks'
 import {TOOL_NAME, WRITE_INTENT} from './room/constants'
 import {OpenInWritingRoomAction} from './room/OpenInWritingRoomAction'
 import {RoomAwareNavbar} from './room/RoomAwareNavbar'
@@ -28,6 +29,8 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
 
   return {
     name: 'sanity-plugin-writing-room',
+    // Only the room's own prefixed blocks; it never registers a Studio's names (post, body).
+    schema: {types: roomBlockTypes},
     tools: [
       {
         name: TOOL_NAME,

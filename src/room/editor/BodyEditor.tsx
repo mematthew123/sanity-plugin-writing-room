@@ -22,10 +22,17 @@ import {
 import {type BodyAllows, bodyAllows} from './allows'
 import {InsertMenu} from './InsertMenu'
 import {LinkPopover} from './LinkPopover'
-import {nodes} from './nodes'
+import {bodyNodes} from './nodes'
+import {RoomDocumentContext} from './room-document'
 import {SelectionBubble} from './SelectionBubble'
 
 const inputRules = [codeFenceRule]
+
+/** `---` makes a section break, under whichever name this body has it. */
+function sectionBreakFor(context: {schema: EditorSchema}) {
+  const type = bodyAllows(context.schema).roomBlock('sectionBreak')
+  return type ? {_type: type, kind: 'break'} : undefined
+}
 
 /** `value` when the body type allows it, for the markdown shortcuts. */
 function allowed<T>(
@@ -67,6 +74,9 @@ export function BodyEditor({
   const focusKey = useEditorSelector(editor, (snapshot) => getFocusBlock(snapshot)?.node._key)
   const dimming = settings.focusDimming && focused && focusKey
 
+  const schema = useEditorSelector(editor, (snapshot) => snapshot.context.schema)
+  const nodes = useMemo(() => bodyNodes(schema), [schema])
+  const roomDocument = useMemo(() => ({handle, bodyField: path}), [handle, path])
   const pickImage = useCallback(() => fileInput.current?.click(), [])
   const behaviors = useMemo(
     () => [
@@ -79,7 +89,7 @@ export function BodyEditor({
   )
 
   return (
-    <>
+    <RoomDocumentContext.Provider value={roomDocument}>
       <NodePlugin nodes={nodes} />
       {/* Mounted before PasteLinkPlugin so pasted Embed links win over plain links. */}
       <BehaviorPlugin behaviors={behaviors} />
@@ -97,7 +107,7 @@ export function BodyEditor({
         boldDecorator={({context}) => allowed(context, (a) => a.decorator('strong'), 'strong')}
         italicDecorator={({context}) => allowed(context, (a) => a.decorator('em'), 'em')}
         horizontalRuleObject={({context}) =>
-          allowed(context, (a) => a.block('sectionBreak'), {_type: 'sectionBreak', kind: 'break'})
+          sectionBreakFor(context)
         }
         linkObject={({context, props}) => allowed(context, (a) => a.annotation('link'), {_type: 'link', href: props.href})}
       />
@@ -128,7 +138,7 @@ export function BodyEditor({
           if (files.length > 0) upload(files)
         }}
       />
-    </>
+    </RoomDocumentContext.Provider>
   )
 }
 

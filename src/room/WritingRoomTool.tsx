@@ -6,6 +6,7 @@ import {type WritingRoomConfig, WritingRoomConfigProvider} from '../config'
 import {Lobby} from './Lobby'
 import {Surface} from './primitives'
 import {Room} from './Room'
+import {SetupProblemBoundary} from './SetupProblem'
 import {openedDocument} from './room-route'
 
 /**
@@ -30,13 +31,15 @@ export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
         {TOKENS_CSS}
       </style>
       <Surface data-scheme={scheme} data-calm-surface="">
-        <Suspense fallback={null}>
-          {opened ? (
-            <Room key={opened.documentId} documentId={opened.documentId} documentType={opened.documentType} />
-          ) : (
-            <Lobby />
-          )}
-        </Suspense>
+        <SetupProblemBoundary>
+          <Suspense fallback={null}>
+            {opened ? (
+              <Room key={opened.documentId} documentId={opened.documentId} documentType={opened.documentType} />
+            ) : (
+              <Lobby />
+            )}
+          </Suspense>
+        </SetupProblemBoundary>
       </Surface>
     </WritingRoomConfigProvider>
   )

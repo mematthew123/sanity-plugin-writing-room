@@ -21,16 +21,17 @@ export const exitStyleOnEmptyEnter = defineBehavior({
 export const pasteLinkAsEmbed = defineBehavior({
   on: 'clipboard.paste',
   guard: ({snapshot, event}) => {
-    if (!bodyAllows(snapshot.context.schema).block('embed')) return false
+    const embedType = bodyAllows(snapshot.context.schema).roomBlock('embed')
+    if (!embedType) return false
     const text = event.originEvent.dataTransfer.getData('text/plain').trim()
     if (!text || !parseEmbedUrl(text) || !isSelectionCollapsed(snapshot)) return false
     const focus = getFocusTextBlock(snapshot)
     if (!focus || focus.node.listItem || !isEmptyTextBlock(snapshot.context, focus.node)) return false
-    return {url: text}
+    return {url: text, embedType}
   },
   actions: [
-    (_, {url}) => [
-      raise({type: 'insert.block', block: {_type: 'embed', url}, placement: 'auto', select: 'end'}),
+    (_, {url, embedType}) => [
+      raise({type: 'insert.block', block: {_type: embedType, url}, placement: 'auto', select: 'end'}),
     ],
   ],
 })
@@ -78,16 +79,17 @@ export function pickImageBehavior(pickImage: () => void) {
 export const codeFenceRule = defineInputRule({
   on: /^```$/,
   guard: ({snapshot, event}) => {
-    if (!bodyAllows(snapshot.context.schema).block('codeBlock')) return false
+    const codeType = bodyAllows(snapshot.context.schema).roomBlock('codeBlock')
+    if (!codeType) return false
     const match = event.matches.at(0)
-    return match ? {match} : false
+    return match ? {match, codeType} : false
   },
   actions: [
-    (_, {match}) => [
+    (_, {match, codeType}) => [
       raise({type: 'delete', at: match.targetOffsets}),
       raise({
         type: 'insert.block',
-        block: {_type: 'codeBlock', language: 'text'},
+        block: {_type: codeType, language: 'text'},
         placement: 'auto',
         select: 'start',
       }),

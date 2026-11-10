@@ -9,10 +9,10 @@ import {
 } from '@sanity/sdk-react'
 import {Suspense, useRef, useState} from 'react'
 import {useCurrentUser} from 'sanity'
-import {StateLink, useRouter} from 'sanity/router'
+import {StateLink, useIntentLink, useRouter} from 'sanity/router'
 import styled from 'styled-components'
 import {useWritingKinds, useWritingTypes, type WritingKind} from './kinds'
-import {useAllOfTypePath, useLeaveToStudio} from './navigation'
+import {useLeaveToStudio} from './navigation'
 import {describePostStatus, timeAgo} from './post-status'
 import {Column, Placeholder, QuietButton, RoomControls, SectionLabel} from './primitives'
 import {roomState} from './room-route'
@@ -58,7 +58,9 @@ export function Lobby() {
             </Recent>
             <AllLinks>
               {kinds.map((kind) => (
-                <AllOfTypeLink key={kind.type} kind={kind} />
+                <Suspense key={kind.type} fallback={null}>
+                  <AllOfTypeLink kind={kind} />
+                </Suspense>
               ))}
             </AllLinks>
           </>
@@ -305,18 +307,26 @@ const AllOfType = styled.a`
   }
 `
 
+/**
+ * "All Posts": opens the most recently edited one in Structure, which lays out its list wherever
+ * the Studio keeps it (top level, or nested under Blog). Going through the `edit` intent means the
+ * room never has to know a Studio's Structure. Hidden until there's something to list.
+ */
 function AllOfTypeLink({kind}: {kind: WritingKind}) {
-  const {navigateUrl} = useRouter()
-  const path = useAllOfTypePath(kind.type)
+  const {data} = useDocuments({
+    documentType: kind.type,
+    batchSize: 1,
+    orderings: [{field: '_updatedAt', direction: 'desc'}],
+  })
+  const latest = data[0]
+  if (!latest) return null
+  return <AllOfTypeIntent kind={kind} documentId={latest.documentId} />
+}
+
+function AllOfTypeIntent({kind, documentId}: {kind: WritingKind; documentId: string}) {
+  const {href, onClick} = useIntentLink({intent: 'edit', params: {id: documentId, type: kind.type}})
   return (
-    <AllOfType
-      href={path}
-      onClick={(event) => {
-        if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-        event.preventDefault()
-        navigateUrl({path})
-      }}
-    >
+    <AllOfType href={href} onClick={onClick}>
       All {kind.plural}
       <ArrowRightIcon aria-hidden />
     </AllOfType>

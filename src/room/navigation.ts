@@ -15,11 +15,6 @@ export function useLeaveToStudio() {
   return useCallback(() => navigateUrl({path: studioPath('structure')}), [navigateUrl, studioPath])
 }
 
-/** The full list of one type (all Posts, all Case Studies), in Structure. */
-export function useAllOfTypePath(documentType: string) {
-  return useStudioPath()(`structure/${documentType}`)
-}
-
 /** Opens a document's Details (the standard form) in Structure. */
 export function useOpenDetails({documentId, documentType}: DocumentHandle) {
   const {navigateIntent} = useRouter()
