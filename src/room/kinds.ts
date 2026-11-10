@@ -1,6 +1,7 @@
 import {useMemo} from 'react'
 import {type SchemaType, useSchema} from 'sanity'
 import {useWritingRoomConfig, type WritingRoomTypeOptions} from '../config'
+import {detectFields, type WritingFields} from './fields'
 
 /** One kind of writing the room does, named the way the Writer sees it. */
 export interface WritingKind {
@@ -9,8 +10,21 @@ export interface WritingKind {
   singular: string
   /** "Posts", "Case Studies". */
   plural: string
-  /** Whether the type has a `coverImage`, so the room can suggest adding one after a publish. */
-  hasCoverImage: boolean
+  /** Where the room reads and writes in this type. */
+  fields: WritingFields
+  /** The image field's title ("Cover Image", "Main image"), for the nudge after a publish. */
+  imageTitle?: string
+}
+
+const FALLBACK_FIELDS: WritingFields = {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt'}
+
+const warned = new Set<string>()
+
+/** Warns once per message, since kinds are resolved on every render and every document action. */
+function warnOnce(message: string) {
+  if (warned.has(message)) return
+  warned.add(message)
+  console.warn(`[sanity-plugin-writing-room] ${message}`)
 }
 
 /** "Post" → "Posts", "Case Study" → "Case Studies", "Box" → "Boxes". Set `pluralTitle` for the rest. */
@@ -27,8 +41,9 @@ function titleFromName(name: string): string {
 }
 
 /**
- * Names each configured type, from the options first and the schema second. Types missing from
- * the schema are left out (with a warning), since the room can't create or validate them.
+ * Names each configured type and finds its fields, from the options first and the schema second.
+ * Types the room can't write (missing from the schema, or with no title or body) are left out,
+ * with a warning.
  */
 export function resolveKinds(
   types: WritingRoomTypeOptions[],
@@ -37,19 +52,21 @@ export function resolveKinds(
   return types.flatMap((option) => {
     const schemaType = getSchemaType(option.type)
     if (!schemaType) {
-      console.warn(
-        `[sanity-plugin-writing-room] "${option.type}" is in \`types\` but not in the Studio's schema, so the room leaves it out.`,
-      )
+      warnOnce(`"${option.type}" is in \`types\` but not in the Studio's schema, so the room leaves it out.`)
+      return []
+    }
+    const detected = detectFields(schemaType, option.fields)
+    if ('problem' in detected) {
+      warnOnce(`${detected.problem} The room leaves it out.`)
       return []
     }
     const singular = option.title ?? schemaType.title ?? titleFromName(option.type)
-    const fields = 'fields' in schemaType ? schemaType.fields : []
     return [
       {
         type: option.type,
         singular,
         plural: option.pluralTitle ?? pluralize(singular),
-        hasCoverImage: fields.some((field) => field.name === 'coverImage'),
+        ...detected,
       },
     ]
   })
@@ -70,7 +87,7 @@ export function useWritingKind(documentType: string): WritingKind {
       type: documentType,
       singular: titleFromName(documentType),
       plural: pluralize(titleFromName(documentType)),
-      hasCoverImage: false,
+      fields: FALLBACK_FIELDS,
     }
   )
 }

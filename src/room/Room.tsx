@@ -14,7 +14,9 @@ import {useRouter} from 'sanity/router'
 import styled from 'styled-components'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
+import {useWritingKind} from './kinds'
 import {isEmptyPost} from './empty-post'
+import {type WritingFields} from './fields'
 import {useOpenDetails} from './navigation'
 import {FullscreenToggle, RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
@@ -77,10 +79,11 @@ function LoadedRoom({
   onProblem: (problem: string | null) => void
 }) {
   const scheme = useColorSchemeValue()
-  const schemaDefinition = useBodySchema()
+  const {fields} = useWritingKind(handle.documentType)
+  const schemaDefinition = useBodySchema(handle.documentType, fields.body)
   const {data} = useDocumentProjection<{_id: string; slug?: string}>({
     ...handle,
-    projection: '{_id, "slug": slug.current}',
+    projection: fields.slug ? `{_id, "slug": ${fields.slug}.current}` : '{_id}',
   })
   const status = describePostStatus(data?._status)
   const isPublished = status.label !== 'Draft'
@@ -148,19 +151,28 @@ function LoadedRoom({
         }
       />
       <Page as="article" ref={page} $textSize={settings.textSize}>
-        <Title handle={handle} isPublished={isPublished} />
-        <BodyEditor handle={handle} scheme={scheme} onUploadFailed={onProblem} />
+        <Title handle={handle} fields={fields} isPublished={isPublished} />
+        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
       </Page>
     </EditorProvider>
   )
 }
 
 /** Enter in the title carries the Writer into the body. */
-function Title({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
+function Title({
+  handle,
+  fields,
+  isPublished,
+}: {
+  handle: DocumentHandle
+  fields: WritingFields
+  isPublished: boolean
+}) {
   const editor = useEditor()
   return (
     <TitleField
       handle={handle}
+      fields={fields}
       isPublished={isPublished}
       onEnter={() => editor.send({type: 'focus'})}
     />
@@ -175,12 +187,13 @@ function Title({handle, isPublished}: {handle: DocumentHandle; isPublished: bool
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
+  const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post)) void apply(discardDocument(handle))
+    if (!isPublished && isEmptyPost(post, fields)) void apply(discardDocument(handle))
     router.navigate({})
-  }, [apply, handle, isPublished, post, router])
+  }, [apply, handle, isPublished, post, fields, router])
   useEscape(leave)
 
   return (

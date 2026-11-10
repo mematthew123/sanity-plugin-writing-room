@@ -2,27 +2,27 @@ import {type DocumentHandle, useDocument, useEditDocument} from '@sanity/sdk-rea
 import {type KeyboardEvent, useLayoutEffect, useRef} from 'react'
 import styled from 'styled-components'
 import {followingSlug} from '../lib/slug'
+import {type WritingFields} from './fields'
 
-interface PostFields {
-  title?: string
-  slug?: {_type: 'slug'; current?: string}
-}
+type Slug = {_type: 'slug'; current?: string}
 
 /**
- * The Post's title: one line of Newsreader that wraps but never breaks. Enter moves into the body.
- * Until the first publish, the slug follows the title (unless the Writer set it by hand).
+ * The document's title: one line of Newsreader that wraps but never breaks. Enter moves into the
+ * body. Until the first publish, the slug follows the title (unless the Writer set it by hand).
  */
 export function TitleField({
   handle,
+  fields,
   isPublished,
   onEnter,
 }: {
   handle: DocumentHandle
+  fields: WritingFields
   isPublished: boolean
   onEnter: () => void
 }) {
-  const {data: title} = useDocument<string>({...handle, path: 'title'})
-  const editPost = useEditDocument<PostFields>(handle)
+  const {data: title} = useDocument<string>({...handle, path: fields.title})
+  const editPost = useEditDocument<Record<string, unknown>>(handle)
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useLayoutEffect(() => {
@@ -36,18 +36,20 @@ export function TitleField({
     const nextTitle = raw.replace(/\s*\n\s*/g, ' ')
     editPost((current) => {
       const post = current ?? {}
-      const nextSlug = isPublished
-        ? undefined
-        : followingSlug({
-            previousTitle: post.title ?? '',
-            nextTitle,
-            currentSlug: post.slug?.current,
-          })
-      if (nextSlug === undefined) return {...post, title: nextTitle}
+      const previousTitle = typeof post[fields.title] === 'string' ? (post[fields.title] as string) : ''
+      const nextSlug =
+        isPublished || !fields.slug
+          ? undefined
+          : followingSlug({
+              previousTitle,
+              nextTitle,
+              currentSlug: (post[fields.slug] as Slug | undefined)?.current,
+            })
+      if (nextSlug === undefined || !fields.slug) return {...post, [fields.title]: nextTitle}
       return {
         ...post,
-        title: nextTitle,
-        slug: nextSlug ? {_type: 'slug', current: nextSlug} : undefined,
+        [fields.title]: nextTitle,
+        [fields.slug]: nextSlug ? {_type: 'slug', current: nextSlug} : undefined,
       }
     })
   }

@@ -48,22 +48,23 @@ npm ls @sanity/sdk-react @portabletext/editor
 
 Each package should appear at a single version. Yarn doesn't install peers for you; add `@sanity/sdk-react@^3.12.0` and `@portabletext/editor@^8.2.12` yourself.
 
-### 2. Add the plugin and schema
+### 2. Add the plugin
 
 ```ts
 // sanity.config.ts
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
-import {writingRoom, writingRoomSchemaTypes} from 'sanity-plugin-writing-room'
+import {writingRoom} from 'sanity-plugin-writing-room'
 
 export default defineConfig({
-  // …projectId, dataset
-  plugins: [structureTool(), writingRoom()],
-  schema: {types: writingRoomSchemaTypes},
+  // …projectId, dataset, schema
+  plugins: [structureTool(), writingRoom({types: ['post']})],
 })
 ```
 
-If your Studio already has types, spread them together: `types: [...yourTypes, ...writingRoomSchemaTypes]`. Sanity refuses to start if two types share a name. If you already have a `post` or `body`, see [Schema](#schema).
+List the document types you write in: your own `post`, `article`, `caseStudy`… The room finds their title, body, slug and published date by itself (see [Document types](#document-types)), and only offers what each body can store.
+
+No Post type yet? Register the starter one: `schema: {types: writingRoomSchemaTypes}` (see [Schema](#schema)).
 
 ### 3. Turn off Studio auto-updates
 
@@ -113,7 +114,27 @@ writingRoom({
 })
 ```
 
-Each type needs the fields the room reads and writes: `title`, `body` (the `body` type), `slug` and `publishedAt`. Anything else (excerpt, cover image, a client name…) stays in the standard form under **Details**.
+### Fields
+
+The room reads each type's schema to find what it writes:
+
+| | It looks for | If there's none |
+|---|---|---|
+| Title | `title`, else the field the type's preview shows as its title, else the first string field | The type is left out |
+| Body | `body`, else `content`, else the first portable text field | The type is left out |
+| Slug | `slug`, else the first slug field | No slug is settled on publish |
+| Published date | `publishedAt`, else the first date field whose name contains "publish" | No date is stamped on publish |
+| Cover image | `coverImage`, else `mainImage`, else the first image field | No "Add a cover image" nudge after a publish |
+
+If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content', title: 'headline'}}`. Anything else (excerpt, tags, a client name…) stays in the standard form under **Details**.
+
+### The body
+
+The editor is built from the body field's own type, so the room only offers what that type can store. A `blockContent` with headings, quotes, bullets, links and images gets exactly those: no code blocks, embeds or numbered lists in the Insert Menu, selection bubble or markdown shortcuts. Image description and caption inputs appear only when your image type has `alt` and `caption` fields.
+
+The room's extra blocks (embeds, code blocks, section breaks) come with `writingRoomSchemaTypes`. Add `embed`, `codeBlock` or `sectionBreak` to your body type's `of` to offer them.
+
+### Labels and URLs
 
 The Lobby gets a **Start a new …** button and an **All …** link for each type, and Recent lists them together. The room names each type with its schema `title` ("Case Study", "Case Studies"). If the plural comes out wrong, set it yourself:
 
@@ -125,21 +146,22 @@ writingRoom({
 
 | Option | Default | What it does |
 |---|---|---|
-| `types` | `['post']` | The document types the room writes, as names or `{type, title?, pluralTitle?}`. |
+| `types` | `['post']` | The document types the room writes, as names or `{type, title?, pluralTitle?, fields?}`. |
 | `types[].title` | the schema type's `title` | What one is called: "Start a new Case Study". |
 | `types[].pluralTitle` | `title` made plural | What several are called: "All Case Studies". |
+| `types[].fields` | detected | `{title?, body?, slug?, publishedAt?, image?}`: field names, when the room guesses wrong. |
 
 The first type is the default: its documents open at `/writing-room/<id>`, the others at `/writing-room/<type>/<id>`. A Studio with one type keeps short URLs, and links to it keep working if you add more types later, as long as it stays first.
 
-If a type in `types` isn't in your schema, the room leaves it out and warns in the browser console. Slugs are unique within a type, so a Post and a Case Study can both be `hello-world`.
+If a type in `types` isn't in your schema, or has no title or body the room can find, the room leaves it out and says why in the browser console. Slugs are unique within a type, so a Post and a Case Study can both be `hello-world`.
 
 ## Schema
 
-By default the room writes `post` documents whose `body` is the `body` type (see [Document types](#document-types) for others). `writingRoomSchemaTypes` holds both, plus the block types the room knows how to render (`embed`, `codeBlock`, `sectionBreak`). Each is also exported on its own (`post`, `body`, `embed`, `codeBlock`, `sectionBreak`) if you'd rather compose them.
+You don't need the plugin's schema if you already have a type to write in: the room works with yours. `writingRoomSchemaTypes` is a starter for Studios that don't: a `post` with a `body` that has everything the room can do (images with descriptions and captions, embeds, code blocks, section breaks). Each is also exported on its own (`post`, `body`, `embed`, `codeBlock`, `sectionBreak`) if you'd rather compose them.
 
 The plugin doesn't register these types for you, on purpose. `post` and `body` are common names, and a clash would stop your Studio from starting, so you add them where you can see them.
 
-The room reads and writes `title`, `body`, `slug` and `publishedAt`. Only Prose (title, body, and alt text on body images) should *block* a publish, because the Writer can't fix anything else from inside the room.
+Only Prose (title, body, and alt text on body images) should *block* a publish, because the Writer can't fix anything else from inside the room. Publishing from the room is a real publish: webhooks and Functions that listen for it run as usual.
 
 ## Preview on your site
 

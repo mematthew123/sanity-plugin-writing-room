@@ -3,6 +3,7 @@ import {getFocusTextBlock, isSelectionCollapsed} from '@portabletext/editor/sele
 import {isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineInputRule} from '@portabletext/plugin-input-rule'
 import {parseEmbedUrl} from '@calm/content'
+import {bodyAllows} from './allows'
 import {PICK_IMAGE_EVENT} from './commands'
 
 /** Enter on an empty heading or quote returns to a plain paragraph rather than repeating the style. */
@@ -20,6 +21,7 @@ export const exitStyleOnEmptyEnter = defineBehavior({
 export const pasteLinkAsEmbed = defineBehavior({
   on: 'clipboard.paste',
   guard: ({snapshot, event}) => {
+    if (!bodyAllows(snapshot.context.schema).block('embed')) return false
     const text = event.originEvent.dataTransfer.getData('text/plain').trim()
     if (!text || !parseEmbedUrl(text) || !isSelectionCollapsed(snapshot)) return false
     const focus = getFocusTextBlock(snapshot)
@@ -37,12 +39,13 @@ function imageFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.files).filter((file) => file.type.startsWith('image/'))
 }
 
-/** Pasted or dropped image files are uploaded and placed in the body. */
+/** Pasted or dropped image files are uploaded and placed in the body, when it takes images. */
 export function imageFileBehaviors(upload: (files: File[]) => void) {
   return [
     defineBehavior({
       on: 'clipboard.paste',
-      guard: ({event}) => {
+      guard: ({snapshot, event}) => {
+        if (!bodyAllows(snapshot.context.schema).block('image')) return false
         const files = imageFiles(event.originEvent.dataTransfer)
         return files.length > 0 ? {files} : false
       },
@@ -50,7 +53,8 @@ export function imageFileBehaviors(upload: (files: File[]) => void) {
     }),
     defineBehavior({
       on: 'drag.drop',
-      guard: ({event}) => {
+      guard: ({snapshot, event}) => {
+        if (!bodyAllows(snapshot.context.schema).block('image')) return false
         const files = imageFiles(event.originEvent.dataTransfer)
         return files.length > 0 ? {files} : false
       },
@@ -70,10 +74,11 @@ export function pickImageBehavior(pickImage: () => void) {
   })
 }
 
-/** Typing three backticks on an empty line starts a Code Block. */
+/** Typing three backticks on an empty line starts a Code Block, when the body takes them. */
 export const codeFenceRule = defineInputRule({
   on: /^```$/,
-  guard: ({event}) => {
+  guard: ({snapshot, event}) => {
+    if (!bodyAllows(snapshot.context.schema).block('codeBlock')) return false
     const match = event.matches.at(0)
     return match ? {match} : false
   },

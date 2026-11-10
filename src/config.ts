@@ -1,4 +1,5 @@
 import {createContext, createElement, type ReactNode, useContext} from 'react'
+import {type WritingFields} from './room/fields'
 
 /** A document type the room writes, with what the room calls it. */
 export interface WritingRoomTypeOptions {
@@ -8,6 +9,11 @@ export interface WritingRoomTypeOptions {
   title?: string
   /** What several are called ("All Case Studies"). Defaults to `title` made plural. */
   pluralTitle?: string
+  /**
+   * Which fields the room uses, when it can't tell from the schema. Usually unnecessary: it finds
+   * `title`, the portable text body, `slug`, `publishedAt` and the cover image by itself.
+   */
+  fields?: Partial<WritingFields>
 }
 
 /** How the room's Preview opens a document on your site, in draft mode. */
@@ -29,8 +35,9 @@ export interface WritingRoomPreviewOptions {
 /** Options for `writingRoom()`. Every one is optional. */
 export interface WritingRoomOptions {
   /**
-   * The document types the room writes, e.g. `['post', 'caseStudy']`. Each needs the fields the
-   * room reads and writes: `title`, `body` (the `body` type), `slug` and `publishedAt`.
+   * The document types the room writes, e.g. `['post', 'caseStudy']`. The room finds each type's
+   * title, portable text body, slug, published date and cover image in its schema; a type needs
+   * at least a title and a body.
    *
    * The first is the default: its documents open at `/writing-room/<id>`, the others at
    * `/writing-room/<type>/<id>`. Defaults to `['post']`.

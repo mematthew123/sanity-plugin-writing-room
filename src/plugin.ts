@@ -6,6 +6,7 @@ import {resolveConfig, type WritingRoomOptions} from './config'
 import {TOOL_NAME, WRITE_INTENT} from './room/constants'
 import {OpenInWritingRoomAction} from './room/OpenInWritingRoomAction'
 import {RoomAwareNavbar} from './room/RoomAwareNavbar'
+import {resolveKinds} from './room/kinds'
 import {ROOM_ROUTES, roomState} from './room/room-route'
 import {WritingRoomTool} from './room/WritingRoomTool'
 
@@ -49,15 +50,21 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
       },
     },
     document: {
-      actions: (prev, context) =>
-        isWritingType(context.schemaType)
-          ? [
-              ...prev.map((action) =>
-                action.action === 'publish' ? withPostDetailsOnPublish(action, context) : action,
-              ),
-              OpenInWritingRoomAction,
-            ]
-          : prev,
+      actions: (prev, context) => {
+        if (!isWritingType(context.schemaType)) return prev
+        // Only types the room can write (a title and a body it can find) get the room's actions.
+        const [kind] = resolveKinds(
+          config.types.filter((option) => option.type === context.schemaType),
+          (name) => context.schema.get(name),
+        )
+        if (!kind) return prev
+        return [
+          ...prev.map((action) =>
+            action.action === 'publish' ? withPostDetailsOnPublish(action, context, kind.fields) : action,
+          ),
+          OpenInWritingRoomAction,
+        ]
+      },
     },
   }
 })

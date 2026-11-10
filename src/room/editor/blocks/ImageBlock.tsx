@@ -2,6 +2,7 @@ import {type BlockObjectRenderProps} from '@portabletext/editor'
 import {useDataset, useProjectId} from 'sanity'
 import styled, {keyframes} from 'styled-components'
 import {imageUrl} from '../../../lib/image-url'
+import {useBodyAllows} from '../allows'
 import {useBlockField} from '../use-block-field'
 import {BlockFrame, Controls, FieldInput} from './frame'
 
@@ -14,6 +15,10 @@ export function ImageBlock({attributes, children, node, selected}: BlockObjectRe
   const src = imageUrl(ref, {projectId, dataset}, {width: ROOM_IMAGE_WIDTH})
   const alt = useBlockField(node._key, 'alt', node.alt)
   const caption = useBlockField(node._key, 'caption', node.caption)
+  // A Studio's own image type may have no description or caption; never write fields it can't store.
+  const allows = useBodyAllows()
+  const hasAlt = allows.blockField(node._type, 'alt')
+  const hasCaption = allows.blockField(node._type, 'caption')
 
   return (
     <BlockFrame {...attributes} data-calm-block={node._key} $selected={selected}>
@@ -24,21 +29,25 @@ export function ImageBlock({attributes, children, node, selected}: BlockObjectRe
         ) : (
           <Shimmer role="status" aria-label="Uploading image" />
         )}
-        <FieldInput
-          aria-label="Image description"
-          data-calm-field={`${node._key}.alt`}
-          placeholder="Describe this image for people who can’t see it"
-          value={alt.value}
-          onChange={(event) => alt.onChange(event.currentTarget.value)}
-          onBlur={alt.onBlur}
-        />
-        <FieldInput
-          aria-label="Caption"
-          placeholder="Add a caption (optional)"
-          value={caption.value}
-          onChange={(event) => caption.onChange(event.currentTarget.value)}
-          onBlur={caption.onBlur}
-        />
+        {hasAlt && (
+          <FieldInput
+            aria-label="Image description"
+            data-calm-field={`${node._key}.alt`}
+            placeholder="Describe this image for people who can’t see it"
+            value={alt.value}
+            onChange={(event) => alt.onChange(event.currentTarget.value)}
+            onBlur={alt.onBlur}
+          />
+        )}
+        {hasCaption && (
+          <FieldInput
+            aria-label="Caption"
+            placeholder="Add a caption (optional)"
+            value={caption.value}
+            onChange={(event) => caption.onChange(event.currentTarget.value)}
+            onBlur={caption.onBlur}
+          />
+        )}
       </Controls>
     </BlockFrame>
   )

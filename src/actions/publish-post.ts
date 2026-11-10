@@ -1,7 +1,8 @@
 import {type DocumentActionComponent, type DocumentActionsContext, useDocumentOperation} from 'sanity'
 import {API_VERSION} from '../lib/api-version'
-import {detailsForPublish, type PublishablePost} from '../lib/publish-details'
+import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
+import {detailsPatch, readPublishable, type WritingFields} from '../room/fields'
 
 /**
  * Extends the built-in Publish so a document published from the form gets the same Details the
@@ -10,6 +11,7 @@ import {slugTakenByAnother} from '../lib/slug-availability'
 export function withPostDetailsOnPublish(
   original: DocumentActionComponent,
   context: DocumentActionsContext,
+  fields: WritingFields,
 ): DocumentActionComponent {
   const client = context.getClient({apiVersion: API_VERSION})
 
@@ -21,13 +23,14 @@ export function withPostDetailsOnPublish(
     return {
       ...result,
       onHandle: async () => {
-        const post = (props.draft ?? props.published ?? {}) as PublishablePost
+        const document = (props.draft ?? props.published ?? {}) as Record<string, unknown>
         const details = await detailsForPublish({
-          post,
+          post: readPublishable(document, fields),
           isFirstPublish: !props.published,
-          isTaken: slugTakenByAnother(client, props.type, props.id),
+          isTaken: slugTakenByAnother(client, props.type, fields.slug, props.id),
         })
-        if (Object.keys(details).length > 0) patch.execute([{set: details}])
+        const set = detailsPatch(details, fields)
+        if (Object.keys(set).length > 0) patch.execute([{set}])
         result.onHandle?.()
       },
     }
