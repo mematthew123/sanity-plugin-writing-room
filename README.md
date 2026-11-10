@@ -252,16 +252,22 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 `npm run smoke` (in this package) packs the plugin, installs it with npm into a brand-new Studio and checks that:
 
 1. it installs with no peer-dependency conflicts,
-2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor`, `react` and `styled-components`,
-3. the README's `sanity.config.ts` type-checks against the published types,
-4. `sanity build` bundles the Studio.
+2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor`, `react` and `styled-components`, and of every `@portabletext/*` package,
+3. a `sanity.config.ts` using the plugin and its theme type-checks against the published types,
+4. `sanity build` bundles the Studio with exactly one copy of the App SDK,
+5. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
 
 ```sh
-pnpm --filter sanity-plugin-writing-room smoke              # latest sanity
-pnpm --filter sanity-plugin-writing-room smoke 6.12.0 --loose  # an older one, ignoring the declared range
+pnpm --filter sanity-plugin-writing-room smoke                     # latest sanity
+pnpm --filter sanity-plugin-writing-room smoke latest --embedded   # …and embedded in Next.js
+pnpm --filter sanity-plugin-writing-room smoke 6.12.0 --loose      # an older one, ignoring the declared range
 ```
 
+CI runs it on every pull request against the declared minimum (6.22.0) and the latest release, embedded too.
+
 It can't open the room itself, because that needs a logged-in Studio. Check that by hand.
+
+**Embedding the Studio in Next.js:** put `'use client'` at the top of `sanity.config.ts`, as Sanity's guide for the App Router says; without it, Next tries to bundle the whole Studio for the server.
 
 | `sanity` | Smoke test | Notes |
 |---|---|---|
