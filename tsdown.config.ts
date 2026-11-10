@@ -6,11 +6,14 @@ import {defineConfig} from 'tsdown'
  * into `dist` and consumers never need them.
  */
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/theme.ts'],
   format: 'esm',
   platform: 'browser',
   target: 'es2022',
   dts: true,
   sourcemap: true,
   clean: true,
+  // The room's fonts go into the package as data URLs (in their own chunk, loaded when the room
+  // opens), so Studios need neither the font packages nor a loader for font files.
+  loader: {'.woff2': 'dataurl'},
 })
