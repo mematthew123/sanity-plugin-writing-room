@@ -1,4 +1,4 @@
-import {type Palette, palette} from '@calm/tokens'
+import {type Palette, palette} from './tokens'
 import {createContext, createElement, type ReactNode, useContext} from 'react'
 import {type WritingFields} from './room/fields'
 

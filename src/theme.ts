@@ -1,4 +1,4 @@
-import {fonts, palette} from '@calm/tokens'
+import {fonts, palette} from './tokens'
 import {buildTheme} from '@sanity/themer'
 import {type StudioTheme} from 'sanity'
 import {type WritingRoomColors, type WritingRoomScheme} from './config'

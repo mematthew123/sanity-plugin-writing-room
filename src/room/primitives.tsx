@@ -2,7 +2,7 @@ import {type ComponentType, type ReactNode, type Ref} from 'react'
 import styled from 'styled-components'
 
 /**
- * Shared building blocks for the Writing Room. Every value comes from `@calm/tokens`
+ * Shared building blocks for the Writing Room. Every value comes from `../tokens`
  * CSS variables; see DESIGN.md before adding a literal.
  */
 

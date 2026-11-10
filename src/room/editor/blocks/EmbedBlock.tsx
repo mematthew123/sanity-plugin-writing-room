@@ -1,7 +1,7 @@
 import {type BlockObjectRenderProps, useEditor} from '@portabletext/editor'
 import {useState} from 'react'
 import styled from 'styled-components'
-import {EMBED_PROVIDER_NAMES, embedPlayerUrl, parseEmbedUrl} from '@calm/content'
+import {EMBED_PROVIDER_NAMES, embedPlayerUrl, parseEmbedUrl} from '../../../embed'
 import {useBlockField} from '../use-block-field'
 import {BlockFrame, Caution, Controls, FieldInput} from './frame'
 

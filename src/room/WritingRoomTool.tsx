@@ -1,4 +1,4 @@
-import {toScopedCss} from '@calm/tokens'
+import {toScopedCss} from '../tokens'
 import {Suspense, useEffect, useMemo, useState} from 'react'
 import {type Tool, useColorSchemeValue} from 'sanity'
 import {useRouter} from 'sanity/router'

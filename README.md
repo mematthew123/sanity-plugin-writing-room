@@ -14,7 +14,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
 - **Preview** opens the document on your site in draft mode, exactly as readers will see it.
 
-> **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](https://github.com/mematthew123/calm-editor/blob/main/packages/writing-room/CHANGELOG.md). The plugin comes from the [Calm Editor template](https://github.com/mematthew123/calm-editor), which uses it. See the [roadmap](https://github.com/mematthew123/calm-editor/blob/main/docs/plugin-roadmap.md).
+> **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/CHANGELOG.md). What's next is in the [roadmap](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/ROADMAP.md).
 
 ## Requirements
 
@@ -244,9 +244,9 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 5. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
 
 ```sh
-pnpm --filter sanity-plugin-writing-room smoke                     # latest sanity
-pnpm --filter sanity-plugin-writing-room smoke latest --embedded   # …and embedded in Next.js
-pnpm --filter sanity-plugin-writing-room smoke 6.12.0 --loose      # an older one, ignoring the declared range
+pnpm smoke                      # latest sanity
+pnpm smoke latest --embedded   # …and embedded in Next.js
+pnpm smoke 6.12.0 --loose      # an older one, ignoring the declared range
 ```
 
 CI runs it on every pull request against the declared minimum (6.22.0) and the latest release, embedded too.
@@ -257,7 +257,7 @@ It can't open the room itself, because that needs a logged-in Studio. Check that
 
 | `sanity` | Smoke test | Notes |
 |---|---|---|
-| 6.22.0 | ✅ passes | Declared minimum. Used day to day in the template. |
+| 6.22.0 | ✅ passes | Declared minimum. Used day to day. |
 | 6.12.0 – 6.21.x | ✅ passes with `--loose` | Not yet used for real writing, so not in the declared range. |
 | ≤ 6.11.x | ❌ fails | Ships App SDK v2 and `@portabletext/editor` 7, so the room gets a second copy of each. |
 
@@ -265,17 +265,21 @@ Results from November 2026.
 
 ## Develop
 
-This package lives in the Calm Editor monorepo. The template Studio (`apps/studio`) uses it straight from `src`, so `pnpm dev` at the repo root picks up changes without a build.
-
 ```sh
-pnpm --filter sanity-plugin-writing-room test       # Vitest
-pnpm --filter sanity-plugin-writing-room typecheck
-pnpm --filter sanity-plugin-writing-room build      # tsdown → dist/
-pnpm --filter sanity-plugin-writing-room smoke      # install into a fresh Studio
+pnpm install
+pnpm test        # Vitest
+pnpm typecheck
+pnpm lint
+pnpm build       # tsdown → dist/
+pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 ```
 
-`@calm/content` and `@calm/tokens` are private workspace packages, so they're dev dependencies and get bundled into `dist`. `publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published.
+`publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published, so always publish with `pnpm publish`. Releases are made with Changesets; see [RELEASING.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/RELEASING.md).
+
+To try a change in a Studio of your own, install a packed tarball (`pnpm pack`, then `npm install ./sanity-plugin-writing-room-*.tgz`) rather than linking the folder: a linked plugin resolves its own copy of Sanity's App SDK, and the room can't start (see [Troubleshooting](#troubleshooting)).
+
+`src/tokens.ts` and `src/embed.ts` are copies of the design tokens and embed parsing in the Calm Editor template (private), which shares them with its Reading Site. Keep the two in step.
 
 ## License
 
-[MIT](https://github.com/mematthew123/calm-editor/blob/main/packages/writing-room/LICENSE)
+[MIT](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/LICENSE)

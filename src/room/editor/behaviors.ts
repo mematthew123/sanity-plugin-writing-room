@@ -2,7 +2,7 @@ import {defineBehavior, effect, raise} from '@portabletext/editor/behaviors'
 import {getFocusTextBlock, isSelectionCollapsed} from '@portabletext/editor/selectors'
 import {isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineInputRule} from '@portabletext/plugin-input-rule'
-import {parseEmbedUrl} from '@calm/content'
+import {parseEmbedUrl} from '../../embed'
 import {bodyAllows} from './allows'
 import {PICK_IMAGE_EVENT} from './commands'
 

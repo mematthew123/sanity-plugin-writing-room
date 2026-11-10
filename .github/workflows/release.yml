@@ -1,0 +1,42 @@
+name: Release
+
+# On main: Changesets opens (or updates) a "Release sanity-plugin-writing-room" pull request
+# from the pending changesets. Merging that PR bumps the plugin's version and changelog, and this
+# workflow then publishes it to npm. See RELEASING.md.
+#
+# Publishing uses npm trusted publishing (OIDC): no npm token is stored anywhere. The plugin's
+# npm settings trust this repository and this file (release.yml); pnpm 11 (>= 11.1.3) exchanges
+# the job's GitHub identity for a short-lived publish token itself, and npm adds provenance.
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write # push the version commit and tags
+  pull-requests: write # open the release PR
+  id-token: write # trusted publishing (OIDC) and provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck && pnpm test && pnpm lint && pnpm build
+      - uses: changesets/action@v2
+        with:
+          version-script: pnpm exec changeset version
+          # Publishing stays off until the repository variable NPM_PUBLISH is "true", which you set
+          # once the package trusts this workflow on npm.
+          publish-script: ${{ vars.NPM_PUBLISH == 'true' && 'pnpm release' || '' }}
+          pr-title: Release sanity-plugin-writing-room
+          commit-message: Release sanity-plugin-writing-room
+          create-github-releases: true
