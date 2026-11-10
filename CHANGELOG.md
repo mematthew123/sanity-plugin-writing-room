@@ -1,5 +1,11 @@
 # sanity-plugin-writing-room
 
+## 0.0.2
+
+### Patch Changes
+
+- [#16](https://github.com/mematthew123/calm-editor/pull/16) [`6985acd`](https://github.com/mematthew123/calm-editor/commit/6985acdb4d7a017db7f94f3553756a0daeb9b7ba) Thanks [@mematthew123](https://github.com/mematthew123)! - The README's links to the changelog, roadmap and licence now work on npm.
+
 ## 0.0.1
 
 The first release, to hold the name on npm. The API may change before 1.0.
