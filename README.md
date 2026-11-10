@@ -267,6 +267,8 @@ Results from November 2026.
 
 ```sh
 pnpm install
+cp .env.example .env.local   # your project ID and dataset; once
+pnpm dev         # a Studio at http://localhost:3333 using the plugin from src/
 pnpm test        # Vitest
 pnpm typecheck
 pnpm lint
@@ -275,6 +277,8 @@ pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 ```
 
 `publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published, so always publish with `pnpm publish`. Releases are made with Changesets; see [RELEASING.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/RELEASING.md).
+
+`pnpm dev` runs the dev Studio in `sanity.config.ts`: the starter schema, `writingRoom({types: ['post']})` and the theme, with the plugin imported straight from `src/`, so edits reload as you save. It writes real documents, so point `.env.local` at a project and dataset you don't mind testing in, with `http://localhost:3333` as a CORS origin. Set `SANITY_STUDIO_PREVIEW_ORIGIN` to try Preview against a site with a draft-mode route. The dev Studio isn't part of the package, and isn't meant to be built (`sanity build` would write over `dist/`).
 
 To try a change in a Studio of your own, install a packed tarball (`pnpm pack`, then `npm install ./sanity-plugin-writing-room-*.tgz`) rather than linking the folder: a linked plugin resolves its own copy of Sanity's App SDK, and the room can't start (see [Troubleshooting](#troubleshooting)).
 
