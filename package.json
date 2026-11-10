@@ -76,11 +76,11 @@
   "peerDependencies": {
     "@portabletext/editor": "^8.2.12",
     "@sanity/sdk-react": "^3.12.0",
+    "@sanity/themer": "^0.10.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sanity": "^6.22.0",
-    "styled-components": "^6.1.18",
-    "@sanity/themer": "^0.10.6"
+    "styled-components": "^6.1.18"
   },
   "peerDependenciesMeta": {
     "@sanity/themer": {
@@ -99,6 +99,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.3.0",
     "eslint": "^10.8.1",
+    "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "sanity": "^6.22.0",
