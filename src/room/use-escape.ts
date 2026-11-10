@@ -1,10 +1,6 @@
 import {useEffect} from 'react'
 
-/**
- * Runs `onEscape` when the Writer presses Esc, unless something else (a dialog, a popover,
- * an IME composition) is using that keypress. In browser fullscreen, the browser takes the
- * first Esc to exit fullscreen, so leaving takes a second press.
- */
+/** Ignores an Esc that something else (a dialog, a popover, an IME composition) is using. */
 export function useEscape(onEscape: () => void) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {

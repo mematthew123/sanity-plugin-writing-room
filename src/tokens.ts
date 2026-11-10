@@ -1,38 +1,23 @@
-/*
- * The Writing Room's design tokens. A copy of Calm Editor's @calm/tokens, whose Reading Site uses
- * the same values: change them in both places.
- */
-/**
- * Shared design tokens for the Writing Room, the Studio theme, and the Reading Site.
- *
- * This file is the single source of truth. `tokens.css` is generated from it
- * (`pnpm --filter @calm/tokens build`) and must never be edited by hand.
- */
-
 export type Scheme = 'light' | 'dark'
 
 export interface Palette {
-  /** The page itself: warm, never pure white or black. */
+  /** Warm, never pure white or black. */
   paper: string
-  /** A gently raised surface: Code Blocks, Embed cards, the Selection Bubble. */
+  /** Raised elements: Code Blocks, Embed cards, the Selection Bubble. */
   surface: string
-  /** Hairlines and borders. Decorative only. */
+  /** Decorative only. */
   rule: string
-  /** Prose. */
   ink: string
-  /** Room Controls, captions, placeholders. Meets AA on paper. */
+  /** Meets AA on paper. */
   inkMuted: string
-  /** Ornaments (the Section Break) and disabled states. Decorative only. */
+  /** Ornaments and disabled states. Decorative only. */
   inkFaint: string
-  /** The one accent: caret, selection, links, Publish. */
   accent: string
-  /** Text drawn on top of `accent`. */
   onAccent: string
-  /** Text selection highlight. */
   selection: string
   /** Messages that must not recede: offline, blocked publish. */
   caution: string
-  /** Lift for floating things (Selection Bubble, Insert Menu). Dark relies on `rule` borders instead. */
+  /** Dark uses `rule` borders instead. */
   floatingShadow: string
 }
 
@@ -66,29 +51,25 @@ export const palette: Record<Scheme, Palette> = {
 }
 
 export const fonts = {
-  /** Prose: titles, body, captions on the Reading Site. */
   prose: '"Newsreader Variable", "Newsreader", Georgia, "Times New Roman", serif',
-  /** Room Controls and the Studio UI. */
   ui: '"Figtree Variable", "Figtree", ui-sans-serif, system-ui, sans-serif',
-  /** Code Blocks. */
   mono: 'ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace',
 } as const
 
-/** Prose body size per Room Settings text size; everything else in `type` scales from it. */
+/** Per Room Settings text size; everything in `type` scales from it. */
 export const proseSize = {
   small: '1.125rem',
   medium: '1.25rem',
   large: '1.375rem',
 } as const
 
-/** Relative to the prose body size (em). */
+/** In em, relative to `proseSize`. */
 export const type = {
   title: '2.25em',
   heading: '1.5em',
   subheading: '1.2em',
   caption: '0.85em',
   code: '0.85em',
-  /** Space between paragraphs and around blocks in the body. */
   proseGap: '1em',
   proseLeading: '1.65',
   headingLeading: '1.25',
@@ -104,7 +85,7 @@ export const weight = {
   uiStrong: '600',
 } as const
 
-/** A 4px-based scale for Room Controls and the Lobby. Prose spacing is em-based (see `type`). */
+/** For Room Controls and the Lobby; prose spacing is em-based (see `type`). */
 export const space = {
   xs: '0.25rem',
   sm: '0.5rem',
@@ -115,7 +96,7 @@ export const space = {
 } as const
 
 export const layout = {
-  /** The reading/writing column. ~68 characters of Newsreader at body size. */
+  /** ~68 characters of Newsreader at body size. */
   measure: '38rem',
   radius: '0.5rem',
   radiusLarge: '0.875rem',
@@ -123,11 +104,9 @@ export const layout = {
 } as const
 
 export const motion = {
-  /** A button giving under a press. Quicker than `gentle`, so the click feels received at once. */
+  /** Quicker than `gentle`, so a click feels received at once. */
   press: '150ms',
-  /** Small responses: hover, the Selection Bubble appearing. */
   gentle: '200ms',
-  /** Room Controls returning or receding. Slow enough to feel unhurried. */
   recede: '700ms',
   easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
 } as const
@@ -140,12 +119,7 @@ function declarations(prefix: string, values: Record<string, string>, indent: st
     .join('\n')
 }
 
-/**
- * Renders the tokens as CSS custom properties (`--calm-*`).
- *
- * Light is the default. Dark applies when an ancestor carries `data-scheme="dark"`,
- * or when the OS prefers dark and nothing has forced `data-scheme="light"`.
- */
+/** Dark applies under `data-scheme="dark"`, or when the OS prefers dark and nothing forces light. */
 export function toCss(): string {
   const constants = [
     declarations('font-', fonts, '  '),
@@ -183,11 +157,7 @@ ${declarations('color-', {...palette.dark}, '    ')}
 `
 }
 
-/**
- * The same tokens, set only on the given elements (a plugin's own surface and popovers), never on
- * `:root` or on other elements' `data-scheme`, so they can't change the rest of a Studio: its
- * `color-scheme`, its scrollbars, or Sanity UI cards that carry their own `data-scheme`.
- */
+/** Like `toCss`, but only on `selectors`, so the rest of the Studio is never restyled. */
 export function toScopedCss(
   selectors: string[],
   colors: Record<Scheme, Palette> = palette,

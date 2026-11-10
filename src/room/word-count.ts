@@ -11,7 +11,7 @@ function countWords(text: string): number {
   return text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
 }
 
-/** Words in a Post's body: prose, captions and code, never ornaments. */
+/** Prose, captions and code, never ornaments. */
 export function wordCount(body: unknown): number {
   if (!Array.isArray(body)) return 0
   let words = 0
@@ -26,7 +26,6 @@ export function wordCount(body: unknown): number {
   return words
 }
 
-/** "6 min read", or null before there's anything to read. */
 export function readingTime(words: number): string | null {
   if (words === 0) return null
   return `${Math.ceil(words / WORDS_PER_MINUTE)} min read`

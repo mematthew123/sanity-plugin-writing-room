@@ -2,11 +2,7 @@ import {DocumentTextIcon} from '@sanity/icons/DocumentText'
 import {defineField, defineType, type SlugIsUniqueValidator} from 'sanity'
 import {API_VERSION} from '../../lib/api-version'
 
-/**
- * Until a Post's first publish its slug follows the title, and publishing settles any clash
- * (`notes` → `notes-2`), so a clash isn't an error yet. Flagging it would disable Publish before
- * that settling could run. Once published, the slug stays put and must be unique.
- */
+/** Publishing settles clashes on the first publish, so flagging one earlier would block Publish. */
 const isUniqueOncePublished: SlugIsUniqueValidator = async (slug, context) => {
   const id = context.document?._id.replace(/^(drafts|versions\.[^.]+)\./, '')
   if (!id) return context.defaultIsUnique(slug, context)
@@ -17,11 +13,8 @@ const isUniqueOncePublished: SlugIsUniqueValidator = async (slug, context) => {
 }
 
 /**
- * A Post. Only Prose (title, body) may block publishing; every Detail is optional
- * and the Reading Site supplies a fallback. Writers publish from the Writing Room, which can't
- * show Details, so a required Detail would block a publish they can't fix from where they are.
- * Don't add required validation to anything in the `details` group without giving the room a
- * way to resolve it in place.
+ * Keep every field in `details` optional: the room can't show Details, so a required one would
+ * block a publish the Writer can't fix from there.
  */
 export const post = defineType({
   name: 'post',

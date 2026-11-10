@@ -31,7 +31,6 @@ import {presenceSentence} from './presence'
 import {QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
 
-/** A message in the Room Controls, optionally with one gentle next step. */
 export interface RoomNotice {
   text: string
   action?: {label: string; onClick: () => void}
@@ -51,10 +50,7 @@ const useOnline = () => useSyncExternalStore(subscribeOnline, () => navigator.on
 const SAVED_VISIBLE_MS = 2000
 const SAVING_DELAY_MS = 800
 
-/**
- * Whether the Writer's words have reached the Content Lake. Normally a small "Saved" that
- * fades; offline it switches to caution and stays until the connection returns.
- */
+/** Offline, it stays until the connection returns. */
 export function SaveState({handle}: {handle: DocumentHandle}) {
   const isSynced = useDocumentSyncStatus(handle) ?? true
   const online = useOnline()
@@ -92,12 +88,11 @@ export function SaveState({handle}: {handle: DocumentHandle}) {
   )
 }
 
-/** "Draft", "Published", or "Published · unpublished changes". */
 export function StatusLabel({status}: {status: PostStatus}) {
   return <Quiet>{status.label}</Quiet>
 }
 
-/** "Sam is here too". Never recedes: writing alongside someone without knowing is unsettling. */
+/** Never recedes: writing alongside someone without knowing is unsettling. */
 export function Presence({handle}: {handle: DocumentHandle}) {
   const {presence} = usePresenceForDocument({
     documentId: handle.documentId,
@@ -113,7 +108,7 @@ export function Presence({handle}: {handle: DocumentHandle}) {
   return sentence ? <Quiet role="status">{sentence}</Quiet> : null
 }
 
-/** Switches the whole Studio between light and dark; the navbar's own toggle is hidden in here. */
+/** Stands in for the navbar's toggle, which is hidden in the room. */
 export function ThemeToggle() {
   const scheme = useColorSchemeValue()
   const setScheme = useColorSchemeSetValue()
@@ -131,11 +126,7 @@ export function ThemeToggle() {
 
 const SETTLE_TIMEOUT_MS = 4000
 
-/**
- * Publish, from inside the room. Waits for the Writer's latest words to sync and validate (and
- * gives up with a gentle retry if that takes too long); if something blocks the publish, takes
- * them straight to it instead of listing errors.
- */
+/** Waits for the latest words to sync and validate, then publishes or goes to the problem. */
 export function PublishButton({
   handle,
   status,

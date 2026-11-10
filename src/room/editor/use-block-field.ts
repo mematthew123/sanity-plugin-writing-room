@@ -3,12 +3,7 @@ import {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react'
 
 const WRITE_DELAY = 400
 
-/**
- * Edits one string field of a block object (an image's alt text, a Code Block's code…).
- * Typing stays local and smooth; the value is written to the Post shortly after the Writer
- * pauses, immediately on blur, and on unmount (e.g. leaving the Room mid-pause). Remote changes flow
- * in whenever the field isn't being edited.
- */
+/** Local while typing; written after a pause, on blur and on unmount. Remote changes apply while not editing. */
 export function useBlockField(blockKey: string, field: string, remote: unknown) {
   const editor = useEditor()
   const remoteValue = typeof remote === 'string' ? remote : ''
@@ -30,8 +25,7 @@ export function useBlockField(blockKey: string, field: string, remote: unknown) 
     editor.send({type: 'block.set', at: [{_key: blockKey}], props: {[field]: latest.current}})
   }, [editor, blockKey, field])
 
-  // A layout-effect cleanup runs before EditorProvider's passive cleanup stops the editor, so a
-  // pending write still reaches the Post when the Room unmounts.
+  // Layout-effect cleanup runs before EditorProvider's passive cleanup stops the editor.
   useLayoutEffect(
     () => () => {
       if (timer.current !== undefined) write()

@@ -5,10 +5,7 @@ import styled from 'styled-components'
 const GAP = 8
 const EDGE = 12
 
-/**
- * Positions floating UI (the Selection Bubble, the Insert Menu) against a viewport rect: on the
- * preferred side when there's room, otherwise the other side, and always inside the window.
- */
+/** Flips to the other side when there's no room, and always stays inside the window. */
 export function Floating({
   anchor,
   placement = 'above',
@@ -67,7 +64,6 @@ const Root = styled.div`
   font-weight: var(--calm-weight-ui);
 `
 
-/** Re-reads a rect whenever the page scrolls or resizes, so floating UI stays attached. */
 export function useViewportChanges(onChange: () => void) {
   useLayoutEffect(() => {
     window.addEventListener('scroll', onChange, true)
@@ -79,10 +75,7 @@ export function useViewportChanges(onChange: () => void) {
   }, [onChange])
 }
 
-/**
- * The soft, raised surface shared by the Selection Bubble and the Insert Menu. It never grows
- * taller than the window, so `Floating`'s clamp always fits it; anything longer scrolls.
- */
+/** Never taller than the window, so `Floating`'s clamp always fits it. */
 export const FloatingSurface = styled.div<{$round?: boolean}>`
   box-sizing: border-box;
   max-height: calc(100dvh - ${EDGE * 2}px);

@@ -1,9 +1,6 @@
 import {type SanityClient} from 'sanity'
 
-/**
- * Whether another document of the same type (any version of it) already uses `slug` in its
- * `slugField`. Field names come from the schema, so they're safe to put in the query.
- */
+/** `slugField` comes from the schema, so it's safe to interpolate into the query. */
 export function slugTakenByAnother(
   client: SanityClient,
   documentType: string,

@@ -7,10 +7,7 @@ const Root = styled.div`
   user-select: none;
 `
 
-/**
- * Hosts interactive controls (inputs, buttons) inside a block object. The editor would otherwise
- * treat clicks, keys and pastes here as edits to the text around it.
- */
+/** Stops the editor treating clicks, keys and pastes on controls inside a block object as text edits. */
 export function Isolate({children, className}: {children: ReactNode; className?: string}) {
   return (
     <Root

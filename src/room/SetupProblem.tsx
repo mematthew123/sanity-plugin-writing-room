@@ -2,18 +2,12 @@ import {Component, type ReactNode} from 'react'
 import styled from 'styled-components'
 import {Column} from './primitives'
 
-/**
- * The App SDK's error when the room's `@sanity/sdk-react` isn't the copy the Studio provides.
- * It's a setup problem, not a bug in the room, so the room explains it instead of crashing.
- */
+/** Thrown when the room's `@sanity/sdk-react` isn't the copy the Studio provides. */
 export function isSdkContextError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('SanityInstance context not found')
 }
 
-/**
- * Catches the App SDK context error anywhere in the room and says how to fix it. Any other error
- * is rethrown, so the Studio's own error screen handles it as usual.
- */
+/** Rethrows any other error to the Studio's own error screen. */
 export class SetupProblemBoundary extends Component<{children: ReactNode}, {error: unknown}> {
   override state: {error: unknown} = {error: null}
 

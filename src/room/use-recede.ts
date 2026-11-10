@@ -4,10 +4,7 @@ const KEYSTROKES_TO_RECEDE = 3
 const PAUSE_TO_RETURN_MS = 2000
 const POINTER_JITTER_PX = 4
 
-/**
- * Room Controls recede once the Writer is typing (a few keystrokes in the title or body) and
- * return when they pause, move the pointer, or move keyboard focus into the controls.
- */
+/** Recedes after a few keystrokes; returns on a pause, pointer move, or focus into the controls. */
 export function useRecede(writingArea: RefObject<HTMLElement | null>): boolean {
   const [receded, setReceded] = useState(false)
 

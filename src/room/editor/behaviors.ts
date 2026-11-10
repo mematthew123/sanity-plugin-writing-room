@@ -6,7 +6,6 @@ import {parseEmbedUrl} from '../../embed'
 import {bodyAllows} from './allows'
 import {PICK_IMAGE_EVENT} from './commands'
 
-/** Enter on an empty heading or quote returns to a plain paragraph rather than repeating the style. */
 export const exitStyleOnEmptyEnter = defineBehavior({
   on: 'insert.break',
   guard: ({snapshot}) => {
@@ -17,7 +16,6 @@ export const exitStyleOnEmptyEnter = defineBehavior({
   actions: [(_, {path}) => [raise({type: 'block.set', at: path, props: {style: 'normal'}})]],
 })
 
-/** Pasting a YouTube, Vimeo or Spotify link onto an empty line makes it an Embed. */
 export const pasteLinkAsEmbed = defineBehavior({
   on: 'clipboard.paste',
   guard: ({snapshot, event}) => {
@@ -40,7 +38,6 @@ function imageFiles(dataTransfer: DataTransfer): File[] {
   return Array.from(dataTransfer.files).filter((file) => file.type.startsWith('image/'))
 }
 
-/** Pasted or dropped image files are uploaded and placed in the body, when it takes images. */
 export function imageFileBehaviors(upload: (files: File[]) => void) {
   return [
     defineBehavior({
@@ -67,7 +64,6 @@ export function imageFileBehaviors(upload: (files: File[]) => void) {
   ]
 }
 
-/** The Insert Menu's Image command asks the room to open a file picker. */
 export function pickImageBehavior(pickImage: () => void) {
   return defineBehavior({
     on: PICK_IMAGE_EVENT,
@@ -75,7 +71,6 @@ export function pickImageBehavior(pickImage: () => void) {
   })
 }
 
-/** Typing three backticks on an empty line starts a Code Block, when the body takes them. */
 export const codeFenceRule = defineInputRule({
   on: /^```$/,
   guard: ({snapshot, event}) => {

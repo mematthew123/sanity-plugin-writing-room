@@ -31,7 +31,7 @@ function targetFor(path: unknown[], fields: {title: string; body: string}): Prob
 
 const ORDER: Record<ProblemTarget['kind'], number> = {title: 0, body: 1, block: 1, details: 2}
 
-/** The validation errors that block a publish, each with where in the room the Writer can fix it. */
+/** Blocking validation errors, each with where in the room the Writer can fix it. */
 export function publishProblems(
   markers: Marker[],
   fields: {title: string; body: string} = {title: 'title', body: 'body'},

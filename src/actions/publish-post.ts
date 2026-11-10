@@ -4,10 +4,7 @@ import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {detailsPatch, readPublishable, type WritingFields} from '../room/fields'
 
-/**
- * Extends the built-in Publish so a document published from the form gets the same Details the
- * Writing Room fills in: a settled slug, unique within its type, and a published date.
- */
+/** Fills in the same slug and published date as publishing from the room. */
 export function withPostDetailsOnPublish(
   original: DocumentActionComponent,
   context: DocumentActionsContext,

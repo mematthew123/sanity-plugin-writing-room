@@ -1,11 +1,10 @@
-/** YouTube, Vimeo and Spotify links. A copy of Calm Editor's @calm/content embed parsing, which its Reading Site uses too. */
 export type EmbedProvider = 'youtube' | 'vimeo' | 'spotify'
 
 export interface ParsedEmbed {
   provider: EmbedProvider
-  /** Provider-specific id; for Spotify it includes the kind, e.g. `track/4uLU6…`. */
+  /** For Spotify, includes the kind, e.g. `track/4uLU6…`. */
   id: string
-  /** Vimeo only: the privacy hash an unlisted video's player needs. */
+  /** Vimeo only: needed to play unlisted videos. */
   hash?: string
 }
 
@@ -19,7 +18,6 @@ const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/
 const VIMEO_HASH = /^[A-Za-z0-9]+$/
 const SPOTIFY_KINDS = new Set(['track', 'album', 'playlist', 'episode', 'show', 'artist'])
 
-/** Recognises a link to a supported Embed provider, or returns null. */
 export function parseEmbedUrl(input: string): ParsedEmbed | null {
   let url: URL
   try {
@@ -62,7 +60,6 @@ export function parseEmbedUrl(input: string): ParsedEmbed | null {
   return null
 }
 
-/** The privacy-friendly player url for an Embed, used for the opt-in Preview. */
 export function embedPlayerUrl({provider, id, hash}: ParsedEmbed): string {
   switch (provider) {
     case 'youtube':

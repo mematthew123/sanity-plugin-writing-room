@@ -6,10 +6,7 @@ import {type WritingFields} from './fields'
 
 type Slug = {_type: 'slug'; current?: string}
 
-/**
- * The document's title: one line of Newsreader that wraps but never breaks. Enter moves into the
- * body. Until the first publish, the slug follows the title (unless the Writer set it by hand).
- */
+/** Until the first publish, the slug follows the title unless the Writer set it by hand. */
 export function TitleField({
   handle,
   fields,

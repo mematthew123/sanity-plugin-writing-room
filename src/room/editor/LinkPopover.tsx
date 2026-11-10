@@ -7,13 +7,10 @@ import styled from 'styled-components'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {displayHref, normalizeHref} from './link'
 
-/** How long the caret must rest in a link before its popover appears, so typing never triggers it. */
+/** Long enough that typing through a link never shows the popover. */
 const REST_MS = 400
 
-/**
- * When the caret rests inside a link: a small popover below it to open, edit or remove the link.
- * A selection gets the Selection Bubble instead; this is only for a collapsed caret.
- */
+/** For a collapsed caret only; a selection gets the Selection Bubble. */
 export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocused: boolean}) {
   const editor = useEditor()
   const toolbarSchema = useToolbarSchema({})
@@ -30,7 +27,6 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
   const inLink = !!link && collapsed && popover.snapshot.matches({enabled: 'active'})
   const visible = inLink && (editing || (editorFocused && rested))
 
-  // Hide while the caret moves; show again once it has rested.
   useEffect(() => {
     setRested(false)
     if (!inLink) {

@@ -9,13 +9,10 @@ import {Room} from './Room'
 import {SetupProblemBoundary} from './SetupProblem'
 import {openedDocument} from './room-route'
 
-/** The room's own elements: its surface, and its popovers (portaled to the body). */
+/** The surface and its portaled popovers. */
 const ROOM_ELEMENTS = ['[data-calm-surface]', '[data-calm-floating]']
 
-/**
- * The room's fonts, loaded the first time the room opens (they're ~230 KB, in their own chunk) and
- * kept for the rest of the session. Until then, and if they fail, the token stacks' fallbacks show.
- */
+/** Loaded lazily and kept for the session; the token stacks' fallbacks show until then. */
 let fontsCss: Promise<string> | undefined
 function useRoomFonts(): string | null {
   const [css, setCss] = useState<string | null>(null)
@@ -38,9 +35,8 @@ export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
   const {state} = useRouter()
   const scheme = useColorSchemeValue()
   const config = tool.options!
-  // The design tokens as CSS custom properties, set only on the room's own elements, so they
-  // never touch the rest of the Studio. A `<style>` (React hoists and dedupes it by `href`) rather
-  // than an imported stylesheet, so the plugin works in any Studio without a CSS loader.
+  // Scoped to the room's elements so the rest of the Studio is untouched. A `<style>` rather than
+  // an imported stylesheet, so the plugin needs no CSS loader.
   const tokensCss = useMemo(() => toScopedCss(ROOM_ELEMENTS, config.colors), [config.colors])
   const opened = openedDocument(
     state,

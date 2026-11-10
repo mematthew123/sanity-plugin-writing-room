@@ -21,7 +21,6 @@ import {useEscape} from './use-escape'
 
 const RECENT_POSTS = 8
 
-/** The entrance to the Writing Room: start something new or pick up recent work. */
 export function Lobby() {
   const leave = useLeaveToStudio()
   const kinds = useWritingKinds()
@@ -115,7 +114,7 @@ const StartButton = styled.button`
     box-shadow: inset 0 0 0 1px var(--calm-color-rule);
   }
 
-  /* 0.98, not 0.97: across the full measure, 0.97 pulls each edge in ~9px. */
+  /* Any deeper and the edges of a full-measure button visibly pull in. */
   @media (prefers-reduced-motion: no-preference) {
     &:active {
       transform: scale(0.98);
@@ -239,7 +238,7 @@ const RowLink = styled(StateLink)`
     background: var(--calm-color-surface);
   }
 
-  /* Barely: any more and the title and meta read as moving text. */
+  /* Any deeper and the title and meta read as moving text. */
   @media (prefers-reduced-motion: no-preference) {
     &:active {
       transform: scale(0.99);
@@ -283,7 +282,6 @@ function PostRow({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}
     projection: `{"title": ${titleField}}`,
   })
   const status = describePostStatus(data?._status)
-  // Name the kind only when there's more than one to tell apart.
   const kind = kinds.length > 1 ? ownKind : undefined
 
   return (
@@ -325,11 +323,7 @@ const AllOfType = styled.a`
   }
 `
 
-/**
- * "All Posts": opens the most recently edited one in Structure, which lays out its list wherever
- * the Studio keeps it (top level, or nested under Blog). Going through the `edit` intent means the
- * room never has to know a Studio's Structure. Hidden until there's something to list.
- */
+/** Opens the latest document via the `edit` intent, so the room never needs to know a Studio's Structure. */
 function AllOfTypeLink({kind}: {kind: WritingKind}) {
   const {data} = useDocuments({
     documentType: kind.type,

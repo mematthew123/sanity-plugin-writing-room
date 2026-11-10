@@ -11,9 +11,9 @@ const compiled = createSchema({
   types: [
     ...schemaTypes,
     ...roomBlockTypes,
-    // A Studio's own body that opts into the room's blocks, as the README shows.
+    // A Studio body that opts into the room's blocks.
     {name: 'optedIn', type: 'array', of: [{type: 'block'}, ...writingRoomBlocks]},
-    // Chipter's blockContent: no embeds, code blocks, section breaks or numbered lists.
+    // No embeds, code blocks, section breaks or numbered lists.
     {
       name: 'blockContent',
       type: 'array',

@@ -8,7 +8,7 @@ const schema = createSchema({
   types: [
     ...schemaTypes,
     {name: 'blockContent', type: 'array', of: [{type: 'block'}, {type: 'image'}]},
-    // Chipter's `post`: blockContent body, mainImage, no `excerpt`.
+    // blockContent body, mainImage, no `excerpt`.
     {
       name: 'chipterPost',
       type: 'document',

@@ -8,7 +8,6 @@ import {QuietButton} from './primitives'
 import {type RoomSettings, useRoomSettings} from './room-settings'
 import {readingTime, wordCount} from './word-count'
 
-/** "1,240 words · 6 min read", quietly, in the Room Controls. */
 export function WordCount() {
   const editor = useEditor()
   const body = useEditorSelector(editor, (snapshot) => snapshot.context.value)
@@ -28,7 +27,6 @@ const TEXT_SIZES: Array<{value: RoomSettings['textSize']; label: string}> = [
   {value: 'large', label: 'L'},
 ]
 
-/** The `Aa` menu: text size, typewriter scrolling and focus dimming, remembered per browser. */
 export function RoomSettingsMenu({scheme}: {scheme: string}) {
   const [settings, update] = useRoomSettings()
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
@@ -143,10 +141,6 @@ function subscribeFullscreen(onChange: () => void) {
   return () => document.removeEventListener('fullscreenchange', onChange)
 }
 
-/**
- * Optional true fullscreen (hides the browser's own tabs too). Opt-in only: a click or
- * ⌘/Ctrl + Shift + F. The browser takes the first Esc to leave fullscreen.
- */
 export function FullscreenToggle() {
   const isFullscreen = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement)
 
@@ -178,7 +172,7 @@ async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await document.documentElement.requestFullscreen()
   } catch {
-    // Some browsers refuse fullscreen (e.g. inside an iframe); the room works without it.
+    // Some browsers refuse fullscreen, e.g. inside an iframe.
   }
 }
 

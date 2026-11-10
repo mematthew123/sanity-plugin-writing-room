@@ -4,10 +4,7 @@ import {QuietButton} from '../../primitives'
 import {useOpenBlockDetails} from '../room-document'
 import {BlockFrame, Controls} from './frame'
 
-/**
- * A block the room doesn't know how to show (a Studio's own `callout`, `chipterScale`…). It keeps
- * its place in the text: the Writer can select it, move it or delete it, and edit it in Details.
- */
+/** Keeps an unrecognised block's place in the text; it's edited in Details. */
 export function UnknownBlock({attributes, children, node, selected, title}: BlockObjectRenderProps & {title: string}) {
   const openDetails = useOpenBlockDetails(node._key)
   return (

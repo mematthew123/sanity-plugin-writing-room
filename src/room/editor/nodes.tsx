@@ -34,7 +34,6 @@ function TextBlock({attributes: pteAttributes, children, node}: TextBlockRenderP
   }
 }
 
-/** How each part of the body the room knows looks in the Writing Room. */
 const knownNodes = [
   defineTextBlock({type: 'block', render: (props) => <TextBlock {...props} />}),
   defineDecorator({type: 'strong', render: ({children}) => <strong>{children}</strong>}),
@@ -57,11 +56,7 @@ const knownNodes = [
 ]
 
 
-/**
- * The room's renderers for one body type: the ones it knows, plus a placeholder for every block
- * type the Studio adds that the room doesn't (so they keep their place instead of vanishing).
- * Memoise on the schema, which is fixed for an editor, so registrations stay stable.
- */
+/** Unknown block types get a placeholder so they keep their place. Memoise on the schema. */
 export function bodyNodes(schema: EditorSchema) {
   const unknown = schema.blockObjects
     .filter((block) => block.name !== 'image' && !ROOM_BLOCK_NAMES.has(block.name))

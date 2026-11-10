@@ -24,10 +24,7 @@ import {useBodyAllows} from './allows'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {normalizeHref} from './link'
 
-/**
- * Formatting for selected text: a soft pill that appears above the selection. Alt+F10 moves
- * keyboard focus into it (it's portaled, so Tab never reaches it); Esc returns to the text.
- */
+/** Alt+F10 focuses it, since it's portaled and Tab never reaches it; Esc returns to the text. */
 export function SelectionBubble({scheme, editorFocused}: {scheme: string; editorFocused: boolean}) {
   const editor = useEditor()
   const expanded = useEditorSelector(editor, isSelectionExpanded)
@@ -39,7 +36,7 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
   const subheading = useEditorSelector(editor, isActiveStyle('h3'))
   const quote = useEditorSelector(editor, isActiveStyle('blockquote'))
   const linked = useEditorSelector(editor, isActiveAnnotation('link', {mode: 'partial'}))
-  // Only what the body type can store: a Studio's blockContent may have no subheadings or links.
+  // A Studio's body type may have no subheadings or links.
   const allows = useBodyAllows()
   const can = {
     bold: allows.decorator('strong'),
