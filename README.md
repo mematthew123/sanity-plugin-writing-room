@@ -14,7 +14,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
 - **Preview** opens the document on your site in draft mode, exactly as readers will see it.
 
-> **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](CHANGELOG.md). The plugin comes from the [Calm Editor template](https://github.com/mematthew123/calm-editor), which uses it. See the [roadmap](../../docs/plugin-roadmap.md).
+> **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](https://github.com/mematthew123/calm-editor/blob/main/packages/writing-room/CHANGELOG.md). The plugin comes from the [Calm Editor template](https://github.com/mematthew123/calm-editor), which uses it. See the [roadmap](https://github.com/mematthew123/calm-editor/blob/main/docs/plugin-roadmap.md).
 
 ## Requirements
 
@@ -278,4 +278,4 @@ pnpm --filter sanity-plugin-writing-room smoke      # install into a fresh Studi
 
 ## License
 
-[MIT](LICENSE)
+[MIT](https://github.com/mematthew123/calm-editor/blob/main/packages/writing-room/LICENSE)
