@@ -6,6 +6,7 @@ import {type WritingRoomConfig, WritingRoomConfigProvider} from '../config'
 import {Lobby} from './Lobby'
 import {Surface} from './primitives'
 import {Room} from './Room'
+import {openedDocument} from './room-route'
 
 /**
  * The room's design tokens as CSS custom properties. Rendered as a `<style>` (React hoists and
@@ -17,16 +18,24 @@ const TOKENS_CSS = toCss()
 export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
   const {state} = useRouter()
   const scheme = useColorSchemeValue()
-  const postId = typeof state.postId === 'string' ? state.postId : undefined
+  const config = tool.options!
+  const opened = openedDocument(
+    state,
+    config.types.map((option) => option.type),
+  )
 
   return (
-    <WritingRoomConfigProvider config={tool.options!}>
+    <WritingRoomConfigProvider config={config}>
       <style href="sanity-plugin-writing-room/tokens" precedence="default">
         {TOKENS_CSS}
       </style>
       <Surface data-scheme={scheme} data-calm-surface="">
         <Suspense fallback={null}>
-          {postId ? <Room key={postId} postId={postId} /> : <Lobby />}
+          {opened ? (
+            <Room key={opened.documentId} documentId={opened.documentId} documentType={opened.documentType} />
+          ) : (
+            <Lobby />
+          )}
         </Suspense>
       </Surface>
     </WritingRoomConfigProvider>

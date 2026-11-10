@@ -99,13 +99,43 @@ Run `sanity dev`. **Writing Room** appears in the Studio's navigation, and every
 
 ## What the plugin adds
 
-- the **Writing Room** Tool at `/writing-room`, with a Lobby of recent Posts;
-- an **Open in Writing Room** action on Posts;
-- a wrapper around the built-in **Publish** on Posts, so a Post published from the form gets the same settled slug and published date as one published from the room.
+- the **Writing Room** Tool at `/writing-room`, with a Lobby of recent writing;
+- an **Open in Writing Room** action on the room's document types (Posts, by default);
+- a wrapper around the built-in **Publish** on those types, so a document published from the form gets the same settled slug and published date as one published from the room.
+
+## Document types
+
+The room writes Posts by default. To write other kinds too, list their document types:
+
+```ts
+writingRoom({
+  types: ['post', 'caseStudy'],
+})
+```
+
+Each type needs the fields the room reads and writes: `title`, `body` (the `body` type), `slug` and `publishedAt`. Anything else (excerpt, cover image, a client name…) stays in the standard form under **Details**.
+
+The Lobby gets a **Start a new …** button and an **All …** link for each type, and Recent lists them together. The room names each type with its schema `title` ("Case Study", "Case Studies"). If the plural comes out wrong, set it yourself:
+
+```ts
+writingRoom({
+  types: ['post', {type: 'news', title: 'News', pluralTitle: 'News'}],
+})
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `types` | `['post']` | The document types the room writes, as names or `{type, title?, pluralTitle?}`. |
+| `types[].title` | the schema type's `title` | What one is called: "Start a new Case Study". |
+| `types[].pluralTitle` | `title` made plural | What several are called: "All Case Studies". |
+
+The first type is the default: its documents open at `/writing-room/<id>`, the others at `/writing-room/<type>/<id>`. A Studio with one type keeps short URLs, and links to it keep working if you add more types later, as long as it stays first.
+
+If a type in `types` isn't in your schema, the room leaves it out and warns in the browser console. Slugs are unique within a type, so a Post and a Case Study can both be `hello-world`.
 
 ## Schema
 
-The room writes `post` documents whose `body` is the `body` type. `writingRoomSchemaTypes` holds both, plus the block types the room knows how to render (`embed`, `codeBlock`, `sectionBreak`). Each is also exported on its own (`post`, `body`, `embed`, `codeBlock`, `sectionBreak`) if you'd rather compose them.
+By default the room writes `post` documents whose `body` is the `body` type (see [Document types](#document-types) for others). `writingRoomSchemaTypes` holds both, plus the block types the room knows how to render (`embed`, `codeBlock`, `sectionBreak`). Each is also exported on its own (`post`, `body`, `embed`, `codeBlock`, `sectionBreak`) if you'd rather compose them.
 
 The plugin doesn't register these types for you, on purpose. `post` and `body` are common names, and a clash would stop your Studio from starting, so you add them where you can see them.
 
@@ -113,7 +143,7 @@ The room reads and writes `title`, `body`, `slug` and `publishedAt`. Only Prose 
 
 ## Preview on your site
 
-Preview opens the Post on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:
+Preview opens the document on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:
 
 ```ts
 writingRoom({
@@ -128,7 +158,13 @@ writingRoom({
 |---|---|---|
 | `preview.origin` | — | Your site's origin. Setting `preview` turns on the room's Preview button. |
 | `preview.enablePath` | `/api/draft-mode/enable` | The route that checks the preview secret and turns on draft mode. |
-| `preview.pathname` | `(slug) => '/posts/' + slug` | Where a Post is read on your site. |
+| `preview.pathname` | `/posts/<slug>` for `post`, `/<type>/<slug>` for other types | `(slug, type) => path`: where a document is read on your site. |
+
+With more than one type, use the second argument:
+
+```ts
+pathname: (slug, type) => (type === 'caseStudy' ? `/case-studies/${slug}` : `/blog/${slug}`)
+```
 
 The room creates a one-hour preview secret and opens `<origin><enablePath>?sanity-preview-secret=…&sanity-preview-pathname=…`. Your site needs a route there that validates the secret and redirects:
 

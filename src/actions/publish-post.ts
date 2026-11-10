@@ -1,11 +1,11 @@
 import {type DocumentActionComponent, type DocumentActionsContext, useDocumentOperation} from 'sanity'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishablePost} from '../lib/publish-details'
-import {slugTakenByAnotherPost} from '../lib/slug-availability'
+import {slugTakenByAnother} from '../lib/slug-availability'
 
 /**
- * Extends the built-in Publish so a Post published from the form gets the same Details the
- * Writing Room fills in: a settled, unique slug and a published date.
+ * Extends the built-in Publish so a document published from the form gets the same Details the
+ * Writing Room fills in: a settled slug, unique within its type, and a published date.
  */
 export function withPostDetailsOnPublish(
   original: DocumentActionComponent,
@@ -25,7 +25,7 @@ export function withPostDetailsOnPublish(
         const details = await detailsForPublish({
           post,
           isFirstPublish: !props.published,
-          isTaken: slugTakenByAnotherPost(client, props.id),
+          isTaken: slugTakenByAnother(client, props.type, props.id),
         })
         if (Object.keys(details).length > 0) patch.execute([{set: details}])
         result.onHandle?.()

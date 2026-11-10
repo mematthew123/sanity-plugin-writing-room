@@ -10,10 +10,18 @@ import {API_VERSION} from '../lib/api-version'
 import {QuietButton} from './primitives'
 
 /**
- * Opens the Post on the Reading Site exactly as readers will see it, unpublished changes
+ * Opens the document on your site exactly as readers will see it, unpublished changes
  * included. A one-hour preview secret lets the site switch itself into draft mode.
  */
-export function PreviewButton({slug, onProblem}: {slug: string | undefined; onProblem: (problem: string) => void}) {
+export function PreviewButton({
+  documentType,
+  slug,
+  onProblem,
+}: {
+  documentType: string
+  slug: string | undefined
+  onProblem: (problem: string) => void
+}) {
   const client = useClient({apiVersion: API_VERSION})
   const user = useCurrentUser()
   const [opening, setOpening] = useState(false)
@@ -21,7 +29,7 @@ export function PreviewButton({slug, onProblem}: {slug: string | undefined; onPr
 
   if (!slug || !options) return null
   const {origin, enablePath, pathname} = options
-  const path = pathname(slug)
+  const path = pathname(slug, documentType)
 
   async function preview() {
     // Open the tab now, while the click still counts, so popup blockers allow it.
