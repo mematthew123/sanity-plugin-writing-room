@@ -6,20 +6,25 @@ import {resolveConfig, type WritingRoomOptions} from './config'
 import {TOOL_NAME, WRITE_INTENT} from './room/constants'
 import {OpenInWritingRoomAction} from './room/OpenInWritingRoomAction'
 import {RoomAwareNavbar} from './room/RoomAwareNavbar'
+import {ROOM_ROUTES, roomState} from './room/room-route'
 import {WritingRoomTool} from './room/WritingRoomTool'
 
 /**
- * The Writing Room: a calm, full-screen space for writing a single Post. It's a Studio Tool
- * rather than a custom input because only a Tool can take the whole screen; Details stay in
- * the standard document form.
+ * The Writing Room: a calm, full-screen space for writing a single document (a Post, by default;
+ * see the `types` option). It's a Studio Tool rather than a custom input because only a Tool can
+ * take the whole screen; Details stay in the standard document form.
  *
- * The plugin adds the Tool, an "Open in Writing Room" action on Posts, and wraps the built-in
- * Publish so a Post published from the form gets the same slug and date as one published from
- * the room. It doesn't register schema types: add `writingRoomSchemaTypes` (or your own `post`
- * and `body` with the same shape) to your Studio's schema.
+ * The plugin adds the Tool, an "Open in Writing Room" action on the room's types, and wraps the
+ * built-in Publish on them so a document published from the form gets the same slug and date as
+ * one published from the room. It doesn't register schema types: add `writingRoomSchemaTypes`
+ * (or your own types with the same shape) to your Studio's schema.
  */
 export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => {
   const config = resolveConfig(options ?? undefined)
+  const types = config.types.map((option) => option.type)
+  const isWritingType = (type: unknown): type is string =>
+    typeof type === 'string' && types.includes(type)
+
   return {
     name: 'sanity-plugin-writing-room',
     tools: [
@@ -29,9 +34,13 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
         icon: ComposeIcon,
         component: WritingRoomTool,
         options: config,
-        router: route.create('/', [route.create('/:postId')]),
-        canHandleIntent: (intent, params) => intent === WRITE_INTENT && params.type === 'post',
-        getIntentState: (_intent, params) => ({postId: params.id}),
+        router: route.create(
+          '/',
+          ROOM_ROUTES.map((path) => route.create(path)),
+        ),
+        canHandleIntent: (intent, params) => intent === WRITE_INTENT && isWritingType(params.type),
+        getIntentState: (_intent, params) =>
+          isWritingType(params.type) ? roomState(params.id, params.type, types) : {},
       },
     ],
     studio: {
@@ -41,7 +50,7 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
     },
     document: {
       actions: (prev, context) =>
-        context.schemaType === 'post'
+        isWritingType(context.schemaType)
           ? [
               ...prev.map((action) =>
                 action.action === 'publish' ? withPostDetailsOnPublish(action, context) : action,

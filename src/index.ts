@@ -1,5 +1,5 @@
 export {writingRoom} from './plugin'
-export type {WritingRoomOptions, WritingRoomPreviewOptions} from './config'
+export type {WritingRoomOptions, WritingRoomPreviewOptions, WritingRoomTypeOptions} from './config'
 
 export {schemaTypes as writingRoomSchemaTypes} from './schema'
 export {post} from './schema/documents/post'
