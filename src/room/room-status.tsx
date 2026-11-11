@@ -491,6 +491,12 @@ const PublishPill = styled.button`
     opacity: 0.7;
   }
 
+  /* While the room asks "Publish this?", the answer is the one clay thing; the question steps back. */
+  &[aria-expanded='true'] {
+    background: var(--calm-color-surface);
+    color: var(--calm-color-ink);
+  }
+
   &:focus-visible {
     outline: 2px solid var(--calm-color-accent);
     outline-offset: 2px;
@@ -504,7 +510,8 @@ const PublishPill = styled.button`
 const NoticeLink = styled.a`
   margin-inline-start: var(--calm-space-sm);
   border-radius: var(--calm-radius);
-  color: var(--calm-color-accent);
+  /* Ink, not clay: the tick beside it is the notice's one accent. */
+  color: var(--calm-color-ink);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.2em;

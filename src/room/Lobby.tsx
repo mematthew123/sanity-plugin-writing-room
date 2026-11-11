@@ -261,7 +261,7 @@ const StartButton = styled.button`
 
   svg {
     flex-shrink: 0;
-    color: var(--calm-color-accent);
+    color: var(--calm-color-ink-muted);
     font-size: 1.25rem;
   }
 
@@ -471,7 +471,8 @@ const Dot = styled.span`
   width: 0.45em;
   height: 0.45em;
   border-radius: 50%;
-  background: var(--calm-color-accent);
+  /* Muted, not clay: "Continue" is the Lobby's one accent. The word beside it carries the meaning. */
+  background: var(--calm-color-ink-muted);
 `
 
 /** The one large thing in the Lobby: the document to pick back up, with enough of it to recognise. */

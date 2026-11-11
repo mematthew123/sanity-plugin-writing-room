@@ -283,6 +283,8 @@ pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 
 To try a change in a Studio of your own, install a packed tarball (`pnpm pack`, then `npm install ./sanity-plugin-writing-room-*.tgz`) rather than linking the folder: a linked plugin resolves its own copy of Sanity's App SDK, and the room can't start (see [Troubleshooting](#troubleshooting)).
 
+How the room should look, behave and speak is written down in [DESIGN.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/DESIGN.md); read it before changing the interface. A test keeps its token values in step with `src/tokens.ts`.
+
 `src/tokens.ts` and `src/embed.ts` are copies of the design tokens and embed parsing in the Calm Editor template (private), which shares them with its Reading Site. Keep the two in step.
 
 ## License
