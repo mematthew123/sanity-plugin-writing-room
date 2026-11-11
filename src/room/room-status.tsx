@@ -1,4 +1,5 @@
 import {useEditor} from '@portabletext/editor'
+import {CloseIcon} from '@sanity/icons/Close'
 import {MoonIcon} from '@sanity/icons/Moon'
 import {SunIcon} from '@sanity/icons/Sun'
 import {
@@ -18,7 +19,7 @@ import {
   useCurrentUser,
   useValidationStatus,
 } from 'sanity'
-import styled from 'styled-components'
+import styled, {keyframes} from 'styled-components'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
@@ -31,7 +32,7 @@ import {presenceSentence} from './presence'
 import {QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
 
-/** A message in the Room Controls, optionally with one gentle next step. */
+/** A passing message at the foot of the room, optionally with one gentle next step. */
 export interface RoomNotice {
   text: string
   action?: {label: string; onClick: () => void}
@@ -53,7 +54,8 @@ const SAVING_DELAY_MS = 800
 
 /**
  * Whether the Writer's words have reached the Content Lake. Normally a small "Saved" that
- * fades; offline it switches to caution and stays until the connection returns.
+ * fades; offline it switches to caution and stays until the connection returns ({@link
+ * RoomMessage} says what that means for their words).
  */
 export function SaveState({handle}: {handle: DocumentHandle}) {
   const isSynced = useDocumentSyncStatus(handle) ?? true
@@ -76,20 +78,59 @@ export function SaveState({handle}: {handle: DocumentHandle}) {
     return undefined
   }, [isSynced])
 
-  if (!online) {
-    return (
-      <Caution role="status">
-        {isSynced
-          ? 'Offline — changes will sync when you’re back'
-          : 'Offline — your words are safe here and will sync when you’re back'}
-      </Caution>
-    )
-  }
+  if (!online) return <Caution>Offline</Caution>
   return (
     <Quiet role="status" aria-live="polite">
       {shown === 'saving' ? 'Saving…' : shown === 'saved' ? 'Saved' : ''}
     </Quiet>
   )
+}
+
+/**
+ * The one place the room speaks up, at the foot of the page and clear of the Room Controls: a
+ * problem the Writer needs to know about (it stays until dismissed or resolved), being offline,
+ * or a passing notice such as "Published".
+ */
+export function RoomMessage({
+  handle,
+  problem,
+  onDismissProblem,
+  notice,
+}: {
+  handle: DocumentHandle
+  problem: string | null
+  onDismissProblem: () => void
+  notice: RoomNotice | null
+}) {
+  const online = useOnline()
+  const isSynced = useDocumentSyncStatus(handle) ?? true
+
+  if (problem) {
+    return (
+      <Message role="alert" $caution>
+        {problem}
+        <QuietButton icon={CloseIcon} aria-label="Dismiss" onClick={onDismissProblem} />
+      </Message>
+    )
+  }
+  if (!online) {
+    return (
+      <Message role="status" $caution>
+        {isSynced
+          ? 'Offline — changes will sync when you’re back'
+          : 'Offline — your words are safe here and will sync when you’re back'}
+      </Message>
+    )
+  }
+  if (notice) {
+    return (
+      <Message role="status">
+        {notice.text}
+        {notice.action && <QuietButton onClick={notice.action.onClick}>{notice.action.label}</QuietButton>}
+      </Message>
+    )
+  }
+  return null
 }
 
 /** "Draft", "Published", or "Published · unpublished changes". */
@@ -113,7 +154,10 @@ export function Presence({handle}: {handle: DocumentHandle}) {
   return sentence ? <Quiet role="status">{sentence}</Quiet> : null
 }
 
-/** Switches the whole Studio between light and dark; the navbar's own toggle is hidden in here. */
+/**
+ * Switches the whole Studio between light and dark; the navbar's own toggle is hidden in here.
+ * For the Lobby: in a document it's in the `Aa` menu.
+ */
 export function ThemeToggle() {
   const scheme = useColorSchemeValue()
   const setScheme = useColorSchemeSetValue()
@@ -244,14 +288,64 @@ export function PublishButton({
 }
 
 const Quiet = styled.span`
+  min-width: 0;
+  margin-inline: var(--calm-space-sm);
+  overflow: hidden;
   color: var(--calm-color-ink-muted);
+  font-size: var(--calm-type-ui-size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:empty {
+    display: none;
+  }
+`
+
+const Caution = styled.span`
+  flex-shrink: 0;
+  margin-inline: var(--calm-space-sm);
+  color: var(--calm-color-caution);
   font-size: var(--calm-type-ui-size-small);
   white-space: nowrap;
 `
 
-const Caution = styled.span`
-  color: var(--calm-color-caution);
-  font-size: var(--calm-type-ui-size-small);
+const messageIn = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+`
+
+const Message = styled.p<{$caution?: boolean}>`
+  display: flex;
+  align-items: center;
+  gap: var(--calm-space-xs);
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 2.5rem;
+  margin: 0;
+  padding: var(--calm-space-xs) var(--calm-space-md);
+  border-radius: var(--calm-radius-large);
+  background: var(--calm-color-surface);
+  box-shadow: var(--calm-color-floating-shadow);
+  color: ${({$caution}) => ($caution ? 'var(--calm-color-caution)' : 'var(--calm-color-ink)')};
+  font-size: var(--calm-type-ui-size);
+  text-wrap: pretty;
+
+  [data-scheme='dark'] & {
+    box-shadow: inset 0 0 0 1px var(--calm-color-rule);
+  }
+
+  button {
+    flex-shrink: 0;
+    min-height: 1.75rem;
+    margin-inline-end: calc(var(--calm-space-sm) * -1);
+    padding: var(--calm-space-xs) var(--calm-space-sm);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ${messageIn} var(--calm-motion-gentle) var(--calm-motion-easing);
+  }
 `
 
 const PublishPill = styled.button`

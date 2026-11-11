@@ -5,11 +5,12 @@ A calm, full-screen place to write long-form content inside Sanity Studio: Posts
 Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags) stays in the standard form, one click away. It works with the document types you already have.
 
 - **The Lobby**: start something new or pick up recent work.
-- **Controls that recede**: Leave, Details, Preview, Publish and save state fade after a few keystrokes and return when you pause.
+- **Controls that recede**: Leave on one side; status, Details, Preview and Publish on the other. They fade after a few keystrokes and return when you pause. The word count sits at the foot of the page, and anything the room needs to tell you appears there too.
 - **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
-- **An insert menu**: type `+` or `/` on an empty line for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
+- **An insert menu**: click the `+` beside an empty line, or type `/`, for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
 - **Markdown as you type**: `##`, `>`, `-`, `1.`, `---` and code fences.
-- **Room settings**: text size, typewriter scrolling and focus dimming, kept per Writer in the browser (no setup).
+- **Room settings**: one `Aa` menu for text size, typewriter scrolling and focus dimming (kept per Writer in the browser, no setup), dark mode and fullscreen.
+- **Any screen**: on a phone or a narrow window the controls keep to Leave, `Aa` and Publish, and the rest moves into the `Aa` menu.
 - **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
 - **Preview** opens the document on your site in draft mode, exactly as readers will see it.
