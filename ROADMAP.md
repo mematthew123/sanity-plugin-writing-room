@@ -15,7 +15,7 @@
 - **Look and feel:**
   - Fonts shipped with the plugin.
   - Tokens scoped to the room.
-  - A `colors` option.
+  - An `accent` option: the one colour a Studio can change.
   - An optional matching theme (`sanity-plugin-writing-room/theme`).
 - **Hardening:**
   - CI on every pull request.

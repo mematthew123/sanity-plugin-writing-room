@@ -1,4 +1,5 @@
-import {type Palette, palette} from './tokens'
+import {resolvePalette} from './lib/accent'
+import {type Palette} from './tokens'
 import {createContext, createElement, type ReactNode, useContext} from 'react'
 import {type WritingFields} from './room/fields'
 
@@ -6,9 +7,9 @@ import {type WritingFields} from './room/fields'
 export interface WritingRoomTypeOptions {
   /** The document type's name in your schema, e.g. `'post'`. */
   type: string
-  /** What one is called in the room ("Start a new Case Study"). Defaults to the schema type's title. */
+  /** What one is called in the room ("New Case Study"). Defaults to the schema type's title. */
   title?: string
-  /** What several are called ("All Case Studies"). Defaults to `title` made plural. */
+  /** What several are called ("Case Studies"). Defaults to `title` made plural. */
   pluralTitle?: string
   /**
    * Which fields the room uses, when it can't tell from the schema. Usually unnecessary: it finds
@@ -36,38 +37,10 @@ export interface WritingRoomPreviewOptions {
 export type WritingRoomScheme = 'light' | 'dark'
 
 /**
- * The room's colours for one scheme. Change only what you need, e.g. `{accent: '#2F6FA8'}`; keep
- * text readable against `paper` and `surface` (the defaults meet WCAG AA).
+ * The room's accent: one hex colour for both schemes (`'#2F6FA8'`), or one each
+ * (`{light: '#2F6FA8', dark: '#8DB8E0'}`).
  */
-export interface WritingRoomColors {
-  /** The page. */
-  paper?: string
-  /** Raised things on the page: the Lobby's Start buttons, hovered rows. */
-  surface?: string
-  /** Hairlines and outlines. */
-  rule?: string
-  /** Text. */
-  ink?: string
-  /** Secondary text: status, hints. */
-  inkMuted?: string
-  /** Ornaments and placeholders. */
-  inkFaint?: string
-  /** Links, focus rings, the Publish button. */
-  accent?: string
-  /** Text on the accent. */
-  onAccent?: string
-  /** Selected text. */
-  selection?: string
-  /** Problems the Writer needs to fix. */
-  caution?: string
-  /** Popovers' shadow (a CSS box-shadow). */
-  floatingShadow?: string
-}
-
-/** Fails to compile if the palette gains or loses a colour that `WritingRoomColors` doesn't. */
-type SameKeys<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never
-const colorsMatchPalette: SameKeys<Required<WritingRoomColors>, Palette> = true
-void colorsMatchPalette
+export type WritingRoomAccent = string | Partial<Record<WritingRoomScheme, string>>
 
 /** Options for `writingRoom()`. Every one is optional. */
 export interface WritingRoomOptions {
@@ -86,17 +59,19 @@ export interface WritingRoomOptions {
    */
   preview?: WritingRoomPreviewOptions
   /**
-   * The room's colours, over the defaults, per scheme: `{light: {accent: '#2F6FA8'}, dark: {…}}`.
-   * They apply inside the room only, never to the rest of the Studio.
+   * The room's accent colour (links, the caret, focus rings, Publish), as a hex colour. It's the
+   * one colour you can change: the room keeps it readable on its paper in light and dark, and
+   * works out the selection highlight and the text on Publish from it. Inside the room only.
    */
-  colors?: Partial<Record<WritingRoomScheme, WritingRoomColors>>
+  accent?: WritingRoomAccent
 }
 
 /** The options with every default filled in, as the room reads them. */
 export interface WritingRoomConfig {
   /** Never empty. */
   types: WritingRoomTypeOptions[]
-  colors: Record<WritingRoomScheme, Required<WritingRoomColors>>
+  /** The room's whole palette per scheme, with the Studio's accent worked in. */
+  colors: Record<WritingRoomScheme, Palette>
   preview: Required<WritingRoomPreviewOptions> | null
 }
 
@@ -121,10 +96,7 @@ export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConf
   const {preview} = options
   return {
     types: resolveTypes(options.types),
-    colors: {
-      light: {...palette.light, ...options.colors?.light},
-      dark: {...palette.dark, ...options.colors?.dark},
-    },
+    colors: resolvePalette(options.accent),
     preview: preview
       ? {
           origin: preview.origin,

@@ -4,7 +4,7 @@ import {getFocusTextBlock, isSelectionCollapsed} from '@portabletext/editor/sele
 import {getTextBlockText, isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineTypeaheadPicker, useTypeaheadPicker} from '@portabletext/plugin-typeahead-picker'
 import {AddIcon} from '@sanity/icons/Add'
-import {useCallback, useEffect, useLayoutEffect, useMemo, useState} from 'react'
+import {type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useState} from 'react'
 import styled from 'styled-components'
 import {type BodyAllows, useBodyAllows} from './allows'
 import {commandEvents, type InsertCommand, type InsertCommandId, matchCommands} from './commands'
@@ -108,7 +108,13 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
         type="button"
         aria-label="Insert"
         aria-expanded={menuOpen}
-        style={{top: lineRect.top + lineRect.height / 2, left: lineRect.left}}
+        style={
+          {
+            top: lineRect.top + lineRect.height / 2,
+            '--calm-line-start': `${lineRect.left}px`,
+            '--calm-line-end': `${lineRect.right}px`,
+          } as CSSProperties
+        }
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => {
           setActiveIndex(0)
@@ -214,12 +220,16 @@ function Menu({
   )
 }
 
+/** Below this the column's own padding is all the margin there is, and the `+` wouldn't fit in it. */
+const NO_PLUS_MARGIN = '@media (max-width: 45rem)'
+
 const PlusButton = styled.button`
   position: fixed;
   z-index: 10;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  left: var(--calm-line-start);
   width: 1.75rem;
   height: 1.75rem;
   margin-left: calc(-1.75rem - var(--calm-space-md));
@@ -247,6 +257,14 @@ const PlusButton = styled.button`
 
   svg {
     font-size: 1.25rem;
+  }
+
+  /* No margin to sit in: move to the far end of the (empty) line, at a size a thumb can hit. */
+  ${NO_PLUS_MARGIN} {
+    left: calc(var(--calm-line-end) - 2.25rem);
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-left: 0;
   }
 
   @media (prefers-reduced-motion: reduce) {

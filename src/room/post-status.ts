@@ -9,7 +9,7 @@ export interface PostStatus {
   lastEditedAt: string | undefined
 }
 
-/** Describes a Post's state in the Writer's words (see Q16 in the design session). */
+/** Describes a Post's state in the Writer's words (see DESIGN.md, Voice & Copy). */
 export function describePostStatus(status: DocumentEditStatus | undefined): PostStatus {
   const draft = status?.lastEditedDraftAt
   const published = status?.lastEditedPublishedAt

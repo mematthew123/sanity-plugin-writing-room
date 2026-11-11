@@ -86,8 +86,8 @@ describe('resolveConfig', () => {
     expect(preview?.pathname('hello', 'caseStudy')).toBe('/caseStudy/hello')
   })
 
-  it('changes only the colours given, per scheme', () => {
-    const {colors} = resolveConfig({colors: {light: {accent: '#2F6FA8'}}})
+  it('changes only the accent, for the scheme given', () => {
+    const {colors} = resolveConfig({accent: {light: '#2F6FA8'}})
     expect(colors.light.accent).toBe('#2F6FA8')
     expect(colors.light.paper).toBe(resolveConfig().colors.light.paper)
     expect(colors.dark).toEqual(resolveConfig().colors.dark)

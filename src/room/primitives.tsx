@@ -24,12 +24,31 @@ export const Surface = styled.div`
   }
 `
 
+/** A phone, or a window about that narrow: the Room Controls keep only what fits. */
+export const NARROW = '@media (max-width: 40rem)'
+
+/** Too narrow for anything to sit in the margin beside the column. */
+export const NO_MARGIN = '@media (max-width: 64rem)'
+
 /** The single centred column, the width of the measure. */
 export const Column = styled.div`
   box-sizing: content-box;
   max-width: var(--calm-measure);
   margin-inline: auto;
   padding: var(--calm-space-xxl) var(--calm-space-lg) var(--calm-space-xxl);
+
+  ${NARROW} {
+    padding-block: var(--calm-space-lg) var(--calm-space-xl);
+  }
+`
+
+/** Shown only where there's room for it; elsewhere it isn't there at all. */
+export const WideOnly = styled.span`
+  display: contents;
+
+  ${NARROW} {
+    display: none;
+  }
 `
 
 const ControlsBar = styled.header`
@@ -40,11 +59,18 @@ const ControlsBar = styled.header`
   align-items: center;
   justify-content: space-between;
   gap: var(--calm-space-md);
-  padding: var(--calm-space-md) var(--calm-space-lg);
+  padding: var(--calm-space-md) var(--calm-space-lg) var(--calm-space-lg);
+  /* Paper behind the controls, fading out below them, so Prose never scrolls through them. */
+  background: linear-gradient(to bottom, var(--calm-color-paper) 60%, transparent);
   pointer-events: none;
 
   & > * {
     pointer-events: auto;
+  }
+
+  ${NARROW} {
+    gap: var(--calm-space-sm);
+    padding-inline: var(--calm-space-sm);
   }
 
   [data-recedes] {
@@ -68,12 +94,19 @@ const ControlsBar = styled.header`
 
 const ControlsGroup = styled.div`
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--calm-space-xs);
+
+  /* The end group gives way first: its status text shortens before anything wraps. */
+  &:last-child {
+    flex-shrink: 1;
+    min-width: 0;
+  }
 `
 
 /**
- * Room Controls: quiet, in the corners, never over the Prose. Wrap anything that should fade
+ * Room Controls: quiet, in the corners, with paper behind them so Prose never shows through. Wrap anything that should fade
  * while the Writer types in {@link Recedes}; leave things that must stay visible (offline,
  * a blocked publish, presence) unwrapped.
  */
@@ -134,6 +167,7 @@ const QuietButtonRoot = styled.button`
 /** Room Controls that fade while the Writer is typing. */
 const RecedesRoot = styled.div`
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: var(--calm-space-xs);
 `

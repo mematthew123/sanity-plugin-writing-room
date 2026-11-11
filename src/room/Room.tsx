@@ -1,6 +1,5 @@
 import {EditorProvider, useEditor} from '@portabletext/editor'
 import {ArrowLeftIcon} from '@sanity/icons/ArrowLeft'
-import {CloseIcon} from '@sanity/icons/Close'
 import {
   discardDocument,
   type DocumentHandle,
@@ -9,26 +8,37 @@ import {
   useDocumentProjection,
 } from '@sanity/sdk-react'
 import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue} from 'sanity'
+import {useColorSchemeValue, useDataset, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import styled from 'styled-components'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
+import {didComeFromForm} from './came-from'
 import {useWritingKind} from './kinds'
+import {rememberLastOpened} from './last-opened'
 import {isEmptyPost} from './empty-post'
 import {type WritingFields} from './fields'
 import {useOpenDetails} from './navigation'
-import {FullscreenToggle, RoomSettingsMenu, WordCount} from './comfort'
+import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
 import {PreviewButton} from './PreviewButton'
-import {Column, Placeholder, QuietButton, Recedes, RoomControls} from './primitives'
+import {
+  Column,
+  NARROW,
+  NO_MARGIN,
+  Placeholder,
+  QuietButton,
+  Recedes,
+  RoomControls,
+  WideOnly,
+} from './primitives'
 import {
   Presence,
   PublishButton,
+  RoomMessage,
   type RoomNotice,
   SaveState,
   StatusLabel,
-  ThemeToggle,
 } from './room-status'
 import {useRoomSettings} from './room-settings'
 import {TitleField} from './TitleField'
@@ -68,6 +78,8 @@ function LoadingRoom() {
 }
 
 const NOTICE_VISIBLE_MS = 8000
+/** Long enough to reach for a notice that offers somewhere to go. */
+const NOTICE_WITH_NEXT_STEP_MS = 16000
 
 function LoadedRoom({
   handle,
@@ -91,69 +103,89 @@ function LoadedRoom({
   const receded = useRecede(page)
   const [notice, setNotice] = useState<RoomNotice | null>(null)
   const [settings] = useRoomSettings()
+  const projectId = useProjectId()
+  const dataset = useDataset()
+
+  // So the Lobby can offer to continue this one.
+  useEffect(() => {
+    rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
+  }, [projectId, dataset, handle.documentId, handle.documentType])
 
   useEffect(() => {
     if (!notice) return undefined
-    const timer = setTimeout(() => setNotice(null), NOTICE_VISIBLE_MS)
+    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
+    const timer = setTimeout(() => setNotice(null), visibleFor)
     return () => clearTimeout(timer)
   }, [notice])
 
+  const details = <DetailsButton handle={handle} />
+  const preview = (
+    <PreviewButton documentType={handle.documentType} slug={data?.slug} onProblem={onProblem} />
+  )
+
   return (
     <EditorProvider initialConfig={{schemaDefinition}}>
-      <RoomControls
-        receded={receded}
-        start={
-          <Recedes>
-            <LeaveButton handle={handle} isPublished={isPublished} />
-            <FullscreenToggle />
-          </Recedes>
-        }
-        end={
-          <>
-            {problem && (
-              <Problem role="alert">
-                {problem}
-                <QuietButton icon={CloseIcon} aria-label="Dismiss" onClick={() => onProblem(null)} />
-              </Problem>
-            )}
-            <Presence handle={handle} />
-            <SaveState handle={handle} />
+      <Layout>
+        {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
+        <RoomControls
+          receded={receded}
+          start={
             <Recedes>
-              {notice ? (
-                <Notice role="status">
-                  {notice.text}
-                  {notice.action && (
-                    <QuietButton onClick={notice.action.onClick}>{notice.action.label}</QuietButton>
-                  )}
-                </Notice>
-              ) : (
-                <>
-                  <WordCount />
-                  <StatusLabel status={status} />
-                </>
-              )}
-              <RoomSettingsMenu scheme={scheme} />
-              <ThemeToggle />
-              <DetailsButton handle={handle} />
-              <PreviewButton
-                documentType={handle.documentType}
-                slug={data?.slug}
-                onProblem={onProblem}
-              />
-              <PublishButton
-                handle={handle}
-                status={status}
-                onProblem={onProblem}
-                onNotice={setNotice}
-              />
+              <LeaveButton handle={handle} isPublished={isPublished} />
             </Recedes>
-          </>
-        }
-      />
-      <Page as="article" ref={page} $textSize={settings.textSize}>
-        <Title handle={handle} fields={fields} isPublished={isPublished} />
-        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
-      </Page>
+          }
+          end={
+            <>
+              <Presence handle={handle} />
+              <SaveState handle={handle} />
+              <Recedes>
+                <WideOnly>
+                  <StatusLabel status={status} />
+                </WideOnly>
+                <RoomSettingsMenu
+                  scheme={scheme}
+                  more={
+                    <>
+                      {details}
+                      {preview}
+                    </>
+                  }
+                />
+                <WideOnly>
+                  {details}
+                  {preview}
+                </WideOnly>
+                <PublishButton
+                  handle={handle}
+                  status={status}
+                  scheme={scheme}
+                  onProblem={onProblem}
+                  onNotice={setNotice}
+                />
+              </Recedes>
+            </>
+          }
+        />
+        <Main>
+          <Page as="article" ref={page} $textSize={settings.textSize}>
+            <Title handle={handle} fields={fields} isPublished={isPublished} />
+            <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
+          </Page>
+        </Main>
+        <Foot>
+          <Count data-receded={receded}>
+            <WordCount />
+          </Count>
+          <Messages>
+            <RoomMessage
+              handle={handle}
+              problem={problem}
+              onDismissProblem={() => onProblem(null)}
+              notice={notice}
+            />
+          </Messages>
+        </Foot>
+      </Layout>
     </EditorProvider>
   )
 }
@@ -180,25 +212,35 @@ function Title({
 }
 
 /**
- * Leave (or Esc) returns to the Lobby. A document that was never published and is still completely
- * empty (Prose and Details alike) is discarded on the way out, so an abandoned "Start a new Post"
- * leaves nothing behind.
+ * Leave (or Esc) returns the Writer to where they came from: the document's form if they opened
+ * it from there, otherwise the Lobby. A document that was never published and is still completely
+ * empty (Prose and Details alike) is discarded on the way out, so an abandoned "New Post" leaves
+ * nothing behind; with nothing left to show in the form, that always ends in the Lobby.
  */
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
+  const openDetails = useOpenDetails(handle)
+  const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post, fields)) void apply(discardDocument(handle))
-    router.navigate({})
-  }, [apply, handle, isPublished, post, fields, router])
+    if (!isPublished && isEmptyPost(post, fields)) {
+      void apply(discardDocument(handle))
+      router.navigate({})
+    } else if (toForm) {
+      openDetails()
+    } else {
+      router.navigate({})
+    }
+  }, [apply, handle, isPublished, post, fields, router, toForm, openDetails])
   useEscape(leave)
 
+  const label = toForm ? 'Back to the form' : 'Back to the Lobby'
   return (
-    <QuietButton icon={ArrowLeftIcon} onClick={leave}>
-      Leave
+    <QuietButton icon={ArrowLeftIcon} aria-label={label} title={label} onClick={leave}>
+      <WideOnly>Leave</WideOnly>
     </QuietButton>
   )
 }
@@ -215,25 +257,63 @@ const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
   line-height: var(--calm-type-prose-leading);
 `
 
-const Notice = styled.span`
+/** The room from top to bottom: Room Controls, the page, and a foot that stays in view. */
+const Layout = styled.div`
   display: flex;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
+  flex-direction: column;
+  min-height: 100%;
 `
 
-const Problem = styled.p`
-  display: flex;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  margin: 0;
-  color: var(--calm-color-caution);
-  font-size: var(--calm-type-ui-size-small);
+const Main = styled.div`
+  flex: 1;
+`
 
-  button {
-    min-height: 1.75rem;
-    padding: var(--calm-space-xs);
-    color: inherit;
+/**
+ * The foot of the room: the word count in the margin, and the room's one message slot in the
+ * middle. Clicks pass through everywhere but the message.
+ */
+const Foot = styled.footer`
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: end;
+  gap: var(--calm-space-md);
+  padding: var(--calm-space-md) var(--calm-space-lg);
+  pointer-events: none;
+
+  ${NO_MARGIN} {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  ${NARROW} {
+    padding-inline: var(--calm-space-sm);
+  }
+`
+
+/** Recedes with the Room Controls. Without a margin to sit in, it's in the `Aa` menu instead. */
+const Count = styled.div`
+  transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
+
+  &[data-receded='true'] {
+    opacity: 0.08;
+  }
+
+  ${NO_MARGIN} {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`
+
+const Messages = styled.div`
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+
+  & > * {
+    pointer-events: auto;
   }
 `
