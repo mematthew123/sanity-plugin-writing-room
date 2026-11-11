@@ -4,7 +4,7 @@ A calm, full-screen place to write long-form content inside Sanity Studio: Posts
 
 Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags) stays in the standard form, one click away. It works with the document types you already have.
 
-- **The Lobby**: start something new or pick up recent work.
+- **The Lobby**: a doorway, not a document browser. Continue the piece you were last in, start something new, or pick from a few recent ones. The Studio's navbar stays above it, and Structure is one link away for everything else.
 - **Controls that recede**: Leave on one side; status, Details, Preview and Publish on the other. They fade after a few keystrokes and return when you pause. The word count sits at the foot of the page, and anything the room needs to tell you appears there too.
 - **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
 - **An insert menu**: click the `+` beside an empty line, or type `/`, for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
@@ -106,8 +106,8 @@ If you changed the room's accent, build the theme from the same one: `theme: cre
 
 ## What the plugin adds
 
-- the **Writing Room** Tool at `/writing-room`, with a Lobby of recent writing;
-- an **Open in Writing Room** action on the room's document types (Posts, by default);
+- the **Writing Room** Tool at `/writing-room`, with a Lobby to continue or start from;
+- an **Open in Writing Room** action on the room's document types (Posts, by default). Leave then takes you back to that document's form; from the Lobby, back to the Lobby;
 - a wrapper around the built-in **Publish** on those types, so a document published from the form gets the same settled slug and published date as one published from the room.
 
 ## Document types
@@ -156,7 +156,7 @@ Blocks of your own that the room doesn't know (a `callout`, a product card…) k
 
 ### Labels and URLs
 
-The Lobby gets a **Start a new …** button and an **All …** link for each type, and Recent lists them together. **All …** opens the type's most recent document in Structure, wherever your Structure keeps that list. The room names each type with its schema `title` ("Case Study", "Case Studies"). If the plural comes out wrong, set it yourself:
+The Lobby's **New** button starts a document of your type ("New Post"); with several types it asks which. Recent writing lists them together. The room names each type with its schema `title` ("Case Study"). If a name comes out wrong, set it yourself:
 
 ```ts
 writingRoom({
@@ -167,8 +167,8 @@ writingRoom({
 | Option | Default | What it does |
 |---|---|---|
 | `types` | `['post']` | The document types the room writes, as names or `{type, title?, pluralTitle?, fields?}`. |
-| `types[].title` | the schema type's `title` | What one is called: "Start a new Case Study". |
-| `types[].pluralTitle` | `title` made plural | What several are called: "All Case Studies". |
+| `types[].title` | the schema type's `title` | What one is called: "New Case Study". |
+| `types[].pluralTitle` | `title` made plural | What several are called: "Case Studies". |
 | `types[].fields` | detected | `{title?, body?, slug?, publishedAt?, image?}`: field names, when the room guesses wrong. |
 
 The first type is the default: its documents open at `/writing-room/<id>`, the others at `/writing-room/<type>/<id>`. A Studio with one type keeps short URLs, and links to it keep working if you add more types later, as long as it stays first.

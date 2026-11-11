@@ -1,8 +1,6 @@
 import {useEditor} from '@portabletext/editor'
 import {CheckmarkCircleIcon} from '@sanity/icons/CheckmarkCircle'
 import {CloseIcon} from '@sanity/icons/Close'
-import {MoonIcon} from '@sanity/icons/Moon'
-import {SunIcon} from '@sanity/icons/Sun'
 import {
   type DocumentHandle,
   editDocument,
@@ -15,8 +13,6 @@ import {
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {
   useClient,
-  useColorSchemeSetValue,
-  useColorSchemeValue,
   useCurrentUser,
   useValidationStatus,
 } from 'sanity'
@@ -165,25 +161,6 @@ export function Presence({handle}: {handle: DocumentHandle}) {
   }
   const sentence = presenceSentence([...others.values()])
   return sentence ? <Quiet role="status">{sentence}</Quiet> : null
-}
-
-/**
- * Switches the whole Studio between light and dark; the navbar's own toggle is hidden in here.
- * For the Lobby: in a document it's in the `Aa` menu.
- */
-export function ThemeToggle() {
-  const scheme = useColorSchemeValue()
-  const setScheme = useColorSchemeSetValue()
-  if (!setScheme) return null
-  const next = scheme === 'dark' ? 'light' : 'dark'
-  return (
-    <QuietButton
-      icon={scheme === 'dark' ? SunIcon : MoonIcon}
-      aria-label={`Switch to ${next} mode`}
-      title={`Switch to ${next} mode`}
-      onClick={() => setScheme(next)}
-    />
-  )
 }
 
 const SETTLE_TIMEOUT_MS = 4000

@@ -8,12 +8,14 @@ import {
   useDocumentProjection,
 } from '@sanity/sdk-react'
 import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue} from 'sanity'
+import {useColorSchemeValue, useDataset, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import styled from 'styled-components'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
+import {didComeFromForm} from './came-from'
 import {useWritingKind} from './kinds'
+import {rememberLastOpened} from './last-opened'
 import {isEmptyPost} from './empty-post'
 import {type WritingFields} from './fields'
 import {useOpenDetails} from './navigation'
@@ -101,6 +103,13 @@ function LoadedRoom({
   const receded = useRecede(page)
   const [notice, setNotice] = useState<RoomNotice | null>(null)
   const [settings] = useRoomSettings()
+  const projectId = useProjectId()
+  const dataset = useDataset()
+
+  // So the Lobby can offer to continue this one.
+  useEffect(() => {
+    rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
+  }, [projectId, dataset, handle.documentId, handle.documentType])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -203,24 +212,34 @@ function Title({
 }
 
 /**
- * Leave (or Esc) returns to the Lobby. A document that was never published and is still completely
- * empty (Prose and Details alike) is discarded on the way out, so an abandoned "Start a new Post"
- * leaves nothing behind.
+ * Leave (or Esc) returns the Writer to where they came from: the document's form if they opened
+ * it from there, otherwise the Lobby. A document that was never published and is still completely
+ * empty (Prose and Details alike) is discarded on the way out, so an abandoned "New Post" leaves
+ * nothing behind; with nothing left to show in the form, that always ends in the Lobby.
  */
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
+  const openDetails = useOpenDetails(handle)
+  const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post, fields)) void apply(discardDocument(handle))
-    router.navigate({})
-  }, [apply, handle, isPublished, post, fields, router])
+    if (!isPublished && isEmptyPost(post, fields)) {
+      void apply(discardDocument(handle))
+      router.navigate({})
+    } else if (toForm) {
+      openDetails()
+    } else {
+      router.navigate({})
+    }
+  }, [apply, handle, isPublished, post, fields, router, toForm, openDetails])
   useEscape(leave)
 
+  const label = toForm ? 'Back to the form' : 'Back to the Lobby'
   return (
-    <QuietButton icon={ArrowLeftIcon} aria-label="Leave" onClick={leave}>
+    <QuietButton icon={ArrowLeftIcon} aria-label={label} title={label} onClick={leave}>
       <WideOnly>Leave</WideOnly>
     </QuietButton>
   )

@@ -7,7 +7,7 @@ interface Node {
 
 const WORDS_PER_MINUTE = 238
 
-function countWords(text: string): number {
+export function countWords(text: string): number {
   return text.split(/\s+/).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
 }
 

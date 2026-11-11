@@ -7,9 +7,9 @@ import {type WritingFields} from './room/fields'
 export interface WritingRoomTypeOptions {
   /** The document type's name in your schema, e.g. `'post'`. */
   type: string
-  /** What one is called in the room ("Start a new Case Study"). Defaults to the schema type's title. */
+  /** What one is called in the room ("New Case Study"). Defaults to the schema type's title. */
   title?: string
-  /** What several are called ("All Case Studies"). Defaults to `title` made plural. */
+  /** What several are called ("Case Studies"). Defaults to `title` made plural. */
   pluralTitle?: string
   /**
    * Which fields the room uses, when it can't tell from the schema. Usually unnecessary: it finds
