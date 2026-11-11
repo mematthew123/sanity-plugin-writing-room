@@ -76,6 +76,8 @@ function LoadingRoom() {
 }
 
 const NOTICE_VISIBLE_MS = 8000
+/** Long enough to reach for a notice that offers somewhere to go. */
+const NOTICE_WITH_NEXT_STEP_MS = 16000
 
 function LoadedRoom({
   handle,
@@ -102,7 +104,8 @@ function LoadedRoom({
 
   useEffect(() => {
     if (!notice) return undefined
-    const timer = setTimeout(() => setNotice(null), NOTICE_VISIBLE_MS)
+    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
+    const timer = setTimeout(() => setNotice(null), visibleFor)
     return () => clearTimeout(timer)
   }, [notice])
 
@@ -146,6 +149,7 @@ function LoadedRoom({
                 <PublishButton
                   handle={handle}
                   status={status}
+                  scheme={scheme}
                   onProblem={onProblem}
                   onNotice={setNotice}
                 />

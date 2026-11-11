@@ -12,7 +12,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Room settings**: one `Aa` menu for text size, typewriter scrolling and focus dimming (kept per Writer in the browser, no setup), dark mode and fullscreen.
 - **Any screen**: on a phone or a narrow window the controls keep to Leave, `Aa` and Publish, and the rest moves into the `Aa` menu.
 - **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
-- **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it.
+- **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it; if nothing does, it shows where the document will go live and asks once. Afterwards, a link to the live page (when `preview` says where your site is).
 - **Preview** opens the document on your site in draft mode, exactly as readers will see it.
 
 > **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/CHANGELOG.md). What's next is in the [roadmap](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/ROADMAP.md).
@@ -74,16 +74,16 @@ That's all. Run `sanity dev`: **Writing Room** appears in the Studio's navigatio
 The room brings its own look, and none of it reaches the rest of your Studio:
 
 - **Fonts.** Newsreader (prose, with a true italic) and Figtree (controls) come with the plugin, Latin and Latin Extended, and load the first time the room opens. Nothing to install. Other scripts fall back to Georgia and the system UI font.
-- **Colours.** The room's paper, warm neutrals and clay accent apply inside the room only. To change them, pass the ones you want per scheme; the rest keep their defaults:
+- **Colours.** The room's paper, warm neutrals and clay accent apply inside the room only. The accent (links, the caret, focus rings, Publish) is the one colour you can change, to match your brand:
 
   ```ts
   writingRoom({
     types: ['post'],
-    colors: {light: {accent: '#2F6FA8'}, dark: {accent: '#8DB8E0'}},
+    accent: '#2F6FA8',
   })
   ```
 
-  The colours are `paper`, `surface`, `rule`, `ink`, `inkMuted`, `inkFaint`, `accent`, `onAccent`, `selection`, `caution` and `floatingShadow`. Keep text readable against `paper` and `surface`; the defaults meet WCAG AA.
+  Give one hex colour and the room uses it in light and dark, adjusting it where it has to so it stays readable on the room's paper (WCAG AA), and works out the selection highlight and the text on Publish from it. To choose each yourself: `accent: {light: '#2F6FA8', dark: '#8DB8E0'}`.
 
 ### A matching Studio theme (optional)
 
@@ -102,7 +102,7 @@ export default defineConfig({
 })
 ```
 
-If you changed the room's colours, build the theme from the same ones: `theme: createWritingRoomTheme({colors})`.
+If you changed the room's accent, build the theme from the same one: `theme: createWritingRoomTheme({accent: '#2F6FA8'})`.
 
 ## What the plugin adds
 
