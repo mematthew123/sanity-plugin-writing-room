@@ -231,10 +231,12 @@ const Divider = styled.span`
 
 const Button = styled.button<{$active: boolean}>`
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   min-width: 2rem;
   height: 2rem;
+  white-space: nowrap;
   padding: 0 var(--calm-space-sm);
   border: 0;
   border-radius: var(--calm-radius-pill);

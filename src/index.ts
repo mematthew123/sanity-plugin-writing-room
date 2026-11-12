@@ -1,6 +1,6 @@
 export {writingRoom} from './plugin'
 export type {
-  WritingRoomColors,
+  WritingRoomAccent,
   WritingRoomScheme,
   WritingRoomOptions,
   WritingRoomPreviewOptions,

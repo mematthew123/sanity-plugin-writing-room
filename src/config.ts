@@ -1,12 +1,13 @@
-import {type Palette, palette} from './tokens'
+import {resolvePalette} from './lib/accent'
+import {type Palette} from './tokens'
 import {createContext, createElement, type ReactNode, useContext} from 'react'
 import {type WritingFields} from './room/fields'
 
 export interface WritingRoomTypeOptions {
   type: string
-  /** Defaults to the schema type's title. */
+  /** What one is called in the room ("New Case Study"). Defaults to the schema type's title. */
   title?: string
-  /** Defaults to `title` made plural. */
+  /** What several are called ("Case Studies"). Defaults to `title` made plural. */
   pluralTitle?: string
   /** Only needed when the room can't detect a field from the schema. */
   fields?: Partial<WritingFields>
@@ -23,34 +24,11 @@ export interface WritingRoomPreviewOptions {
 
 export type WritingRoomScheme = 'light' | 'dark'
 
-/** Keep text readable against `paper` and `surface`; the defaults meet WCAG AA. */
-export interface WritingRoomColors {
-  /** Page background. */
-  paper?: string
-  /** Raised elements: buttons, hovered rows. */
-  surface?: string
-  /** Hairlines and borders. */
-  rule?: string
-  /** Body text. */
-  ink?: string
-  /** Secondary text. */
-  inkMuted?: string
-  /** Ornaments and placeholders. */
-  inkFaint?: string
-  /** Links, focus rings, Publish. */
-  accent?: string
-  onAccent?: string
-  selection?: string
-  /** Problems the Writer needs to fix. */
-  caution?: string
-  /** A CSS box-shadow for popovers. */
-  floatingShadow?: string
-}
-
-/** Keeps `WritingRoomColors` in step with the palette. */
-type SameKeys<A, B> = [keyof A] extends [keyof B] ? ([keyof B] extends [keyof A] ? true : never) : never
-const colorsMatchPalette: SameKeys<Required<WritingRoomColors>, Palette> = true
-void colorsMatchPalette
+/**
+ * The room's accent: one hex colour for both schemes (`'#2F6FA8'`), or one each
+ * (`{light: '#2F6FA8', dark: '#8DB8E0'}`).
+ */
+export type WritingRoomAccent = string | Partial<Record<WritingRoomScheme, string>>
 
 export interface WritingRoomOptions {
   /**
@@ -60,14 +38,18 @@ export interface WritingRoomOptions {
   types?: Array<string | WritingRoomTypeOptions>
   /** Shows a Preview button that opens the draft on your site. Hidden when omitted. */
   preview?: WritingRoomPreviewOptions
-  /** Overrides per scheme, e.g. `{light: {accent: '#2F6FA8'}}`. Applies inside the room only. */
-  colors?: Partial<Record<WritingRoomScheme, WritingRoomColors>>
+  /**
+   * The room's accent (links, the caret, focus rings, Publish). The room keeps it readable on its
+   * paper in both schemes and derives the selection and on-Publish text from it. Inside the room only.
+   */
+  accent?: WritingRoomAccent
 }
 
 export interface WritingRoomConfig {
   /** Never empty. */
   types: WritingRoomTypeOptions[]
-  colors: Record<WritingRoomScheme, Required<WritingRoomColors>>
+  /** The room's whole palette per scheme, with the Studio's accent worked in. */
+  colors: Record<WritingRoomScheme, Palette>
   preview: Required<WritingRoomPreviewOptions> | null
 }
 
@@ -92,10 +74,7 @@ export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConf
   const {preview} = options
   return {
     types: resolveTypes(options.types),
-    colors: {
-      light: {...palette.light, ...options.colors?.light},
-      dark: {...palette.dark, ...options.colors?.dark},
-    },
+    colors: resolvePalette(options.accent),
     preview: preview
       ? {
           origin: preview.origin,

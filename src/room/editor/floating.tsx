@@ -75,11 +75,12 @@ export function useViewportChanges(onChange: () => void) {
   }, [onChange])
 }
 
-/** Never taller than the window, so `Floating`'s clamp always fits it. */
+/** Never bigger than the window, so `Floating`'s clamp always fits it. */
 export const FloatingSurface = styled.div<{$round?: boolean}>`
   box-sizing: border-box;
+  max-width: calc(100vw - ${EDGE * 2}px);
   max-height: calc(100dvh - ${EDGE * 2}px);
-  overflow-y: auto;
+  overflow: auto;
   overscroll-behavior: contain;
   padding: var(--calm-space-xs);
   border-radius: ${({$round}) => ($round ? 'var(--calm-radius-pill)' : 'var(--calm-radius-large)')};

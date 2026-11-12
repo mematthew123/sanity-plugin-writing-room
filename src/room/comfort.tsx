@@ -1,10 +1,9 @@
 import {useEditor, useEditorSelector} from '@portabletext/editor'
-import {CollapseIcon} from '@sanity/icons/Collapse'
-import {ExpandIcon} from '@sanity/icons/Expand'
-import {useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react'
+import {type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react'
+import {useColorSchemeSetValue, useColorSchemeValue} from 'sanity'
 import styled from 'styled-components'
 import {Floating, FloatingSurface} from './editor/floating'
-import {QuietButton} from './primitives'
+import {NARROW, NO_MARGIN, QuietButton} from './primitives'
 import {type RoomSettings, useRoomSettings} from './room-settings'
 import {readingTime, wordCount} from './word-count'
 
@@ -27,8 +26,12 @@ const TEXT_SIZES: Array<{value: RoomSettings['textSize']; label: string}> = [
   {value: 'large', label: 'L'},
 ]
 
-export function RoomSettingsMenu({scheme}: {scheme: string}) {
+/** `more` holds Room Controls that don't fit the bar on a narrow screen. */
+export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNode}) {
   const [settings, update] = useRoomSettings()
+  const setScheme = useColorSchemeSetValue()
+  const isDark = useColorSchemeValue() === 'dark'
+  const isFullscreen = useFullscreen()
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
@@ -72,6 +75,9 @@ export function RoomSettingsMenu({scheme}: {scheme: string}) {
           }}
         >
           <Panel ref={panel} role="dialog" aria-label="Room settings">
+            <PanelCount>
+              <WordCount />
+            </PanelCount>
             <Setting>
               <span id="calm-text-size">Text size</span>
               <Segments role="radiogroup" aria-labelledby="calm-text-size">
@@ -102,6 +108,23 @@ export function RoomSettingsMenu({scheme}: {scheme: string}) {
               checked={settings.focusDimming}
               onChange={(focusDimming) => update({focusDimming})}
             />
+            {setScheme && (
+              <Toggle
+                label="Dark mode"
+                hint="For the whole Studio"
+                checked={isDark}
+                onChange={(dark) => setScheme(dark ? 'dark' : 'light')}
+              />
+            )}
+            {document.fullscreenEnabled && (
+              <Toggle
+                label="Fullscreen"
+                hint={`Hides the browser too · ${FULLSCREEN_KEYS}`}
+                checked={isFullscreen}
+                onChange={() => void toggleFullscreen()}
+              />
+            )}
+            {more && <More>{more}</More>}
           </Panel>
         </Floating>
       )}
@@ -141,9 +164,11 @@ function subscribeFullscreen(onChange: () => void) {
   return () => document.removeEventListener('fullscreenchange', onChange)
 }
 
-export function FullscreenToggle() {
-  const isFullscreen = useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement)
+const FULLSCREEN_KEYS =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘⇧F' : 'Ctrl+Shift+F'
 
+/** Opt-in only. The browser takes the first Esc to leave fullscreen. */
+function useFullscreen(): boolean {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'f') {
@@ -155,16 +180,7 @@ export function FullscreenToggle() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  if (!document.fullscreenEnabled) return null
-  const label = isFullscreen ? 'Exit fullscreen' : 'Fullscreen (⌘⇧F)'
-  return (
-    <QuietButton
-      icon={isFullscreen ? CollapseIcon : ExpandIcon}
-      aria-label={label}
-      title={label}
-      onClick={() => void toggleFullscreen()}
-    />
-  )
+  return useSyncExternalStore(subscribeFullscreen, () => !!document.fullscreenElement)
 }
 
 async function toggleFullscreen() {
@@ -190,7 +206,7 @@ const Glyph = styled.span`
 const Panel = styled(FloatingSurface)`
   display: grid;
   gap: var(--calm-space-xs);
-  width: 17rem;
+  width: 18rem;
   padding: var(--calm-space-sm);
 `
 
@@ -240,10 +256,85 @@ const Segment = styled.button<{$active: boolean}>`
 `
 
 const Switch = styled.input`
+  position: relative;
   flex-shrink: 0;
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 2.25rem;
+  height: 1.375rem;
   margin: 0;
-  accent-color: var(--calm-color-accent);
+  border-radius: var(--calm-radius-pill);
+  background: var(--calm-color-ink-faint);
+  appearance: none;
   cursor: pointer;
+  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.375rem - 4px);
+    height: calc(1.375rem - 4px);
+    border-radius: 50%;
+    background: var(--calm-color-paper);
+    transition: transform var(--calm-motion-gentle) var(--calm-motion-easing);
+  }
+
+  &:checked {
+    background: var(--calm-color-accent);
+  }
+
+  &:checked::before {
+    transform: translateX(0.875rem);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &::before {
+      transition: none;
+    }
+  }
+`
+
+/** The word count, here only when there's no margin for it at the foot of the room. */
+const PanelCount = styled.div`
+  display: none;
+
+  ${NO_MARGIN} {
+    display: block;
+    padding: var(--calm-space-xs) var(--calm-space-sm);
+
+    &:empty {
+      display: none;
+    }
+  }
+`
+
+/** Room Controls that moved out of the bar on a narrow screen. */
+const More = styled.div`
+  display: none;
+
+  ${NARROW} {
+    display: grid;
+    margin-top: var(--calm-space-xs);
+    padding-top: var(--calm-space-xs);
+    border-top: 1px solid var(--calm-color-rule);
+
+    button {
+      justify-content: flex-start;
+      width: 100%;
+      padding-inline: var(--calm-space-sm);
+      border-radius: var(--calm-radius);
+      color: var(--calm-color-ink);
+    }
+
+    button:hover,
+    button:focus-visible {
+      background: var(--calm-color-paper);
+    }
+  }
 `

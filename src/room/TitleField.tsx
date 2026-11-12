@@ -22,11 +22,28 @@ export function TitleField({
   const editPost = useEditDocument<Record<string, unknown>>(handle)
   const ref = useRef<HTMLTextAreaElement>(null)
 
+  // As tall as its text: whenever the title changes, and whenever it wraps differently (the window
+  // narrows, or the room's fonts arrive after the first paint).
   useLayoutEffect(() => {
     const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
+    if (!el) return undefined
+    const fit = () => {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+    fit()
+    let width = el.clientWidth
+    const resized = new ResizeObserver(() => {
+      if (el.clientWidth === width) return
+      width = el.clientWidth
+      fit()
+    })
+    resized.observe(el)
+    document.fonts?.addEventListener('loadingdone', fit)
+    return () => {
+      resized.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fit)
+    }
   }, [title])
 
   function setTitle(raw: string) {

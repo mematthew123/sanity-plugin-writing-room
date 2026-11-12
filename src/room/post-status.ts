@@ -9,6 +9,7 @@ export interface PostStatus {
   lastEditedAt: string | undefined
 }
 
+/** Voice per DESIGN.md, Voice & Copy. */
 export function describePostStatus(status: DocumentEditStatus | undefined): PostStatus {
   const draft = status?.lastEditedDraftAt
   const published = status?.lastEditedPublishedAt

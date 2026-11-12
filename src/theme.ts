@@ -1,7 +1,8 @@
-import {fonts, palette} from './tokens'
+import {fonts} from './tokens'
 import {buildTheme} from '@sanity/themer'
 import {type StudioTheme} from 'sanity'
-import {type WritingRoomColors, type WritingRoomScheme} from './config'
+import {type WritingRoomAccent} from './config'
+import {resolvePalette} from './lib/accent'
 import {UI_FONT_FACES_CSS} from './room/fonts-ui'
 
 // A separate entry point, so only Studios that use the theme need `@sanity/themer`.
@@ -25,17 +26,14 @@ function withUiFont(font: ThemeFonts): ThemeFonts {
   }
 }
 
-/** A Studio theme matching the room. Pass the same `colors` you gave `writingRoom()`. */
-export function createWritingRoomTheme({
-  colors = {},
-}: {colors?: Partial<Record<WritingRoomScheme, WritingRoomColors>>} = {}): StudioTheme {
+/** A Studio theme matching the room. Pass the same `accent` you gave `writingRoom()`. */
+export function createWritingRoomTheme({accent}: {accent?: WritingRoomAccent} = {}): StudioTheme {
   loadUiFont()
-  const light = {...palette.light, ...colors.light}
-  const dark = {...palette.dark, ...colors.dark}
+  const {light, dark} = resolvePalette(accent)
   const theme = buildTheme({
     light: {accent: light.accent, text: light.inkMuted, background: light.paper},
     // Dimmer than the room's muted ink, so the Studio's chrome recedes.
-    dark: {accent: dark.accent, text: colors.dark?.inkMuted ?? '#8F8478', background: dark.paper},
+    dark: {accent: dark.accent, text: '#8F8478', background: dark.paper},
   })
   return {
     ...theme,
