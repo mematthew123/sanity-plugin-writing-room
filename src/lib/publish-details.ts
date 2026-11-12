@@ -6,7 +6,7 @@ export interface PublishablePost {
   publishedAt?: string
 }
 
-/** Used when the title can't produce a slug (e.g. `静かな朝`), so every published Post has a URL. */
+/** For titles with no Latin letters or digits, e.g. `静かな朝`. */
 const FALLBACK_SLUG = 'post'
 
 export interface PublishDetails {
@@ -14,12 +14,7 @@ export interface PublishDetails {
   publishedAt?: string
 }
 
-/**
- * The Details a Post needs filled in as it's published, so publishing only ever requires Prose.
- * On the first publish the slug is settled
- * (derived from the title if missing, falling back to `post` when the title has no Latin letters
- * or digits, and made unique on a clash) and then stays put; the published date is stamped if empty.
- */
+/** Settles a unique slug on the first publish and stamps a missing published date. */
 export async function detailsForPublish({
   post,
   isFirstPublish,

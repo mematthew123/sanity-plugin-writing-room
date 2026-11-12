@@ -12,14 +12,8 @@ import {ROOM_ROUTES, roomState} from './room/room-route'
 import {WritingRoomTool} from './room/WritingRoomTool'
 
 /**
- * The Writing Room: a calm, full-screen space for writing a single document (a Post, by default;
- * see the `types` option). It's a Studio Tool rather than a custom input because only a Tool can
- * take the whole screen; Details stay in the standard document form.
- *
- * The plugin adds the Tool, an "Open in Writing Room" action on the room's types, and wraps the
- * built-in Publish on them so a document published from the form gets the same slug and date as
- * one published from the room. It doesn't register schema types: add `writingRoomSchemaTypes`
- * (or your own types with the same shape) to your Studio's schema.
+ * A full-screen Studio Tool for writing documents. Doesn't register document types: add
+ * `writingRoomSchemaTypes`, or your own types with the same shape, to your schema.
  */
 export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => {
   const config = resolveConfig(options ?? undefined)
@@ -29,7 +23,7 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
 
   return {
     name: 'sanity-plugin-writing-room',
-    // Only the room's own prefixed blocks; it never registers a Studio's names (post, body).
+    // Prefixed names only, so nothing clashes with the Studio's own types.
     schema: {types: roomBlockTypes},
     tools: [
       {
@@ -55,7 +49,6 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
     document: {
       actions: (prev, context) => {
         if (!isWritingType(context.schemaType)) return prev
-        // Only types the room can write (a title and a body it can find) get the room's actions.
         const [kind] = resolveKinds(
           config.types.filter((option) => option.type === context.schemaType),
           (name) => context.schema.get(name),

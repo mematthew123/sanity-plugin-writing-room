@@ -7,10 +7,6 @@ function reveal(element: Element | null) {
   element?.scrollIntoView({block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth'})
 }
 
-/**
- * Takes the Writer to the thing blocking their publish: scrolls it into view and puts the caret
- * there, rather than listing errors.
- */
 export function goToProblem(target: ProblemTarget, editor: Editor, openDetails: () => void) {
   if (target.kind === 'details') {
     openDetails()

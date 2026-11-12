@@ -6,25 +6,18 @@ import {
 } from 'sanity'
 import {type PublishablePost, type PublishDetails} from '../lib/publish-details'
 
-/**
- * Where the room finds what it reads and writes in a document type. Only `title` and `body` are
- * required; a type without a slug or a published date still works, the room just doesn't settle
- * what isn't there.
- */
 export interface WritingFields {
-  /** A string field: the room's title line. */
   title: string
-  /** A portable text field: the room's page. */
   body: string
-  /** A slug field the room keeps following the title until the first publish, then settles. */
+  /** Follows the title until the first publish. */
   slug?: string
-  /** A datetime field the room stamps on the first publish. */
+  /** Stamped on the first publish. */
   publishedAt?: string
-  /** An image field outside the body, for the "Add a cover image" nudge after a publish. */
+  /** For the "Add a cover image" nudge after a publish. */
   image?: string
 }
 
-/** Whether `type` is, or is built on, the schema type named `name` (e.g. a field of type `slug`). */
+/** Whether `type` is, or is built on, the schema type `name`. */
 function isOfType(type: SchemaType | undefined, name: string): boolean {
   for (let current = type; current; current = current.type) {
     if (current.name === name) return true
@@ -46,7 +39,6 @@ const isSlug = (field: ObjectField) => isOfType(field.type, 'slug')
 const isDate = (field: ObjectField) => isOfType(field.type, 'datetime') || isOfType(field.type, 'date')
 const isImage = (field: ObjectField) => isImageSchemaType(field.type)
 
-/** The field the type's preview shows as its title, when that's a plain top-level field. */
 function previewTitle(schemaType: SchemaType): string[] {
   const select = (schemaType as {preview?: {select?: Record<string, unknown>}}).preview?.select
   const title = select?.title
@@ -54,16 +46,15 @@ function previewTitle(schemaType: SchemaType): string[] {
 }
 
 /**
- * Finds the room's fields in a document type, so a Studio only has to name the type. Fields the
- * Studio names in `override` win; the rest are detected:
+ * Fields in `override` win; the rest are detected:
  *
- * - title: `title`, else the field the type's preview uses as its title, else the first string;
+ * - title: `title`, else the preview's title field, else the first string;
  * - body: `body`, else `content`, else the first portable text field;
  * - slug: `slug`, else the first slug field;
  * - published date: `publishedAt`, else the first date field whose name says "publish";
  * - image: `coverImage`, else `mainImage`, else the first image field.
  *
- * Returns the problem instead when the type has no usable title or body.
+ * Returns a problem when the type has no usable title or body.
  */
 export function detectFields(
   schemaType: SchemaType,
@@ -95,7 +86,6 @@ export function detectFields(
   }
 }
 
-/** The room's view of a document, wherever its type keeps the title, slug and published date. */
 export function readPublishable(
   document: Record<string, unknown> | null | undefined,
   fields: WritingFields,
@@ -107,7 +97,6 @@ export function readPublishable(
   }
 }
 
-/** The publish Details as a patch on the type's own fields, leaving out any the type doesn't have. */
 export function detailsPatch(details: PublishDetails, fields: WritingFields): Record<string, unknown> {
   const patch: Record<string, unknown> = {}
   if (details.slug && fields.slug) patch[fields.slug] = details.slug
@@ -115,7 +104,6 @@ export function detailsPatch(details: PublishDetails, fields: WritingFields): Re
   return patch
 }
 
-/** "Add a cover image", "Add a main image", "Add an image": the nudge after a publish. */
 export function addImageLabel(imageTitle = 'Image'): string {
   const name = imageTitle.toLowerCase()
   return `Add ${/^[aeiou]/.test(name) ? 'an' : 'a'} ${name}`

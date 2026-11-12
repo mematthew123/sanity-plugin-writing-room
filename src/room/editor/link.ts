@@ -1,6 +1,5 @@
 const MAX_SHOWN = 40
 
-/** Turns what a Writer typed into a link the schema accepts: https, or mailto for an address. */
 export function normalizeHref(input: string): string | null {
   const href = input.trim()
   if (!href) return null
@@ -9,7 +8,6 @@ export function normalizeHref(input: string): string | null {
   return `https://${href}`
 }
 
-/** A link as a Writer would say it: "example.com/notes", without protocol, www or trailing slash. */
 export function displayHref(href: string): string {
   const shown = href
     .replace(/^mailto:/i, '')

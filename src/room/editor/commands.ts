@@ -22,11 +22,10 @@ export interface InsertCommand {
   label: string
   icon: ComponentType
   keywords: string[]
-  /** Whether the body type can store what this command adds. */
   allowed: (allows: BodyAllows) => boolean
 }
 
-/** Everything the Insert Menu can offer, in the order the Writer sees it. */
+/** In display order. */
 export const INSERT_COMMANDS: InsertCommand[] = [
   {id: 'image', label: 'Image', icon: ImageIcon, keywords: ['picture', 'photo'], allowed: (a) => a.block('image')},
   {
@@ -55,7 +54,6 @@ export const INSERT_COMMANDS: InsertCommand[] = [
   {id: 'numberList', label: 'Numbered list', icon: OlistIcon, keywords: ['list', 'ordered'], allowed: (a) => a.list('number')},
 ]
 
-/** The commands this body allows that match what the Writer typed after `/` (all of them for none). */
 export function matchCommands(keyword: string, allows: BodyAllows): InsertCommand[] {
   const query = keyword.trim().toLowerCase()
   const available = INSERT_COMMANDS.filter((command) => command.allowed(allows))
@@ -67,13 +65,9 @@ export function matchCommands(keyword: string, allows: BodyAllows): InsertComman
   )
 }
 
-/** Custom editor event that asks the room to open the image file picker. */
 export const PICK_IMAGE_EVENT = 'custom.pick image'
 
-/**
- * The editor events that carry out a command on the current (empty) line. Images are the
- * exception: they need a file first, so they raise {@link PICK_IMAGE_EVENT} instead.
- */
+/** Images need a file first, so they raise {@link PICK_IMAGE_EVENT} instead. */
 export function commandEvents(id: InsertCommandId, allows: BodyAllows) {
   switch (id) {
     case 'image':
@@ -92,7 +86,7 @@ export function commandEvents(id: InsertCommandId, allows: BodyAllows) {
         } as const,
       ]
     case 'sectionBreak':
-      // Placed before the empty line, so the Writer carries straight on after the pause.
+      // Before the empty line, so the Writer carries straight on.
       return [
         {
           type: 'insert.block',

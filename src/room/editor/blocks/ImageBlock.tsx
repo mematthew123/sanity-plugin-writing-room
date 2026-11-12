@@ -15,7 +15,7 @@ export function ImageBlock({attributes, children, node, selected}: BlockObjectRe
   const src = imageUrl(ref, {projectId, dataset}, {width: ROOM_IMAGE_WIDTH})
   const alt = useBlockField(node._key, 'alt', node.alt)
   const caption = useBlockField(node._key, 'caption', node.caption)
-  // A Studio's own image type may have no description or caption; never write fields it can't store.
+  // A Studio's image type may have no alt or caption.
   const allows = useBodyAllows()
   const hasAlt = allows.blockField(node._type, 'alt')
   const hasCaption = allows.blockField(node._type, 'caption')

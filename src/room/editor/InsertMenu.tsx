@@ -10,10 +10,7 @@ import {type BodyAllows, useBodyAllows} from './allows'
 import {commandEvents, type InsertCommand, type InsertCommandId, matchCommands} from './commands'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 
-/**
- * `/` at the start of an empty line opens the Insert Menu. Built per editor, since what it offers
- * depends on the body type (and the picker's matcher only sees what was typed).
- */
+/** Built per body type, since the picker's matcher only sees what was typed. */
 const slashPicker = (allows: BodyAllows) =>
   defineTypeaheadPicker<InsertCommand & {key: string}>({
     trigger: /^\//,
@@ -31,7 +28,6 @@ const slashPicker = (allows: BodyAllows) =>
     ],
   })
 
-/** True when the caret sits alone on an empty plain paragraph: the place to insert things. */
 function useOnEmptyLine() {
   const editor = useEditor()
   return useEditorSelector(editor, (snapshot) => {
@@ -46,10 +42,6 @@ function useOnEmptyLine() {
   })
 }
 
-/**
- * The Insert Menu: a faint `+` in the margin of an empty line (click it, or type `/`) opens a
- * short list of things to add.
- */
 export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocused: boolean}) {
   const editor = useEditor()
   const onEmptyLine = useOnEmptyLine()
@@ -172,8 +164,7 @@ function Menu({
 }) {
   const activeId = commands[activeIndex]?.id
 
-  // Focus stays on the list (aria-activedescendant), so keep the active option in view ourselves
-  // when the menu is scrolled in a short window.
+  // Focus stays on the list (aria-activedescendant), so the browser won't scroll the active option into view.
   useLayoutEffect(() => {
     if (activeId) document.getElementById(`calm-insert-${activeId}`)?.scrollIntoView({block: 'nearest'})
   }, [activeId])

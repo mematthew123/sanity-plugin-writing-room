@@ -2,10 +2,7 @@ import {sanitySchemaToPortableTextSchema} from '@portabletext/sanity-bridge'
 import {useMemo} from 'react'
 import {type ArraySchemaType, useSchema} from 'sanity'
 
-/**
- * The editor's schema, derived from the document's own body field, so the room can only write
- * what that field allows: a Studio's `blockContent` gets its own styles, lists and blocks.
- */
+/** Derived from the body field, so the room can only write what it allows. */
 export function useBodySchema(documentType: string, bodyField: string) {
   const schema = useSchema()
   return useMemo(() => {

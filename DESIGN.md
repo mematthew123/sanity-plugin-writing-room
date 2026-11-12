@@ -86,6 +86,7 @@ rounded:
   lg: 0.875rem
   pill: 999px
 motion:
+  press: 150ms
   gentle: 200ms
   recede: 700ms
   easing: cubic-bezier(0.22, 1, 0.36, 1)
@@ -357,10 +358,11 @@ Soft, consistent corners.
 
 Unhurried and small. Motion explains a change; it never decorates.
 
+- `press` (150ms) for a control being pressed, so a click feels received at once.
 - `gentle` (200ms) for small responses: hover, a floating panel or the message appearing, a switch moving.
 - `recede` (700ms) for Room Controls fading out and back, and for focus dimming. Slow enough that the Writer feels it rather than sees it.
 - One easing everywhere: `cubic-bezier(0.22, 1, 0.36, 1)` — quick to start, soft to settle.
-- Opacity and small translations (≤ 4px) only. No scaling, bouncing or sliding panels.
+- Opacity and small translations (≤ 4px) only. No bouncing or sliding panels. The one scale is a press: a control shrinks slightly while held (0.97 for small buttons, 0.99 for cards and rows, whose text would otherwise read as moving).
 - Under `prefers-reduced-motion`, changes are instant, and Room Controls never drop below readable contrast while they have keyboard focus.
 
 ## Voice & Copy

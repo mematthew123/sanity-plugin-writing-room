@@ -5,14 +5,8 @@ import {type WritingRoomAccent} from './config'
 import {resolvePalette} from './lib/accent'
 import {UI_FONT_FACES_CSS} from './room/fonts-ui'
 
-/**
- * An optional Studio theme that matches the Writing Room: the room's paper, warm neutrals and
- * clay accent, and Figtree for the Studio's text, so moving between the room and the rest of the
- * Studio isn't a jolt. Its own entry point (`sanity-plugin-writing-room/theme`), so only Studios
- * that use it need `@sanity/themer`.
- */
+// A separate entry point, so only Studios that use the theme need `@sanity/themer`.
 
-/** Figtree for the Studio's text, declared once in the browser (never during a build in Node). */
 function loadUiFont() {
   if (typeof document === 'undefined' || document.getElementById('sanity-plugin-writing-room-ui-font')) return
   const style = document.createElement('style')
@@ -32,16 +26,13 @@ function withUiFont(font: ThemeFonts): ThemeFonts {
   }
 }
 
-/**
- * The theme, with your accent if you changed the room's: pass the same `accent` you gave
- * `writingRoom()`, e.g. `createWritingRoomTheme({accent: '#2F6FA8'})`.
- */
+/** A Studio theme matching the room. Pass the same `accent` you gave `writingRoom()`. */
 export function createWritingRoomTheme({accent}: {accent?: WritingRoomAccent} = {}): StudioTheme {
   loadUiFont()
   const {light, dark} = resolvePalette(accent)
   const theme = buildTheme({
     light: {accent: light.accent, text: light.inkMuted, background: light.paper},
-    // A step dimmer than the room's muted ink, so the Studio's chrome recedes behind the room.
+    // Dimmer than the room's muted ink, so the Studio's chrome recedes.
     dark: {accent: dark.accent, text: '#8F8478', background: dark.paper},
   })
   return {
@@ -51,5 +42,5 @@ export function createWritingRoomTheme({accent}: {accent?: WritingRoomAccent} = 
   }
 }
 
-/** The theme with the room's default colours: `defineConfig({theme: writingRoomTheme, …})`. */
+/** A Studio theme matching the room's default colours. */
 export const writingRoomTheme: StudioTheme = createWritingRoomTheme()

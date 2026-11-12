@@ -8,9 +8,9 @@ const schema = createSchema({
   types: [
     ...schemaTypes,
     {name: 'blockContent', type: 'array', of: [{type: 'block'}, {type: 'image'}]},
-    // Chipter's `post`: blockContent body, mainImage, no `excerpt`.
+    // blockContent body, mainImage, no `excerpt`.
     {
-      name: 'chipterPost',
+      name: 'blockContentPost',
       type: 'document',
       fields: [
         {name: 'title', type: 'string'},
@@ -45,15 +45,15 @@ const schema = createSchema({
 const get = (name: string) => schema.get(name) as SchemaType
 
 describe('detectFields', () => {
-  it('finds the template Post’s fields', () => {
+  it('finds the default Post’s fields', () => {
     expect(detectFields(get('post'))).toEqual({
       fields: {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt', image: 'coverImage'},
       imageTitle: 'Cover Image',
     })
   })
 
-  it('finds Chipter’s Post: a blockContent body and a main image', () => {
-    expect(detectFields(get('chipterPost'))).toEqual({
+  it('finds a Post with a blockContent body and a main image', () => {
+    expect(detectFields(get('blockContentPost'))).toEqual({
       fields: {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt', image: 'mainImage'},
       imageTitle: 'Main image',
     })

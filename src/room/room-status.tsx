@@ -31,7 +31,6 @@ import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
 
-/** A passing message at the foot of the room, optionally with one gentle next step. */
 export interface RoomNotice {
   text: string
   /** Something went well (a publish): shown with a tick. */
@@ -55,11 +54,7 @@ const useOnline = () => useSyncExternalStore(subscribeOnline, () => navigator.on
 const SAVED_VISIBLE_MS = 2000
 const SAVING_DELAY_MS = 800
 
-/**
- * Whether the Writer's words have reached the Content Lake. Normally a small "Saved" that
- * fades; offline it switches to caution and stays until the connection returns ({@link
- * RoomMessage} says what that means for their words).
- */
+/** Offline, it stays until the connection returns. */
 export function SaveState({handle}: {handle: DocumentHandle}) {
   const isSynced = useDocumentSyncStatus(handle) ?? true
   const online = useOnline()
@@ -142,12 +137,11 @@ export function RoomMessage({
   return null
 }
 
-/** "Draft", "Published", or "Published · unpublished changes". */
 export function StatusLabel({status}: {status: PostStatus}) {
   return <Quiet>{status.label}</Quiet>
 }
 
-/** "Sam is here too". Never recedes: writing alongside someone without knowing is unsettling. */
+/** Never recedes: writing alongside someone without knowing is unsettling. */
 export function Presence({handle}: {handle: DocumentHandle}) {
   const {presence} = usePresenceForDocument({
     documentId: handle.documentId,
@@ -165,21 +159,15 @@ export function Presence({handle}: {handle: DocumentHandle}) {
 
 const SETTLE_TIMEOUT_MS = 4000
 
-/** What a publish will do, worked out before the Writer is asked to confirm it. */
 interface PublishPlan {
   details: PublishDetails
-  /** Where readers will find it, when the Studio has said where its site is. */
+  /** Set when the Studio has said where its site is. */
   url: URL | null
-  /** The slug it will have, for Studios that haven't. */
+  /** Shown instead of `url` when there isn't one. */
   slug: string | undefined
 }
 
-/**
- * Publish, from inside the room. Waits for the Writer's latest words to sync and validate (and
- * gives up with a gentle retry if that takes too long); if something blocks the publish, takes
- * them straight to it instead of listing errors. Once nothing does, it says where the document
- * will go live and asks once, because a publish is real: readers see it, webhooks run.
- */
+/** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
 export function PublishButton({
   handle,
   status,

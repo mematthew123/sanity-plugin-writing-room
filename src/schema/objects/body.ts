@@ -3,7 +3,6 @@ import {defineArrayMember, defineField, defineType, type PortableTextBlock} from
 
 const MAX_LIST_DEPTH = 2
 
-/** Whether a body has any words or objects, not just blank paragraphs. */
 function hasProse(blocks: PortableTextBlock[] | undefined): boolean {
   return (blocks ?? []).some(
     (block) =>
@@ -14,7 +13,6 @@ function hasProse(blocks: PortableTextBlock[] | undefined): boolean {
   )
 }
 
-/** The body of a Post: the Prose a Writer composes in the Writing Room. */
 export const body = defineType({
   name: 'body',
   type: 'array',

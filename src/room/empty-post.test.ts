@@ -52,7 +52,7 @@ describe('isEmptyPost', () => {
     expect(isEmptyPost(details)).toBe(false)
   })
 
-  it('ignores a schema’s initial values, like Chipter’s likes and comments switches', () => {
+  it('ignores a schema’s initial values, like likes and comments switches', () => {
     expect(isEmptyPost({likesEnabled: true, likeCount: 0, commentsEnabled: true})).toBe(true)
   })
 

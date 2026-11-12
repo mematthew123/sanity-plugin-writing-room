@@ -1,6 +1,5 @@
 import {useCallback, useSyncExternalStore} from 'react'
 
-/** A Writer's comfort preferences for the Writing Room. They belong to the Writer, not the Post. */
 export interface RoomSettings {
   textSize: 'small' | 'medium' | 'large'
   typewriter: boolean
@@ -13,13 +12,8 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   focusDimming: false,
 }
 
-/**
- * One key for every Studio: these are the Writer's preferences, not a Studio's, and storage is
- * already per origin (each deployed Studio has its own). Nothing for a Studio to configure.
- */
+/** One key for every Studio: storage is already per origin. */
 const STORAGE_KEY = 'sanity-plugin-writing-room:settings'
-/** Where the template kept them before the plugin, so a Writer's settings carry over. */
-const LEGACY_STORAGE_KEY = 'calm-editor:room-settings'
 const TEXT_SIZES = new Set(['small', 'medium', 'large'])
 
 export function parseRoomSettings(raw: string | null): RoomSettings {
@@ -41,7 +35,6 @@ export function parseRoomSettings(raw: string | null): RoomSettings {
   }
 }
 
-// Stored per browser: a convenience, so private windows or blocked storage just use defaults.
 let cached: {raw: string | null; settings: RoomSettings} | null = null
 let sessionOnly: string | null = null
 const listeners = new Set<() => void>()
@@ -49,10 +42,7 @@ const listeners = new Set<() => void>()
 function read(): RoomSettings {
   let raw: string | null
   try {
-    raw =
-      window.localStorage.getItem(STORAGE_KEY) ??
-      sessionOnly ??
-      window.localStorage.getItem(LEGACY_STORAGE_KEY)
+    raw = window.localStorage.getItem(STORAGE_KEY) ?? sessionOnly
   } catch {
     raw = sessionOnly
   }
@@ -72,7 +62,7 @@ export function useRoomSettings(): [RoomSettings, (change: Partial<RoomSettings>
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     } catch {
-      // Storage unavailable: keep the change for this session only.
+      // Storage unavailable: keep it for this session only.
       sessionOnly = JSON.stringify(next)
     }
     listeners.forEach((listener) => listener())

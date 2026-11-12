@@ -1,6 +1,5 @@
 const IMAGE_REF = /^image-([A-Za-z0-9]+)-(\d+x\d+)-([a-z]+)$/
 
-/** A Sanity CDN url for an image asset reference (`image-<hash>-<w>x<h>-<ext>`), sized for the room. */
 export function imageUrl(
   ref: string | undefined,
   {projectId, dataset}: {projectId: string; dataset: string},

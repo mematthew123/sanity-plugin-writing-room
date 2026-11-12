@@ -1,7 +1,6 @@
 import styled from 'styled-components'
 import {Isolate} from '../isolate'
 
-/** The outer wrapper every body object shares: spacing, and a soft ring when selected. */
 export const BlockFrame = styled.div<{$selected?: boolean}>`
   position: relative;
   margin-block: var(--calm-type-prose-gap);
@@ -15,7 +14,6 @@ export const BlockFrame = styled.div<{$selected?: boolean}>`
   }
 `
 
-/** A quiet Figtree input that looks like a placeholder line until it's used. */
 export const FieldInput = styled.input`
   display: block;
   box-sizing: border-box;
@@ -42,7 +40,6 @@ export const Controls = styled(Isolate)`
   margin-top: var(--calm-space-sm);
 `
 
-/** A small caution-toned message that stays until resolved. */
 export const Caution = styled.p`
   margin: var(--calm-space-xs) 0 0;
   color: var(--calm-color-caution);

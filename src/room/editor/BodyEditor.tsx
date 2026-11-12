@@ -28,13 +28,12 @@ import {SelectionBubble} from './SelectionBubble'
 
 const inputRules = [codeFenceRule]
 
-/** `---` makes a section break, under whichever name this body has it. */
+/** What `---` inserts, if this body has a section break. */
 function sectionBreakFor(context: {schema: EditorSchema}) {
   const type = bodyAllows(context.schema).roomBlock('sectionBreak')
   return type ? {_type: type, kind: 'break'} : undefined
 }
 
-/** `value` when the body type allows it, for the markdown shortcuts. */
 function allowed<T>(
   context: {schema: EditorSchema},
   test: (allows: BodyAllows) => boolean,
@@ -43,7 +42,7 @@ function allowed<T>(
   return test(bodyAllows(context.schema)) ? value : undefined
 }
 
-/** The body of a document, synced live with the Content Lake. Must sit inside an `EditorProvider`. */
+/** Must sit inside an `EditorProvider`. */
 export function BodyEditor({
   handle,
   path,
@@ -51,7 +50,6 @@ export function BodyEditor({
   onUploadFailed,
 }: {
   handle: DocumentHandle
-  /** The document's portable text field. */
   path: string
   scheme: string
   onUploadFailed: (message: string) => void
@@ -144,10 +142,7 @@ export function BodyEditor({
 
 const TYPEWRITER_LINE = 0.4
 
-/**
- * Typewriter scrolling: keeps the line being written at the same height (40% down the room),
- * so the Writer's eyes don't drift to the bottom of the screen.
- */
+/** Keeps the line being written 40% down the room. */
 function useTypewriterScrolling(enabled: boolean) {
   const editor = useEditor()
   useEffect(() => {
@@ -165,10 +160,7 @@ function useTypewriterScrolling(enabled: boolean) {
   }, [editor, enabled])
 }
 
-/**
- * Places each image in the body straight away (a soft shimmer while it uploads), then fills in
- * the uploaded asset. If an upload fails, the placeholder is removed and the Writer is told.
- */
+/** Inserts a placeholder per image at once, fills in the asset after upload, and removes it on failure. */
 function useImageUpload(onUploadFailed: (message: string) => void) {
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
@@ -205,7 +197,6 @@ const Placeholder = styled.span`
   color: var(--calm-color-ink-muted);
 `
 
-/** The body's typography. Every value comes from the shared tokens; see DESIGN.md. */
 const Prose = styled(SDKPortableTextEditable)`
   min-height: 40vh;
   outline: none;
@@ -261,7 +252,7 @@ const Prose = styled(SDKPortableTextEditable)`
     text-underline-offset: 0.2em;
   }
 
-  /* Lists: each item is its own block, so markers and numbering are drawn here. */
+  /* Each list item is its own block, so markers and numbering are drawn here. */
   [data-list-item] {
     position: relative;
     margin-bottom: calc(var(--calm-type-prose-gap) * 0.4);

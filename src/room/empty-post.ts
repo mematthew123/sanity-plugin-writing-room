@@ -3,14 +3,9 @@ interface Block {
   children?: Array<{text?: unknown}>
 }
 
-/** System fields every document has; they say nothing about whether the Writer saved any work. */
 const SYSTEM_FIELDS = new Set(['_id', '_type', '_rev', '_createdAt', '_updatedAt', '_system'])
 
-/**
- * Whether a Detail holds anything the Writer entered: text, a tag, an image asset… Booleans and
- * numbers don't count: they're usually a schema's initial values (`commentsEnabled: true`,
- * `likeCount: 0`), not work.
- */
+/** Booleans and numbers don't count: they're usually a schema's initial values, not work. */
 function hasContent(value: unknown): boolean {
   if (typeof value === 'string') return value.trim() !== ''
   if (typeof value === 'boolean' || typeof value === 'number') return false
@@ -21,10 +16,7 @@ function hasContent(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false
 }
 
-/**
- * A document with no title, no words or objects in its body, and no Details (excerpt, cover image,
- * tags, a hand-set slug…): safe to discard when the Writer leaves.
- */
+/** No title, body content or Details: safe to discard when the Writer leaves. */
 export function isEmptyPost(
   post: Record<string, unknown> | null | undefined,
   fields: {title: string; body: string} = {title: 'title', body: 'body'},

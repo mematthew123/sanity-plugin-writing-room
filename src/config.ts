@@ -3,34 +3,22 @@ import {type Palette} from './tokens'
 import {createContext, createElement, type ReactNode, useContext} from 'react'
 import {type WritingFields} from './room/fields'
 
-/** A document type the room writes, with what the room calls it. */
 export interface WritingRoomTypeOptions {
-  /** The document type's name in your schema, e.g. `'post'`. */
   type: string
   /** What one is called in the room ("New Case Study"). Defaults to the schema type's title. */
   title?: string
   /** What several are called ("Case Studies"). Defaults to `title` made plural. */
   pluralTitle?: string
-  /**
-   * Which fields the room uses, when it can't tell from the schema. Usually unnecessary: it finds
-   * `title`, the portable text body, `slug`, `publishedAt` and the cover image by itself.
-   */
+  /** Only needed when the room can't detect a field from the schema. */
   fields?: Partial<WritingFields>
 }
 
-/** How the room's Preview opens a document on your site, in draft mode. */
 export interface WritingRoomPreviewOptions {
-  /** Your site's origin, e.g. `https://example.com` or `http://localhost:3000`. */
+  /** e.g. `https://example.com` */
   origin: string
-  /**
-   * The route on your site that checks the preview secret and turns on draft mode.
-   * Defaults to `/api/draft-mode/enable` (the `next-sanity` convention).
-   */
+  /** The route that turns on draft mode. Defaults to `/api/draft-mode/enable`. */
   enablePath?: string
-  /**
-   * Where a document is read on your site. Defaults to `/posts/<slug>` for `post` and
-   * `/<type>/<slug>` for any other type.
-   */
+  /** Defaults to `/posts/<slug>` for `post`, `/<type>/<slug>` otherwise. */
   pathname?: (slug: string, documentType: string) => string
 }
 
@@ -42,31 +30,21 @@ export type WritingRoomScheme = 'light' | 'dark'
  */
 export type WritingRoomAccent = string | Partial<Record<WritingRoomScheme, string>>
 
-/** Options for `writingRoom()`. Every one is optional. */
 export interface WritingRoomOptions {
   /**
-   * The document types the room writes, e.g. `['post', 'caseStudy']`. The room finds each type's
-   * title, portable text body, slug, published date and cover image in its schema; a type needs
-   * at least a title and a body.
-   *
-   * The first is the default: its documents open at `/writing-room/<id>`, the others at
-   * `/writing-room/<type>/<id>`. Defaults to `['post']`.
+   * Each type needs at least a title and a portable text body. The first opens at
+   * `/writing-room/<id>`, the rest at `/writing-room/<type>/<id>`. Defaults to `['post']`.
    */
   types?: Array<string | WritingRoomTypeOptions>
-  /**
-   * Turns on the room's Preview button, which opens the document on your site exactly as readers
-   * will see it, unpublished changes included. Leave it out and Preview is hidden.
-   */
+  /** Shows a Preview button that opens the draft on your site. Hidden when omitted. */
   preview?: WritingRoomPreviewOptions
   /**
-   * The room's accent colour (links, the caret, focus rings, Publish), as a hex colour. It's the
-   * one colour you can change: the room keeps it readable on its paper in light and dark, and
-   * works out the selection highlight and the text on Publish from it. Inside the room only.
+   * The room's accent (links, the caret, focus rings, Publish). The room keeps it readable on its
+   * paper in both schemes and derives the selection and on-Publish text from it. Inside the room only.
    */
   accent?: WritingRoomAccent
 }
 
-/** The options with every default filled in, as the room reads them. */
 export interface WritingRoomConfig {
   /** Never empty. */
   types: WritingRoomTypeOptions[]
@@ -119,7 +97,6 @@ export function WritingRoomConfigProvider({
   return createElement(WritingRoomConfigContext.Provider, {value: config}, children)
 }
 
-/** The plugin's resolved options, anywhere inside the Writing Room Tool. */
 export function useWritingRoomConfig(): WritingRoomConfig {
   return useContext(WritingRoomConfigContext)
 }

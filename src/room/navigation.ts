@@ -8,14 +8,13 @@ function useStudioPath() {
   return useCallback((path: string) => `${basePath.replace(/\/+$/, '')}/${path}`, [basePath])
 }
 
-/** Leaves the Writing Room for the rest of the Studio. */
 export function useLeaveToStudio() {
   const {navigateUrl} = useRouter()
   const studioPath = useStudioPath()
   return useCallback(() => navigateUrl({path: studioPath('structure')}), [navigateUrl, studioPath])
 }
 
-/** Opens a document's Details (the standard form) in Structure. */
+/** Opens the standard document form in Structure. */
 export function useOpenDetails({documentId, documentType}: DocumentHandle) {
   const {navigateIntent} = useRouter()
   return useCallback(

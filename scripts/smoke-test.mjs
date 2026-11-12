@@ -1,21 +1,10 @@
 #!/usr/bin/env node
 /**
- * Installs the packed plugin into a brand-new Studio, the way a user would, and checks it:
- *
- *   1. `npm install` succeeds with no peer-dependency conflicts,
- *   2. there's exactly one copy of each package the plugin must share with Sanity,
- *   3. `sanity.config.ts` (the plugin and its theme) type-checks against the published types,
- *   4. `sanity build` bundles the Studio, with exactly one copy of the App SDK in the bundle,
- *   5. with `--embedded`, a Next.js app embedding the same Studio (`next-sanity`'s NextStudio)
- *      builds too, again with one App SDK.
- * It also fails if any `@portabletext/*` package is installed twice (only reports it with --loose).
+ * Installs the packed plugin into a fresh Studio and checks it installs, dedupes, type-checks and
+ * builds (also inside Next.js with `--embedded`).
  *
  * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded]
- *   e.g. node scripts/smoke-test.mjs 6.15.0
- * The version defaults to `latest`. `--loose` installs even when that version is outside the
- * plugin's declared peer range, to find out whether the range could be widened.
- *
- * It can't open the Writing Room itself: that needs a logged-in Studio.
+ * `--loose` ignores the plugin's peer range, to test whether it could be widened.
  */
 import {execFileSync} from 'node:child_process'
 import {existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
@@ -35,7 +24,7 @@ function run(command, args, cwd) {
   execFileSync(command, args, {cwd, stdio: 'inherit', env: {...process.env, CI: 'true'}})
 }
 
-// 1. Pack the plugin exactly as npm would publish it.
+// 1. Pack.
 const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', studioDir], {
   cwd: pluginDir,
   encoding: 'utf8',
@@ -63,8 +52,7 @@ const files = {
     null,
     2,
   ),
-  // 'use client' is what Sanity's guide asks for when a Studio is embedded in the Next.js App
-  // Router (the --embedded build); a standalone Studio ignores it.
+  // Needed for --embedded; a standalone Studio ignores it.
   'sanity.config.ts': `'use client'
 
 import {defineConfig} from 'sanity'
@@ -141,8 +129,7 @@ if (duplicated) {
   process.exit(1)
 }
 
-// A second copy of an @portabletext package means the plugin's range has drifted from Sanity's.
-// Expected (so only reported) with --loose, where older Sanity releases use older editors.
+// A second copy means the plugin's range has drifted from Sanity's. Only reported with --loose.
 const portableText = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
   .map((name) => [`@portabletext/${name}`, findCopies(`@portabletext/${name}`)])
   .filter(([, copies]) => new Set(copies.map((copy) => copy.split(' ')[0])).size > 1)
@@ -198,7 +185,7 @@ export default function StudioPage() {
     stdio: 'inherit',
     env: {...process.env, CI: 'true', NEXT_TELEMETRY_DISABLED: '1'},
   })
-  // The browser bundle only: Next also keeps a server-rendering copy in .next/server.
+  // Browser bundle only: .next/server has its own copy.
   expectOneSdk(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
 }
 
@@ -206,11 +193,7 @@ console.log(
   `\n✓ sanity@${sanityVersion}: installed, deduped, type-checked and built${embedded ? ', standalone and embedded in Next.js' : ''}.`,
 )
 
-/**
- * Every copy of @sanity/sdk-react carries this sentence from its missing-context error, so a bundle
- * with two copies has it twice: the room would crash with it in that Studio. (Only the tail of the
- * message: the room's own setup-problem screen checks for the start of it.)
- */
+/** Each copy of @sanity/sdk-react carries this error message, so two copies means it appears twice. */
 function expectOneSdk(dir, label) {
   const MESSAGE = 'wrapped in a ResourceProvider or a SanityApp component'
   let count = 0

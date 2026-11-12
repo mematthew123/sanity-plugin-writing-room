@@ -1,7 +1,6 @@
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
-// The plugin straight from source, so edits under src/ reload as you save. The Studio and the
-// plugin share this repository's node_modules, so there's one copy of Sanity's App SDK.
+// From source, so edits reload live and the Studio shares one copy of the App SDK.
 import {writingRoom, writingRoomSchemaTypes} from './src'
 import {writingRoomTheme} from './src/theme'
 
@@ -18,8 +17,7 @@ export default defineConfig({
     structureTool(),
     writingRoom({
       types: ['post'],
-      // Optional: set SANITY_STUDIO_PREVIEW_ORIGIN to try Preview against a site that has a
-      // draft-mode route (e.g. Calm Editor's Reading Site on http://localhost:3000).
+      // Set SANITY_STUDIO_PREVIEW_ORIGIN to a site with a draft-mode route to try Preview.
       preview: process.env.SANITY_STUDIO_PREVIEW_ORIGIN
         ? {origin: process.env.SANITY_STUDIO_PREVIEW_ORIGIN}
         : undefined,

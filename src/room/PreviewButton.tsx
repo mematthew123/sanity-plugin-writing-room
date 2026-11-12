@@ -9,10 +9,6 @@ import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
 import {QuietButton} from './primitives'
 
-/**
- * Opens the document on your site exactly as readers will see it, unpublished changes
- * included. A one-hour preview secret lets the site switch itself into draft mode.
- */
 export function PreviewButton({
   documentType,
   slug,
@@ -32,7 +28,7 @@ export function PreviewButton({
   const path = pathname(slug, documentType)
 
   async function preview() {
-    // Open the tab now, while the click still counts, so popup blockers allow it.
+    // Open the tab synchronously so popup blockers allow it.
     const tab = window.open('about:blank', '_blank')
     if (tab) tab.opener = null
     setOpening(true)

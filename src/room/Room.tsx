@@ -45,7 +45,6 @@ import {TitleField} from './TitleField'
 import {useEscape} from './use-escape'
 import {useRecede} from './use-recede'
 
-/** The Writing Room for one document: a Post, or any other of the room's types. */
 export function Room({documentId, documentType}: {documentId: string; documentType: string}) {
   const handle = useMemo<DocumentHandle>(() => ({documentId, documentType}), [documentId, documentType])
   const [problem, setProblem] = useState<string | null>(null)
@@ -190,7 +189,6 @@ function LoadedRoom({
   )
 }
 
-/** Enter in the title carries the Writer into the body. */
 function Title({
   handle,
   fields,
@@ -211,12 +209,7 @@ function Title({
   )
 }
 
-/**
- * Leave (or Esc) returns the Writer to where they came from: the document's form if they opened
- * it from there, otherwise the Lobby. A document that was never published and is still completely
- * empty (Prose and Details alike) is discarded on the way out, so an abandoned "New Post" leaves
- * nothing behind; with nothing left to show in the form, that always ends in the Lobby.
- */
+/** Returns to wherever the Writer came from; a never-published, empty document is discarded on the way out. */
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)

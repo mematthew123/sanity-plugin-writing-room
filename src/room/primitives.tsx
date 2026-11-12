@@ -1,12 +1,6 @@
 import {type ComponentType, type ReactNode, type Ref} from 'react'
 import styled from 'styled-components'
 
-/**
- * Shared building blocks for the Writing Room. Every value comes from `../tokens`
- * CSS variables; see DESIGN.md before adding a literal.
- */
-
-/** The page: warm paper that follows the Studio's colour scheme via `data-scheme`. */
 export const Surface = styled.div`
   position: relative;
   height: 100%;
@@ -24,13 +18,12 @@ export const Surface = styled.div`
   }
 `
 
-/** A phone, or a window about that narrow: the Room Controls keep only what fits. */
+/** A phone, or a window about that narrow. */
 export const NARROW = '@media (max-width: 40rem)'
 
 /** Too narrow for anything to sit in the margin beside the column. */
 export const NO_MARGIN = '@media (max-width: 64rem)'
 
-/** The single centred column, the width of the measure. */
 export const Column = styled.div`
   box-sizing: content-box;
   max-width: var(--calm-measure);
@@ -106,9 +99,8 @@ const ControlsGroup = styled.div`
 `
 
 /**
- * Room Controls: quiet, in the corners, with paper behind them so Prose never shows through. Wrap anything that should fade
- * while the Writer types in {@link Recedes}; leave things that must stay visible (offline,
- * a blocked publish, presence) unwrapped.
+ * Has paper behind it so Prose never shows through. Wrap what should fade while the Writer
+ * types in {@link Recedes}; leave must-see notices unwrapped.
  */
 export function RoomControls({
   start,
@@ -141,7 +133,8 @@ const QuietButtonRoot = styled.button`
   cursor: pointer;
   transition:
     background-color var(--calm-motion-gentle) var(--calm-motion-easing),
-    color var(--calm-motion-gentle) var(--calm-motion-easing);
+    color var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover,
   &:focus-visible {
@@ -159,12 +152,17 @@ const QuietButtonRoot = styled.button`
     font-size: 1.25rem;
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
 `
 
-/** Room Controls that fade while the Writer is typing. */
 const RecedesRoot = styled.div`
   display: flex;
   flex-shrink: 0;
@@ -176,7 +174,6 @@ export function Recedes({children}: {children: ReactNode}) {
   return <RecedesRoot data-recedes="">{children}</RecedesRoot>
 }
 
-/** The default for every Room Control that isn't Publish. */
 export function QuietButton({
   icon: Icon,
   children,
@@ -190,7 +187,6 @@ export function QuietButton({
   )
 }
 
-/** Small Figtree label for sections of the Lobby. */
 export const SectionLabel = styled.h2`
   margin: 0 0 var(--calm-space-sm);
   color: var(--calm-color-ink-muted);
@@ -199,7 +195,6 @@ export const SectionLabel = styled.h2`
   font-weight: var(--calm-weight-ui-strong);
 `
 
-/** A soft placeholder block that holds space while data loads, so nothing jumps. */
 export const Placeholder = styled.div<{$height: string}>`
   height: ${({$height}) => $height};
   border-radius: var(--calm-radius-large);

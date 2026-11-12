@@ -2,10 +2,7 @@ import {type NavbarProps} from 'sanity'
 import {useRouterState} from 'sanity/router'
 import {TOOL_NAME} from './constants'
 
-/**
- * The Studio navbar, stepping aside while the Writer is writing. It stays in the Lobby: that's a
- * place to choose what to write, and the rest of the Studio should be one click away from it.
- */
+/** Steps aside while writing, but stays in the Lobby so the rest of the Studio is one click away. */
 export function RoomAwareNavbar(props: NavbarProps) {
   const isWriting = useRouterState((state) => {
     if (state.tool !== TOOL_NAME) return false

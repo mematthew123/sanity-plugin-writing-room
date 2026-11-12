@@ -7,7 +7,6 @@ import {NARROW, NO_MARGIN, QuietButton} from './primitives'
 import {type RoomSettings, useRoomSettings} from './room-settings'
 import {readingTime, wordCount} from './word-count'
 
-/** "1,240 words · 6 min read", quietly, out of the way of the Room Controls. */
 export function WordCount() {
   const editor = useEditor()
   const body = useEditorSelector(editor, (snapshot) => snapshot.context.value)
@@ -27,11 +26,7 @@ const TEXT_SIZES: Array<{value: RoomSettings['textSize']; label: string}> = [
   {value: 'large', label: 'L'},
 ]
 
-/**
- * The `Aa` menu, where everything about how the room looks lives: text size, typewriter scrolling
- * and focus dimming (remembered per browser), dark mode and fullscreen. `more` is for Room
- * Controls that don't fit in the bar on a narrow screen; they're listed here instead.
- */
+/** `more` holds Room Controls that don't fit the bar on a narrow screen. */
 export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNode}) {
   const [settings, update] = useRoomSettings()
   const setScheme = useColorSchemeSetValue()
@@ -172,11 +167,7 @@ function subscribeFullscreen(onChange: () => void) {
 const FULLSCREEN_KEYS =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘⇧F' : 'Ctrl+Shift+F'
 
-/**
- * Whether the room is in true fullscreen (the browser's own tabs hidden too). Opt-in only: the
- * `Aa` menu, or ⌘/Ctrl + Shift + F from anywhere in the room. The browser takes the first Esc to
- * leave fullscreen.
- */
+/** Opt-in only. The browser takes the first Esc to leave fullscreen. */
 function useFullscreen(): boolean {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -197,7 +188,7 @@ async function toggleFullscreen() {
     if (document.fullscreenElement) await document.exitFullscreen()
     else await document.documentElement.requestFullscreen()
   } catch {
-    // Some browsers refuse fullscreen (e.g. inside an iframe); the room works without it.
+    // Some browsers refuse fullscreen, e.g. inside an iframe.
   }
 }
 

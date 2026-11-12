@@ -27,11 +27,7 @@ import {countWords} from './word-count'
 /** One to continue, and a few more: the Lobby is a doorway, and Structure is the archive. */
 const RECENT = 5
 
-/**
- * The entrance to the Writing Room: pick up where you left off, or start something new. It isn't
- * a document browser; for everything else there's one link to Structure, and the Studio's own
- * navbar stays above it.
- */
+/** Not a document browser: everything else is one link away in Structure. */
 export function Lobby() {
   const kinds = useWritingKinds()
 
@@ -243,7 +239,9 @@ const StartButton = styled.button`
   font: inherit;
   font-weight: var(--calm-weight-ui-strong);
   cursor: pointer;
-  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
+  transition:
+    background-color var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover:not(:disabled) {
     background: var(--calm-color-surface);
@@ -252,6 +250,12 @@ const StartButton = styled.button`
   &:disabled {
     color: var(--calm-color-ink-muted);
     cursor: default;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.97);
+    }
   }
 
   &:focus-visible {
@@ -529,10 +533,19 @@ const ContinueLink = styled(StateLink)`
   background: var(--calm-color-surface);
   color: inherit;
   text-decoration: none;
-  transition: box-shadow var(--calm-motion-gentle) var(--calm-motion-easing);
+  transition:
+    box-shadow var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
 
   &:hover {
     box-shadow: inset 0 0 0 1px var(--calm-color-rule);
+  }
+
+  /* Any deeper and a card this size visibly pulls in, and its text reads as moving. */
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.99);
+    }
   }
 
   &:focus-visible {
@@ -691,6 +704,14 @@ const RowLink = styled(StateLink)`
   border-radius: var(--calm-radius-large);
   color: inherit;
   text-decoration: none;
+  transition: transform var(--calm-motion-press) var(--calm-motion-easing);
+
+  /* Any deeper and the title and meta read as moving text. */
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.99);
+    }
+  }
 
   &:focus-visible {
     outline: 2px solid var(--calm-color-accent);
@@ -699,6 +720,10 @@ const RowLink = styled(StateLink)`
 
   ${NARROW} {
     padding-inline: var(--calm-space-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 `
 
