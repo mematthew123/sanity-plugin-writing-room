@@ -14,8 +14,6 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
 
 /** One key for every Studio: storage is already per origin. */
 const STORAGE_KEY = 'sanity-plugin-writing-room:settings'
-/** Still read, so existing settings carry over. */
-const LEGACY_STORAGE_KEY = 'calm-editor:room-settings'
 const TEXT_SIZES = new Set(['small', 'medium', 'large'])
 
 export function parseRoomSettings(raw: string | null): RoomSettings {
@@ -44,10 +42,7 @@ const listeners = new Set<() => void>()
 function read(): RoomSettings {
   let raw: string | null
   try {
-    raw =
-      window.localStorage.getItem(STORAGE_KEY) ??
-      sessionOnly ??
-      window.localStorage.getItem(LEGACY_STORAGE_KEY)
+    raw = window.localStorage.getItem(STORAGE_KEY) ?? sessionOnly
   } catch {
     raw = sessionOnly
   }

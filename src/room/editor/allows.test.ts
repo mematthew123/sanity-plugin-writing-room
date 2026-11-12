@@ -45,7 +45,7 @@ const allowsFor = (name: string) =>
   bodyAllows(sanitySchemaToPortableTextSchema(compiled.get(name) as ArraySchemaType<unknown>))
 
 describe('bodyAllows', () => {
-  it('allows everything the room offers in the template’s body', () => {
+  it('allows everything the room offers in the default body', () => {
     const allows = allowsFor('body')
     expect(['image', 'embed', 'codeBlock', 'sectionBreak'].every(allows.block)).toBe(true)
     expect(allows.blockField('image', 'alt')).toBe(true)
@@ -60,7 +60,7 @@ describe('bodyAllows', () => {
     ])
   })
 
-  it('offers only what Chipter’s blockContent can store', () => {
+  it('offers only what a limited blockContent can store', () => {
     const allows = allowsFor('blockContent')
     expect(allows.style('h2') && allows.style('blockquote') && allows.list('bullet')).toBe(true)
     expect(allows.decorator('strong') && allows.annotation('link')).toBe(true)
@@ -85,7 +85,7 @@ describe('bodyAllows', () => {
     expect(commandEvents('sectionBreak', allows)[0]).toMatchObject({block: {_type: 'writingRoomSectionBreak'}})
   })
 
-  it('keeps the starter schema’s original names', () => {
+  it('accepts the unprefixed block names', () => {
     expect(commandEvents('codeBlock', allowsFor('body'))[0]).toMatchObject({block: {_type: 'codeBlock'}})
   })
 })
