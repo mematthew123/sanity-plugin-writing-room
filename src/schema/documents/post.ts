@@ -12,10 +12,7 @@ const isUniqueOncePublished: SlugIsUniqueValidator = async (slug, context) => {
   return isPublished ? context.defaultIsUnique(slug, context) : true
 }
 
-/**
- * Keep every field in `details` optional: the room can't show Details, so a required one would
- * block a publish the Writer can't fix from there.
- */
+/** The room shows everything in `details` in its Details view, and opens it at a field that blocks a publish. */
 export const post = defineType({
   name: 'post',
   type: 'document',

@@ -2,7 +2,7 @@
 
 A calm, full-screen place to write long-form content inside Sanity Studio: Posts, articles, case studies, whatever your Studio writes.
 
-Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags) stays in the standard form, one click away. It works with the document types you already have.
+Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags, any field of your own) is under **Details**: one click swaps the body for those fields, without leaving the room. It works with the document types you already have.
 
 - **The Lobby**: a doorway, not a document browser. Continue the piece you were last in, start something new, or pick from a few recent ones. The Studio's navbar stays above it, and Structure is one link away for everything else.
 - **Controls that recede**: Leave on one side; status, Details, Preview and Publish on the other. They fade after a few keystrokes and return when you pause. The word count sits at the foot of the page, and anything the room needs to tell you appears there too.
@@ -132,7 +132,21 @@ The room reads each type's schema to find what it writes:
 | Published date | `publishedAt`, else the first date field whose name contains "publish" | No date is stamped on publish |
 | Cover image | `coverImage`, else `mainImage`, else the first image field | No "Add a cover image" nudge after a publish |
 
-If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content', title: 'headline'}}`. Anything else (excerpt, tags, a client name…) stays in the standard form under **Details**.
+If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content', title: 'headline'}}`. Every other field (excerpt, tags, a client name…) shows up under **Details**, with nothing to configure.
+
+### Details
+
+**Details** in the room's controls swaps the body for the document's other fields, on one page in the order your schema gives them. The title stays where it is, and the arrow or Esc goes back to the writing.
+
+- **Simple fields get the room's own inputs**: strings, text, numbers, booleans, dates, slugs and tag lists.
+- **Everything else is Sanity's own input**, looking as it does in the rest of your Studio: references, images, files, arrays of objects, and lists of choices. With the [matching theme](#a-matching-studio-theme-optional) they sit closer to the room's look.
+- **Your custom inputs are used as they are.** A field with its own `components.input` or `components.field` is never replaced.
+- **Your schema's rules apply**: `hidden`, `readOnly` and validation behave as they do in the standard form. Field groups are not shown as tabs; fieldsets are kept.
+- A type with only a title and a body has no Details button.
+
+Details are saved as you type, like the writing. If a required field blocks a publish, the room opens Details at that field.
+
+If the Details view can't be shown in your Studio, the room says so and offers **Open in Structure** instead.
 
 ### The body
 
