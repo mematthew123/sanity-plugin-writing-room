@@ -8,3 +8,4 @@ dist
 .sanity
 test-results
 playwright-report
+shots/out
