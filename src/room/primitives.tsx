@@ -1,10 +1,12 @@
 import {type ComponentType, type ReactNode, type Ref} from 'react'
 import styled from 'styled-components'
 
+/** The room's one scroller. Its scrollbar's space is always kept, so nothing moves sideways when a short page follows a long one. */
 export const Surface = styled.div`
   position: relative;
   height: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--calm-color-paper);
   color: var(--calm-color-ink);
   font-family: var(--calm-font-ui);
