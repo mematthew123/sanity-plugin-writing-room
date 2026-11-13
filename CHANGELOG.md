@@ -1,5 +1,25 @@
 # sanity-plugin-writing-room
 
+## 0.3.0
+
+### Minor Changes
+
+- [#7](https://github.com/mematthew123/sanity-plugin-writing-room/pull/7) [`e3371fb`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/e3371fbba6ff7d7e9fe0f248fbc6a61c5ec79fd4) Thanks [@mematthew123](https://github.com/mematthew123)! - Details are now edited inside the room.
+
+  - **Details** swaps the body for the document's other fields instead of leaving for the Structure form: every field that isn't the title or the body, on one page in schema order. The title stays put, and the arrow or Esc goes back to the writing.
+  - Simple fields (strings, text, numbers, booleans, dates, slugs, tag lists) get the room's own inputs. References, images, arrays of objects, lists of choices and your own custom inputs use Sanity's form, as they look in the rest of your Studio.
+  - A publish blocked by a Details field opens Details at that field, and so does the "Add a cover image" nudge.
+  - Save state and Publish wait for Details to be saved as well as the writing.
+  - A type with only a title and a body has no Details button.
+  - A block the room doesn't know now reads **Edit in Structure** (it was "Edit in Details"); it still opens that block in the standard form.
+  - If the Details view can't be shown, the room says so and offers **Open in Structure**.
+
+### Patch Changes
+
+- [#7](https://github.com/mematthew123/sanity-plugin-writing-room/pull/7) [`d459d13`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/d459d13850b6e789898e9260dae8d0fec4ba2cbf) Thanks [@mematthew123](https://github.com/mematthew123)! - Details and publishing are sturdier. Publish waits for a validation of the draft as it is saved, and stops if the slug or date changed while you were deciding. Leaving no longer discards a draft that has only Details filled in, and a slug typed in Details isn't replaced by the next title edit. In Details: tags, numbers, dates and web addresses behave better, a publish problem inside an object goes to the field itself, and Escape in a popover closes the popover rather than Details.
+
+- [#7](https://github.com/mematthew123/sanity-plugin-writing-room/pull/7) [`0d1fbda`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/0d1fbda3f5a4b4c6b60caed3d78a94e827afef65) Thanks [@mematthew123](https://github.com/mematthew123)! - Publish now waits for validation to finish. A publish started in the first moment after opening a document, before validation had run, could go through with a required field still empty.
+
 ## 0.2.0
 
 ### Minor Changes
