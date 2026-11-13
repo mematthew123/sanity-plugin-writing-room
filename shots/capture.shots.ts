@@ -4,7 +4,7 @@ import {mkdirSync, rmSync} from 'node:fs'
 import {join, resolve} from 'node:path'
 import {expect, test as base, type BrowserContext, type Page} from '@playwright/test'
 import {contentClient} from '../e2e/content'
-import {missing, projectId, token} from '../e2e/env'
+import {missing, projectId, studioUrl, token} from '../e2e/env'
 import {type TestPost} from '../e2e/fixtures'
 import {Room} from '../e2e/room'
 import {essay, essayBody, pictureHtml} from './essay'
@@ -19,9 +19,13 @@ const OUT = resolve(process.env.SHOTS_OUT || 'shots/out')
 const ID_PREFIX = 'shots-'
 
 async function signIn(context: BrowserContext) {
+  // Init scripts run on every page and every frame the context opens, and one capture leaves the
+  // Studio for the reading site. The token is for the Studio, so it is written there and nowhere else.
   await context.addInitScript(
-    ([key, value]) => window.localStorage.setItem(key, value),
-    [`__studio_auth_token_${projectId}`, JSON.stringify({token})] as const,
+    ([studio, key, value]) => {
+      if (window.location.origin === studio) window.localStorage.setItem(key, value)
+    },
+    [new URL(studioUrl).origin, `__studio_auth_token_${projectId}`, JSON.stringify({token})] as const,
   )
   // The captures sign in with a token, and the room takes the token's other sessions for company
   // ("… is here too"). Nobody else is here, so the note is put away whenever it turns up.
