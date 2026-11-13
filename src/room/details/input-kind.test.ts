@@ -1,6 +1,6 @@
 import {createSchema, type ObjectSchemaType} from 'sanity'
 import {describe, expect, it} from 'vitest'
-import {hasRoomChrome, roomInputKind} from './input-kind'
+import {addressKind, hasRoomChrome, roomInputKind} from './input-kind'
 
 const Custom = () => null
 
@@ -64,6 +64,13 @@ describe('roomInputKind', () => {
 
   it('never replaces a Studio’s own input', () => {
     expect(roomInputKind(type('colour'))).toBeNull()
+  })
+})
+
+describe('addressKind', () => {
+  it('tells a web address from a line of prose', () => {
+    expect(addressKind(type('link'))).toBe('url')
+    expect(addressKind(type('subtitle'))).toBeNull()
   })
 })
 

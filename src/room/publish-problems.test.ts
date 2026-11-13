@@ -41,9 +41,17 @@ describe('publishProblems', () => {
   })
 
   it('points any other field at that field in Details', () => {
+    expect(publishProblems([error(['excerpt'], 'Too long.')])[0]?.target).toEqual({kind: 'details', field: 'excerpt'})
+  })
+
+  it('points at the field itself when it sits inside an object or a list', () => {
     expect(publishProblems([error(['seo', 'description'], 'Too long.')])[0]?.target).toEqual({
       kind: 'details',
-      field: 'seo',
+      field: 'seo.description',
+    })
+    expect(publishProblems([error(['links', {_key: 'a1'}, 'href'], 'Not a link.')])[0]?.target).toEqual({
+      kind: 'details',
+      field: 'links[_key=="a1"].href',
     })
   })
 

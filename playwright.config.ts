@@ -19,7 +19,8 @@ export default defineConfig({
   expect: {timeout: 15_000},
   use: {
     baseURL: studioUrl,
-    trace: 'retain-on-failure',
+    // A trace holds the token the tests sign in with, and CI's report can be downloaded: none there.
+    trace: process.env.CI ? 'off' : 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
   projects: [
@@ -38,7 +39,7 @@ export default defineConfig({
     command: 'pnpm dev',
     url: studioUrl,
     reuseExistingServer: true,
-    // The dev server repeats the browser's console; a failing test's trace has it anyway.
+    // The dev server repeats the browser's console; locally, a failing test's trace has it anyway.
     stderr: 'ignore',
     timeout: 120_000,
   },

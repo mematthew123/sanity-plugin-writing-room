@@ -35,11 +35,25 @@ export function useSwap(target: RoomViewName, page: RefObject<HTMLElement | null
   })
 
   useLayoutEffect(() => {
-    if (!swapped) return
+    if (!swapped) return undefined
     const scroller = page.current?.closest<HTMLElement>('[data-calm-surface]')
-    if (scroller) scroller.scrollTop = shown === 'details' ? 0 : proseScroll.current
+    const place = () => {
+      if (scroller) scroller.scrollTop = shown === 'details' ? 0 : proseScroll.current
+    }
+    // Focus first: it brings the caret into view, and the Writer's own scroll position has the last word.
     if (shown === 'prose') backToProse.current()
+    place()
+    const frame = requestAnimationFrame(place)
+    return () => cancelAnimationFrame(frame)
   }, [shown, swapped, page])
+
+  // Once it has arrived, nothing is left animating: a finished animation that still holds a
+  // transform would go on positioning anything fixed inside it.
+  useEffect(() => {
+    if (!swapped) return undefined
+    const timer = setTimeout(() => setSwapped(false), prefersReducedMotion() ? 0 : parseFloat(motion.gentle))
+    return () => clearTimeout(timer)
+  }, [swapped, shown])
 
   return {shown, leaving, entering: swapped && !leaving}
 }

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {addTags, fromLocalDateTime, parseNumber, toLocalDateTime} from './values'
+import {addTags, fromLocalDateTime, parseNumber, removeTagAt, toLocalDateTime} from './values'
 
 describe('parseNumber', () => {
   it('reads whole numbers, decimals and negatives', () => {
@@ -11,6 +11,18 @@ describe('parseNumber', () => {
     expect(parseNumber('')).toBeUndefined()
     expect(parseNumber('  ')).toBeUndefined()
     expect(parseNumber('twelve')).toBeUndefined()
+    expect(parseNumber('12a')).toBeUndefined()
+    expect(parseNumber('-')).toBeUndefined()
+  })
+
+  it('reads a comma as the decimal mark', () => {
+    expect(parseNumber('1,5')).toBe(1.5)
+    expect(parseNumber('1.')).toBe(1)
+  })
+
+  it('reads only plain decimals, not hex or exponents', () => {
+    expect(parseNumber('0x10')).toBeUndefined()
+    expect(parseNumber('1e3')).toBeUndefined()
   })
 })
 
@@ -25,10 +37,22 @@ describe('local datetimes', () => {
     expect(toLocalDateTime(local.toISOString())).toBe('2026-11-12T09:05')
   })
 
+  it('keeps a year that is still being typed valid for the input', () => {
+    const early = new Date(2026, 10, 12, 9, 5)
+    early.setFullYear(2)
+    expect(toLocalDateTime(early.toISOString())).toBe('0002-11-12T09:05')
+  })
+
   it('treats an empty or unreadable value as no date', () => {
     expect(toLocalDateTime(undefined)).toBe('')
     expect(toLocalDateTime('not a date')).toBe('')
     expect(fromLocalDateTime('')).toBeUndefined()
+  })
+})
+
+describe('removeTagAt', () => {
+  it('removes one tag, leaving another that reads the same', () => {
+    expect(removeTagAt(['news', 'news', 'essay'], 0)).toEqual(['news', 'essay'])
   })
 })
 

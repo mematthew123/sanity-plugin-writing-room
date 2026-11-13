@@ -12,8 +12,9 @@ export default async function globalSetup() {
   const content = contentClient()
   const before = new Date(Date.now() - STALE_AFTER_MS).toISOString()
   const stale = await content.fetch<string[]>(
-    '*[(_id match $published || _id match $drafts) && _updatedAt < $before]._id',
-    {published: `${ID_PREFIX}*`, drafts: `drafts.${ID_PREFIX}*`, before},
+    // A prefix, exactly: `match` reads an id as words, and would take `guide-e2e-testing` too.
+    '*[(string::startsWith(_id, $published) || string::startsWith(_id, $drafts)) && _updatedAt < $before]._id',
+    {published: ID_PREFIX, drafts: `drafts.${ID_PREFIX}`, before},
   )
   if (stale.length === 0) return
   const sweep = content.transaction()

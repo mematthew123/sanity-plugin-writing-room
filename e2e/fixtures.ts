@@ -31,6 +31,8 @@ export const test = base.extend<{
     fields?: Record<string, unknown>
   }) => Promise<TestPost>
   post: TestPost
+  /** A Field Note, which has the simple Details fields a Post doesn't. */
+  note: TestPost
 }>({
   needsStudio: [
     async ({}, provide, testInfo) => {
@@ -53,7 +55,7 @@ export const test = base.extend<{
     await provide(contentClient())
   },
 
-  makePost: async ({content}, provide, testInfo) => {
+  makePost: async ({content, page}, provide, testInfo) => {
     const made: string[] = []
     await provide(async ({type = 'post', paragraphs = 2, fields = {}} = {}) => {
       const id = `${ID_PREFIX}${randomUUID()}`
@@ -70,6 +72,8 @@ export const test = base.extend<{
       made.push(id)
       return {id, title, type, roomPath: type === 'post' ? `/writing-room/${id}` : `/writing-room/${type}/${id}`}
     })
+    // The room may still have an edit on its way; closed, it can't save the draft back after it's gone.
+    if (made.length > 0) await page.close()
     for (const id of made) {
       await content.transaction().delete(`drafts.${id}`).delete(id).commit()
     }
@@ -77,6 +81,10 @@ export const test = base.extend<{
 
   post: async ({makePost}, provide) => {
     await provide(await makePost())
+  },
+
+  note: async ({makePost}, provide) => {
+    await provide(await makePost({type: 'fieldNote', fields: {summary: 'A summary.'}}))
   },
 })
 

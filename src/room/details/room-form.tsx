@@ -1,23 +1,38 @@
 import {CloseIcon} from '@sanity/icons/Close'
-import {createContext, type KeyboardEvent, useContext, useLayoutEffect, useRef, useState} from 'react'
+import {
+  createContext,
+  type KeyboardEvent,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   type FieldProps,
   type InputProps,
+  insert,
   isArrayOfPrimitivesInputProps,
   isBooleanInputProps,
   isNumberInputProps,
   isObjectInputProps,
   isStringInputProps,
   set,
+  setIfMissing,
   unset,
 } from 'sanity'
-import styled from 'styled-components'
+import styled, {css} from 'styled-components'
 import {Switch} from '../primitives'
-import {hasRoomChrome, roomInputKind} from './input-kind'
-import {addTags, fromLocalDateTime, parseNumber, toLocalDateTime} from './values'
+import {addressKind, hasRoomChrome, roomInputKind} from './input-kind'
+import {slugByHand} from './slug-by-hand'
+import {addTags, fromLocalDateTime, parseNumber, removeTagAt, toLocalDateTime} from './values'
 
 /** True only inside the room's Details view, so the overrides below leave the Structure form alone. */
 export const InRoomDetails = createContext(false)
+
+/** The id of the document Details is showing, without `drafts.`. */
+export const DetailsDocument = createContext<string | null>(null)
 
 /** The room's label, description and validation message for simple fields; the rest keep Sanity's. */
 export function RoomField(props: FieldProps) {
@@ -43,13 +58,21 @@ export function RoomField(props: FieldProps) {
   )
 }
 
+/** Addresses aren't prose: no capitals, no spelling corrections, and the keyboard made for them. */
+const ADDRESS = {
+  url: {inputMode: 'url', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false},
+  email: {inputMode: 'email', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false},
+} as const
+
 /** The room's own inputs for simple fields. A Studio's custom input, and anything complex, keeps Sanity's. */
 export function RoomInput(props: InputProps) {
   const inRoom = useContext(InRoomDetails)
+  const documentId = useContext(DetailsDocument)
   const kind = inRoom ? roomInputKind(props.schemaType) : null
 
   if (kind === 'string' && isStringInputProps(props)) {
-    return <TextInput {...props.elementProps} type="text" />
+    const address = addressKind(props.schemaType)
+    return <TextInput {...props.elementProps} {...(address ? ADDRESS[address] : {})} type="text" />
   }
   if (kind === 'text' && isStringInputProps(props)) {
     return <GrowingText {...props.elementProps} />
@@ -61,11 +84,7 @@ export function RoomInput(props: InputProps) {
     const {elementProps, onChange} = props
     return (
       <TextInput
-        id={elementProps.id}
-        ref={elementProps.ref}
-        onFocus={elementProps.onFocus}
-        onBlur={elementProps.onBlur}
-        readOnly={elementProps.readOnly}
+        {...elementProps}
         type="datetime-local"
         value={toLocalDateTime(props.value)}
         onChange={(event) => {
@@ -79,24 +98,19 @@ export function RoomInput(props: InputProps) {
     const {elementProps, onChange} = props
     return (
       <NumberField
-        id={elementProps.id}
-        inputRef={elementProps.ref}
-        onFocus={elementProps.onFocus}
-        onBlur={elementProps.onBlur}
-        readOnly={elementProps.readOnly}
+        {...elementProps}
         value={props.value}
         onChange={(number) => onChange(number === undefined ? unset() : set(number))}
       />
     )
   }
   if (kind === 'boolean' && isBooleanInputProps(props)) {
-    const {elementProps, onChange} = props
+    const {onChange} = props
+    // A checkbox has no text value of its own to be given.
+    const {value: _value, ...elementProps} = props.elementProps
     return (
       <Switch
-        id={elementProps.id}
-        ref={elementProps.ref}
-        onFocus={elementProps.onFocus}
-        onBlur={elementProps.onBlur}
+        {...elementProps}
         disabled={props.readOnly}
         type="checkbox"
         role="switch"
@@ -110,10 +124,7 @@ export function RoomInput(props: InputProps) {
     const current = (props.value as {current?: string} | undefined)?.current ?? ''
     return (
       <TextInput
-        id={elementProps.id}
-        ref={elementProps.ref}
-        onFocus={elementProps.onFocus}
-        onBlur={elementProps.onBlur}
+        {...elementProps}
         readOnly={props.readOnly}
         type="text"
         spellCheck={false}
@@ -121,20 +132,28 @@ export function RoomInput(props: InputProps) {
         value={current}
         onChange={(event) => {
           const next = event.currentTarget.value
-          onChange(next ? set({_type: props.schemaType.name, current: next}) : unset())
+          // The title is told at once, so it doesn't take this for a slug that still follows it.
+          if (documentId && props.path.length === 1) slugByHand.note(documentId, next)
+          // Only `current` is the room's to write: anything else kept on the slug stays.
+          onChange(next ? [setIfMissing({_type: props.schemaType.name}), set(next, ['current'])] : unset())
         }}
       />
     )
   }
-  if (kind === 'tags' && isArrayOfPrimitivesInputProps(props)) {
+  // Tags are told apart by where they are, so a list holding something other than text is Sanity's.
+  if (
+    kind === 'tags' &&
+    isArrayOfPrimitivesInputProps(props) &&
+    (props.value ?? []).every((tag) => typeof tag === 'string')
+  ) {
     const {elementProps, onChange} = props
     return (
       <TagsField
-        id={elementProps.id}
-        onFocus={elementProps.onFocus}
-        onBlur={elementProps.onBlur}
+        {...elementProps}
         readOnly={props.readOnly}
-        tags={(props.value ?? []).filter((tag): tag is string => typeof tag === 'string')}
+        tags={(props.value ?? []) as string[]}
+        // Added at the end, whatever the list has become since: two people adding tags both keep theirs.
+        onAdd={(added) => onChange([setIfMissing([]), insert(added, 'after', [-1])])}
         onChange={(tags) => onChange(tags.length > 0 ? set(tags) : unset())}
       />
     )
@@ -147,12 +166,35 @@ function GrowingText(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & 
   const {ref, ...rest} = props
   const own = useRef<HTMLTextAreaElement | null>(null)
 
-  useLayoutEffect(() => {
+  const fit = useCallback(() => {
     const el = own.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [props.value])
+  }, [])
+
+  useLayoutEffect(fit, [fit, props.value])
+
+  // The same words take more lines in a narrower column, or once the prose font has loaded.
+  useEffect(() => {
+    const el = own.current
+    if (!el) return undefined
+    let width = el.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return
+      width = el.clientWidth
+      fit()
+    })
+    observer.observe(el)
+    let gone = false
+    void document.fonts?.ready.then(() => {
+      if (!gone) fit()
+    })
+    return () => {
+      gone = true
+      observer.disconnect()
+    }
+  }, [fit])
 
   return (
     <TextArea
@@ -167,29 +209,34 @@ function GrowingText(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & 
   )
 }
 
-/** Keeps what was typed while it isn't a number yet ("-", "1."), and saves only real numbers. */
+/**
+ * Keeps what was typed while it isn't a number yet ("-", "1."), and saves only real numbers.
+ * Emptying the field unsets it; text that can't be read leaves the saved number as it was.
+ */
 function NumberField({
   value,
   onChange,
-  inputRef,
+  ref,
   ...rest
 }: {
   value: number | undefined
   onChange: (value: number | undefined) => void
-  inputRef?: React.Ref<HTMLInputElement>
+  ref?: React.Ref<HTMLInputElement>
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [typed, setTyped] = useState<string | null>(null)
 
   return (
     <TextInput
       {...rest}
-      ref={inputRef}
+      ref={ref}
       type="text"
       inputMode="decimal"
       value={typed ?? (value === undefined ? '' : String(value))}
       onChange={(event) => {
-        setTyped(event.currentTarget.value)
-        onChange(parseNumber(event.currentTarget.value))
+        const text = event.currentTarget.value
+        setTyped(text)
+        const number = parseNumber(text)
+        if (number !== undefined || text.trim() === '') onChange(number)
       }}
       onBlur={(event) => {
         setTyped(null)
@@ -202,19 +249,24 @@ function NumberField({
 /** Enter or a comma adds a tag; Backspace in an empty field takes the last one away. */
 function TagsField({
   tags,
+  onAdd,
   onChange,
   readOnly,
+  ref,
   ...rest
 }: {
   tags: string[]
+  onAdd: (added: string[]) => void
   onChange: (tags: string[]) => void
   readOnly?: boolean
-} & Pick<React.InputHTMLAttributes<HTMLInputElement>, 'id' | 'onFocus' | 'onBlur'>) {
+  ref?: React.Ref<HTMLInputElement>
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value' | 'readOnly'>) {
   const [typed, setTyped] = useState('')
 
   function commit() {
     if (!typed.trim()) return
-    onChange(addTags(tags, typed))
+    const added = addTags(tags, typed).slice(tags.length)
+    if (added.length > 0) onAdd(added)
     setTyped('')
   }
 
@@ -223,21 +275,23 @@ function TagsField({
     if (event.key === 'Enter' || event.key === ',') {
       event.preventDefault()
       commit()
-    } else if (event.key === 'Backspace' && typed === '' && tags.length > 0) {
+    } else if (event.key === 'Backspace' && !event.repeat && typed === '' && tags.length > 0) {
+      // A held key that has just finished erasing what was typed mustn't carry on into the tags.
       onChange(tags.slice(0, -1))
     }
   }
 
   return (
     <Tags>
-      {tags.map((tag) => (
-        <Tag key={tag}>
+      {tags.map((tag, index) => (
+        // eslint-disable-next-line @eslint-react/no-array-index-key -- a tag has no identity but its place
+        <Tag key={`${index}:${tag}`}>
           {tag}
           {!readOnly && (
             <RemoveTag
               type="button"
               aria-label={`Remove ${tag}`}
-              onClick={() => onChange(tags.filter((other) => other !== tag))}
+              onClick={() => onChange(removeTagAt(tags, index))}
             >
               <CloseIcon aria-hidden />
             </RemoveTag>
@@ -247,6 +301,7 @@ function TagsField({
       {!readOnly && (
         <TagInput
           {...rest}
+          ref={ref}
           type="text"
           value={typed}
           onChange={(event) => setTyped(event.currentTarget.value)}
@@ -298,28 +353,33 @@ const Problem = styled.p`
   }
 `
 
-const TextInput = styled.input`
-  box-sizing: border-box;
-  width: 100%;
-  padding: var(--calm-space-sm) 0;
+/** How anything typed in Details looks: the prose face, on the paper, with the room's caret. */
+const entry = css`
   border: 0;
-  border-bottom: 1px solid var(--calm-color-rule);
-  border-radius: 0;
   background: transparent;
   color: var(--calm-color-ink);
   color-scheme: inherit;
   font-family: var(--calm-font-prose);
   font-size: var(--calm-prose-size-medium);
   caret-color: var(--calm-color-accent);
+
+  &:read-only {
+    color: var(--calm-color-ink-muted);
+  }
+`
+
+const TextInput = styled.input`
+  ${entry}
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--calm-space-sm) 0;
+  border-bottom: 1px solid var(--calm-color-rule);
+  border-radius: 0;
   transition: border-color var(--calm-motion-gentle) var(--calm-motion-easing);
 
   &:focus {
     outline: none;
     border-bottom-color: var(--calm-color-accent);
-  }
-
-  &:read-only {
-    color: var(--calm-color-ink-muted);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -384,15 +444,10 @@ const RemoveTag = styled.button`
 `
 
 const TagInput = styled.input`
+  ${entry}
   flex: 1;
   min-width: 6rem;
   padding: var(--calm-space-xs) 0;
-  border: 0;
-  background: transparent;
-  color: var(--calm-color-ink);
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-prose-size-medium);
-  caret-color: var(--calm-color-accent);
 
   &:focus {
     outline: none;

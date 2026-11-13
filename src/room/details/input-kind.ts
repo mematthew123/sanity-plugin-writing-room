@@ -38,6 +38,12 @@ export function roomInputKind(type: SchemaType): RoomInputKind | null {
   return ['string', 'url', 'email'].some((name) => isOfType(type, name)) ? 'string' : null
 }
 
+/** A web or email address, which is typed differently from a line of prose. */
+export function addressKind(type: SchemaType): 'url' | 'email' | null {
+  if (isOfType(type, 'url')) return 'url'
+  return isOfType(type, 'email') ? 'email' : null
+}
+
 /** Whether the room draws the label, description and validation message around the input. */
 export function hasRoomChrome(type: SchemaType): boolean {
   if (hasOwn(type, 'field')) return false

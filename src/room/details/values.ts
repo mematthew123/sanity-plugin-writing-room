@@ -1,7 +1,11 @@
-/** Undefined for anything that isn't a finite number, so an emptied field is unset rather than `NaN`. */
+/**
+ * Undefined for anything that isn't a plain decimal number. A comma counts as the decimal mark,
+ * since that's the key a decimal keypad has in much of the world.
+ */
 export function parseNumber(raw: string): number | undefined {
-  if (raw.trim() === '') return undefined
-  const number = Number(raw)
+  const text = raw.trim().replace(',', '.')
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(text)) return undefined
+  const number = Number(text)
   return Number.isFinite(number) ? number : undefined
 }
 
@@ -12,13 +16,18 @@ export function toLocalDateTime(iso: string | undefined): string {
   if (!iso) return ''
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${String(date.getFullYear()).padStart(4, '0')}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 export function fromLocalDateTime(local: string): string | undefined {
   if (!local) return undefined
   const date = new Date(local)
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
+}
+
+/** Takes away the tag at `index`, and no other tag that happens to read the same. */
+export function removeTagAt(tags: readonly string[], index: number): string[] {
+  return tags.filter((_, at) => at !== index)
 }
 
 /** Adds what was typed as one or more tags (commas separate them), skipping blanks and repeats. */

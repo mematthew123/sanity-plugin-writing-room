@@ -122,7 +122,7 @@ test('comes back to the Prose where the Writer left it', async ({page, makePost}
   expect(before).toBeGreaterThan(500)
 
   await room.openDetails()
-  expect(await room.scrollTop()).toBe(0)
+  await expect.poll(() => room.scrollTop()).toBe(0)
 
   await room.back.click()
   await expect(room.body).toBeVisible()
@@ -136,10 +136,12 @@ test('keeps the column still between a long Prose and a short Details', async ({
   const inProse = await room.title.boundingBox()
 
   await room.openDetails()
-  const inDetails = await room.title.boundingBox()
-
-  expect(inDetails?.x).toBe(inProse?.x)
-  expect(inDetails?.width).toBe(inProse?.width)
+  await expect
+    .poll(async () => {
+      const inDetails = await room.title.boundingBox()
+      return {x: inDetails?.x, width: inDetails?.width}
+    })
+    .toEqual({x: inProse?.x, width: inProse?.width})
 })
 
 test('leaves the Structure form as Sanity draws it', async ({page, post}) => {

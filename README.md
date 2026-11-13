@@ -141,6 +141,7 @@ If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content'
 - **Simple fields get the room's own inputs**: strings, text, numbers, booleans, dates, slugs and tag lists.
 - **Everything else is Sanity's own input**, looking as it does in the rest of your Studio: references, images, files, arrays of objects, and lists of choices. With the [matching theme](#a-matching-studio-theme-optional) they sit closer to the room's look.
 - **Your custom inputs are used as they are.** A field with its own `components.input` or `components.field` is never replaced.
+- **List the Writing Room last in `plugins` if another plugin wraps every input.** For simple fields the room's inputs take the place of Sanity's, which ends Sanity's chain of input components there. A plugin listed before the Writing Room still wraps the room's inputs in Details; one listed after it, and a `form.components.input` in your own Studio config, does not. Everything still appears in the Structure form.
 - **Your schema's rules apply**: `hidden`, `readOnly` and validation behave as they do in the standard form. Field groups are not shown as tabs; fieldsets are kept.
 - A type with only a title and a body has no Details button.
 
@@ -294,7 +295,7 @@ pnpm e2e         # Playwright: the room in a real, logged-in Studio
 
 ### Browser tests
 
-`pnpm e2e` opens the dev Studio in Chromium and writes in the room: typing, Details, publishing. It needs one more line in `.env.local`:
+`pnpm e2e` opens the dev Studio in Chromium and writes in the room: typing, Details, publishing. It needs `SANITY_STUDIO_DATASET` set in `.env.local` (the tests won't fall back to `production` on their own) and one more line:
 
 ```sh
 SANITY_E2E_TOKEN=   # an Editor token for the project (sanity.io/manage → API → Tokens)
