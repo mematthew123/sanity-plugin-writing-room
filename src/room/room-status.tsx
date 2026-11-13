@@ -185,6 +185,36 @@ interface PublishPlan {
 
 type SavedDraft = Record<string, unknown> & {_rev?: string}
 
+const VALIDATION_QUIET_MS = 1500
+
+/**
+ * Whether `validation` is a verdict on the document as it is now. For a moment after the room
+ * opens, and after each edit, it reports no problems and isn't validating yet: that isn't a pass.
+ * So it counts once a validation of this revision has been seen to finish, or, for a result that
+ * was already there when the room opened, once it has stayed put for a while.
+ */
+function useValidated({isValidating, revision}: {isValidating: boolean; revision?: string}): boolean {
+  const [settled, setSettled] = useState<string | undefined>(undefined)
+  const sawValidating = useRef(false)
+
+  useEffect(() => {
+    if (isValidating) {
+      sawValidating.current = true
+      return undefined
+    }
+    if (!revision) return undefined
+    if (sawValidating.current) {
+      sawValidating.current = false
+      setSettled(revision)
+      return undefined
+    }
+    const timer = setTimeout(() => setSettled(revision), VALIDATION_QUIET_MS)
+    return () => clearTimeout(timer)
+  }, [isValidating, revision])
+
+  return !isValidating && revision !== undefined && settled === revision
+}
+
 /** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
 export function PublishButton({
   handle,
@@ -204,6 +234,7 @@ export function PublishButton({
   const apply = useApplyDocumentActions()
   const isSynced = useRoomSynced()
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
+  const settled = useValidated(validation)
   const [draft, setDraft] = useState<SavedDraft | null>(null)
   const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
@@ -245,9 +276,10 @@ export function PublishButton({
 
   useEffect(() => {
     if (phase !== 'checking') return
-    // Validation is a verdict only on the revision it names. It counts once that revision is the
-    // saved draft's: until then its markers are for words the Writer has since changed, or for none.
-    const validated = !!draft?._rev && !validation.isValidating && validation.revision === draft._rev
+    // Two things make validation a verdict on what would be published. It has settled: `revision`
+    // moves on the moment the draft does, before the markers do. And its revision is the saved
+    // draft's: the Prose saves through another store, which the Studio's hears of a moment later.
+    const validated = settled && !!draft?._rev && validation.revision === draft._rev
     if (!isSynced || !draft || !validated) {
       // Never publish on stale sync or validation: the SDK's publish doesn't enforce the schema.
       if (timedOut) {
@@ -289,7 +321,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
