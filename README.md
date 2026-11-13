@@ -315,6 +315,18 @@ Tests live in `e2e/`, named `*.e2e.ts` (`*.phone.e2e.ts` for the ones that run a
 
 In CI they run on pushes and on pull requests from this repository, when the `SANITY_E2E_PROJECT_ID`, `SANITY_E2E_DATASET` and `SANITY_E2E_TOKEN` secrets are set; without them the job passes without running anything. The project needs `http://localhost:3333` as a CORS origin.
 
+### Captures for the site
+
+`pnpm shots` photographs the room for [writingroom.studio](https://writingroom.studio), in dark and light: stills as PNG and one short loop as MP4 (which needs `ffmpeg`). It uses the same `.env.local` and dev Studio as the browser tests, seeds the essay in `shots/essay.ts` as a draft Post (ids starting `shots-`), and removes it afterwards. Nothing is published.
+
+```sh
+pnpm shots                                               # into shots/out, which git ignores
+pnpm shots --out ../writingroom-studio/src/assets/shots  # straight into the site
+pnpm shots --project dark -g details                     # one capture, one scheme
+```
+
+The publish capture shows `demo.writingroom.studio` as the place the Post goes live; a dev Studio that was already running keeps its own `SANITY_STUDIO_PREVIEW_ORIGIN`, so stop it first.
+
 `publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published, so always publish with `pnpm publish`. Releases are made with Changesets; see [RELEASING.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/RELEASING.md).
 
 `pnpm dev` runs the dev Studio in `sanity.config.ts`: the starter schema, `writingRoom({types: ['post']})` and the theme, with the plugin imported straight from `src/`, so edits reload as you save. It writes real documents, so point `.env.local` at a project and dataset you don't mind testing in, with `http://localhost:3333` as a CORS origin. Set `SANITY_STUDIO_PREVIEW_ORIGIN` to try Preview against a site with a draft-mode route. The dev Studio isn't part of the package, and isn't meant to be built (`sanity build` would write over `dist/`).
