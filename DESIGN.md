@@ -205,7 +205,7 @@ The room has its own vocabulary. Use these words in the interface, in code and i
 
 - **Writer**: the person writing. Never "user" or "editor".
 - **Prose**: what the Writer writes: the title and the body.
-- **Details**: everything else about a document (slug, excerpt, cover image, tags). They live in the Studio's standard form, never in the room.
+- **Details**: everything about a document that isn't Prose: every other field its schema has (slug, excerpt, cover image, tags, a Studio's own fields). The Writer edits them without leaving the room, and they stay out of sight until asked for.
 - **Lobby**: the entrance. A doorway to the writing, not a document browser.
 - **The room**: one document, open for writing.
 - **Room Controls**: the few controls in the room's corners.

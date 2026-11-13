@@ -7,10 +7,11 @@ import {
   useDocument,
   useDocumentProjection,
 } from '@sanity/sdk-react'
-import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useColorSchemeValue, useDataset, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
-import styled from 'styled-components'
+import styled, {keyframes} from 'styled-components'
+import {DetailsView} from './details/DetailsView'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
 import {didComeFromForm} from './came-from'
@@ -117,7 +118,17 @@ function LoadedRoom({
     return () => clearTimeout(timer)
   }, [notice])
 
-  const details = <DetailsButton handle={handle} />
+  const [view, setView] = useState<'prose' | 'details'>('prose')
+  const [detailsSyncing, setDetailsSyncing] = useState(false)
+  const toProse = useCallback(() => setView('prose'), [])
+  const inDetails = view === 'details'
+
+  const openInStructure = useOpenDetails(handle)
+  const details = (
+    <QuietButton aria-pressed={inDetails} onClick={() => setView(inDetails ? 'prose' : 'details')}>
+      Details
+    </QuietButton>
+  )
   const preview = (
     <PreviewButton documentType={handle.documentType} slug={data?.slug} onProblem={onProblem} />
   )
@@ -127,10 +138,14 @@ function LoadedRoom({
       <Layout>
         {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
         <RoomControls
-          receded={receded}
+          receded={receded && !inDetails}
           start={
             <Recedes>
-              <LeaveButton handle={handle} isPublished={isPublished} />
+              {inDetails ? (
+                <BackToProse onBack={toProse} />
+              ) : (
+                <LeaveButton handle={handle} isPublished={isPublished} />
+              )}
             </Recedes>
           }
           end={
@@ -168,7 +183,19 @@ function LoadedRoom({
         <Main>
           <Page as="article" ref={page} $textSize={settings.textSize}>
             <Title handle={handle} fields={fields} isPublished={isPublished} />
-            <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
+            <Swap data-shown={!inDetails} inert={inDetails}>
+              <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
+            </Swap>
+            {inDetails && (
+              <Swap data-shown data-entering="">
+                <SetuplessBoundary onOpenInStructure={openInStructure}>
+                  <Suspense fallback={<Placeholder $height="12rem" />}>
+                    <DetailsView handle={handle} fields={fields} onSyncing={setDetailsSyncing} />
+                  </Suspense>
+                </SetuplessBoundary>
+                {detailsSyncing && <SpikeNote>Details: saving…</SpikeNote>}
+              </Swap>
+            )}
           </Page>
         </Main>
         <Foot>
@@ -238,10 +265,65 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
   )
 }
 
-function DetailsButton({handle}: {handle: DocumentHandle}) {
-  const openDetails = useOpenDetails(handle)
-  return <QuietButton onClick={openDetails}>Details</QuietButton>
+/** One step out: from Details, the arrow and Escape return to the Prose. */
+function BackToProse({onBack}: {onBack: () => void}) {
+  useEscape(onBack)
+  return (
+    <QuietButton icon={ArrowLeftIcon} aria-label="Back to writing" title="Back to writing" onClick={onBack}>
+      <WideOnly>Back</WideOnly>
+    </QuietButton>
+  )
 }
+
+/** Fails soft: a form that can't render never takes the Prose down with it. */
+class SetuplessBoundary extends Component<
+  {children: ReactNode; onOpenInStructure: () => void},
+  {failed: boolean}
+> {
+  state = {failed: false}
+  static getDerivedStateFromError() {
+    return {failed: true}
+  }
+  componentDidCatch(error: unknown) {
+    console.error('[sanity-plugin-writing-room] Details couldn’t render.', error)
+  }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <SpikeNote>
+        Details couldn’t open here.{' '}
+        <QuietButton onClick={this.props.onOpenInStructure}>Open in Structure</QuietButton>
+      </SpikeNote>
+    )
+  }
+}
+
+/** Fades in over `gentle` with a 4px rise; instant under reduced motion. */
+const rise = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+`
+
+const Swap = styled.div`
+  &[data-shown='false'] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &[data-shown='true'] {
+      animation: ${rise} var(--calm-motion-gentle) var(--calm-motion-easing) both;
+    }
+  }
+`
+
+const SpikeNote = styled.p`
+  margin: var(--calm-space-md) 0 0;
+  color: var(--calm-color-ink-muted);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size-small);
+`
 
 const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
   font-family: var(--calm-font-prose);
