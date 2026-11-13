@@ -8,8 +8,8 @@ export interface RoomSettings {
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   textSize: 'medium',
-  typewriter: false,
-  focusDimming: false,
+  typewriter: true,
+  focusDimming: true,
 }
 
 /** One key for every Studio: storage is already per origin. */
