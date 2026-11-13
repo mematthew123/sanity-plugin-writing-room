@@ -17,6 +17,19 @@ const embedded = args.includes('--embedded')
 const sanityVersion = args.find((arg) => !arg.startsWith('--')) ?? 'latest'
 const pluginDir = resolve(import.meta.dirname, '..')
 const studioDir = mkdtempSync(join(tmpdir(), 'writing-room-smoke-'))
+const FORM_EXPORTS = [
+  'ALL_FIELDS_GROUP',
+  'ChangeIndicatorsTracker',
+  'FormBuilder',
+  'createPatchChannel',
+  'useDocumentForm',
+  'useSyncState',
+  'isArrayOfPrimitivesInputProps',
+  'isBooleanInputProps',
+  'isNumberInputProps',
+  'isObjectInputProps',
+  'isStringInputProps',
+]
 const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
 
 function run(command, args, cwd) {
@@ -143,12 +156,25 @@ if (portableText.length && !loose) {
   process.exit(1)
 }
 
-// 5. Types and bundle.
+// 5. The Details view is built on parts of Sanity's form that aren't all stable API.
+const sanityExports = execFileSync(
+  'node',
+  ['--input-type=module', '-e', "import * as sanity from 'sanity'; console.log(Object.keys(sanity).join(','))"],
+  {cwd: studioDir, encoding: 'utf8'},
+).split(',')
+const missing = FORM_EXPORTS.filter((name) => !sanityExports.includes(name))
+console.log(`\nForm exports the Details view needs: ${missing.length ? `missing ${missing.join(', ')}` : 'all present'}`)
+if (missing.length) {
+  console.error(`\n✗ sanity@${sanityVersion} doesn't export what the Details view is built on.`)
+  process.exit(1)
+}
+
+// 6. Types and bundle.
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
 expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
 
-// 6. The same Studio embedded in a Next.js app.
+// 7. The same Studio embedded in a Next.js app.
 if (embedded) {
   const next = {
     'next.config.mjs': 'export default {}\n',

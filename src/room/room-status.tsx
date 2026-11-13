@@ -6,14 +6,14 @@ import {
   editDocument,
   publishDocument,
   useApplyDocumentActions,
-  useDocument,
   useDocumentSyncStatus,
   usePresenceForDocument,
 } from '@sanity/sdk-react'
-import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {
   useClient,
   useCurrentUser,
+  useSyncState,
   useValidationStatus,
 } from 'sanity'
 import styled, {keyframes} from 'styled-components'
@@ -22,10 +22,11 @@ import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {addImageLabel, detailsPatch, readPublishable} from './fields'
+import {type PublishablePost} from '../lib/publish-details'
 import {goToProblem} from './go-to-problem'
 import {Floating, FloatingSurface, useViewportChanges} from './editor/floating'
 import {useWritingKind} from './kinds'
-import {useOpenDetails} from './navigation'
+import {useRoomView} from './navigation'
 import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
@@ -54,9 +55,23 @@ const useOnline = () => useSyncExternalStore(subscribeOnline, () => navigator.on
 const SAVED_VISIBLE_MS = 2000
 const SAVING_DELAY_MS = 800
 
+const RoomSynced = createContext(true)
+
+/**
+ * The Prose saves through the App SDK and Details through the Studio's own store, so the room is
+ * only saved once both have caught up. Watched once here, for everything in the room that asks.
+ */
+export function RoomSyncProvider({handle, children}: {handle: DocumentHandle; children: ReactNode}) {
+  const proseSynced = useDocumentSyncStatus(handle) ?? true
+  const details = useSyncState(handle.documentId, handle.documentType)
+  return <RoomSynced.Provider value={proseSynced && !details.isSyncing}>{children}</RoomSynced.Provider>
+}
+
+const useRoomSynced = () => useContext(RoomSynced)
+
 /** Offline, it stays until the connection returns. */
-export function SaveState({handle}: {handle: DocumentHandle}) {
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+export function SaveState() {
+  const isSynced = useRoomSynced()
   const online = useOnline()
   const [shown, setShown] = useState<'saving' | 'saved' | null>(null)
   const wasSynced = useRef(isSynced)
@@ -90,18 +105,16 @@ export function SaveState({handle}: {handle: DocumentHandle}) {
  * or a passing notice such as "Published".
  */
 export function RoomMessage({
-  handle,
   problem,
   onDismissProblem,
   notice,
 }: {
-  handle: DocumentHandle
   problem: string | null
   onDismissProblem: () => void
   notice: RoomNotice | null
 }) {
   const online = useOnline()
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+  const isSynced = useRoomSynced()
 
   if (problem) {
     return (
@@ -157,7 +170,8 @@ export function Presence({handle}: {handle: DocumentHandle}) {
   return sentence ? <Quiet role="status">{sentence}</Quiet> : null
 }
 
-const SETTLE_TIMEOUT_MS = 4000
+/** Long enough for a save, a read of the saved draft, and a validation of it. */
+const SETTLE_TIMEOUT_MS = 6000
 
 interface PublishPlan {
   details: PublishDetails
@@ -165,6 +179,40 @@ interface PublishPlan {
   url: URL | null
   /** Shown instead of `url` when there isn't one. */
   slug: string | undefined
+  /** The slug and date the plan was made from. If they've moved by the time the Writer says yes, the plan is off. */
+  basis: PublishablePost
+}
+
+type SavedDraft = Record<string, unknown> & {_rev?: string}
+
+const VALIDATION_QUIET_MS = 1500
+
+/**
+ * Whether `validation` is a verdict on the document as it is now. For a moment after the room
+ * opens, and after each edit, it reports no problems and isn't validating yet: that isn't a pass.
+ * So it counts once a validation of this revision has been seen to finish, or, for a result that
+ * was already there when the room opened, once it has stayed put for a while.
+ */
+function useValidated({isValidating, revision}: {isValidating: boolean; revision?: string}): boolean {
+  const [settled, setSettled] = useState<string | undefined>(undefined)
+  const sawValidating = useRef(false)
+
+  useEffect(() => {
+    if (isValidating) {
+      sawValidating.current = true
+      return undefined
+    }
+    if (!revision) return undefined
+    if (sawValidating.current) {
+      sawValidating.current = false
+      setSettled(revision)
+      return undefined
+    }
+    const timer = setTimeout(() => setSettled(revision), VALIDATION_QUIET_MS)
+    return () => clearTimeout(timer)
+  }, [isValidating, revision])
+
+  return !isValidating && revision !== undefined && settled === revision
 }
 
 /** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
@@ -184,10 +232,11 @@ export function PublishButton({
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
   const apply = useApplyDocumentActions()
-  const {data: post} = useDocument<Record<string, unknown>>(handle)
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+  const isSynced = useRoomSynced()
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
-  const openDetails = useOpenDetails(handle)
+  const settled = useValidated(validation)
+  const [draft, setDraft] = useState<SavedDraft | null>(null)
+  const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
   const [phase, setPhase] = useState<'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing'>('idle')
@@ -205,13 +254,41 @@ export function PublishButton({
     return () => clearTimeout(timer)
   }, [phase])
 
+  // The draft as it is saved, read again whenever validation moves on to another revision. Both
+  // stores write to it, so only the server knows which revision is the latest.
+  useEffect(() => {
+    if (phase !== 'checking' || !isSynced) return undefined
+    let superseded = false
+    client.getDocument<SavedDraft>(`drafts.${handle.documentId}`).then(
+      (saved) => {
+        if (!superseded) setDraft(saved ?? null)
+      },
+      () => {
+        if (superseded) return
+        setPhase('idle')
+        onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)
+      },
+    )
+    return () => {
+      superseded = true
+    }
+  }, [phase, isSynced, validation.revision, client, handle.documentId, kind.singular, onProblem])
+
   useEffect(() => {
     if (phase !== 'checking') return
-    if (!isSynced || validation.isValidating) {
+    // Two things make validation a verdict on what would be published. It has settled: `revision`
+    // moves on the moment the draft does, before the markers do. And its revision is the saved
+    // draft's: the Prose saves through another store, which the Studio's hears of a moment later.
+    const validated = settled && !!draft?._rev && validation.revision === draft._rev
+    if (!isSynced || !draft || !validated) {
       // Never publish on stale sync or validation: the SDK's publish doesn't enforce the schema.
       if (timedOut) {
         setPhase('idle')
-        onProblem('Still saving your latest changes. Try publishing again in a moment.')
+        onProblem(
+          isSynced
+            ? `Still checking this ${kind.singular}. Try publishing again in a moment.`
+            : 'Still saving your latest changes. Try publishing again in a moment.',
+        )
       }
       return
     }
@@ -229,14 +306,14 @@ export function PublishButton({
     void (async () => {
       try {
         const {fields} = kind
-        const publishable = readPublishable(post, fields)
+        const basis = readPublishable(draft, fields)
         const details = await detailsForPublish({
-          post: publishable,
+          post: basis,
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
         })
-        const slug = fields.slug ? (details.slug?.current ?? publishable.slug?.current) : undefined
-        setPlan({details, slug, url: site && slug ? liveUrl(site, slug, handle.documentType) : null})
+        const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
+        setPlan({details, slug, basis, url: site && slug ? liveUrl(site, slug, handle.documentType) : null})
         onProblem(null)
         setPhase('confirming')
       } catch {
@@ -244,7 +321,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, post, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
@@ -277,10 +354,18 @@ export function PublishButton({
     return () => window.removeEventListener('pointerdown', close)
   }, [confirming, cancel])
 
-  async function publish({details, url}: PublishPlan) {
+  async function publish({details, url, basis}: PublishPlan) {
     setPhase('publishing')
     try {
       const {fields} = kind
+      // The plan's slug and date were settled when the room asked. If someone has changed either
+      // since, in Details or from elsewhere, writing the plan now would undo their change.
+      const saved = await client.getDocument<SavedDraft>(`drafts.${handle.documentId}`)
+      const now = readPublishable(saved, fields)
+      if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
+        onProblem(`This ${kind.singular}’s details changed while you were deciding. Publish again to use them.`)
+        return
+      }
       // The date is when the Writer said yes, not when the room asked.
       const patch = detailsPatch(
         details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details,
@@ -289,7 +374,7 @@ export function PublishButton({
       const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
       await apply([...edit, publishDocument(handle)])
       onProblem(null)
-      const image = fields.image ? (post?.[fields.image] as {asset?: unknown} | undefined) : undefined
+      const image = fields.image ? (saved?.[fields.image] as {asset?: unknown} | undefined) : undefined
       onNotice({
         text: isFirstPublish ? 'Published' : 'Changes published',
         done: true,
@@ -297,7 +382,7 @@ export function PublishButton({
         action:
           !fields.image || image?.asset
             ? undefined
-            : {label: addImageLabel(kind.imageTitle), onClick: openDetails},
+            : {label: addImageLabel(kind.imageTitle), onClick: () => openDetails(fields.image)},
       })
     } catch {
       onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)
@@ -323,6 +408,7 @@ export function PublishButton({
         onClick={() => {
           if (confirming) return cancel()
           setTimedOut(false)
+          setDraft(null)
           setPhase('checking')
         }}
       >

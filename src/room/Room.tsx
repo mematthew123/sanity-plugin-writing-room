@@ -7,10 +7,13 @@ import {
   useDocument,
   useDocumentProjection,
 } from '@sanity/sdk-react'
-import {Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue, useDataset, useProjectId} from 'sanity'
+import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
-import styled from 'styled-components'
+import styled, {keyframes} from 'styled-components'
+import {DetailsBoundary} from './details/DetailsBoundary'
+import {DetailsView} from './details/DetailsView'
+import {useSwap} from './details/use-swap'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
 import {didComeFromForm} from './came-from'
@@ -18,7 +21,7 @@ import {useWritingKind} from './kinds'
 import {rememberLastOpened} from './last-opened'
 import {isEmptyPost} from './empty-post'
 import {type WritingFields} from './fields'
-import {useOpenDetails} from './navigation'
+import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
 import {PreviewButton} from './PreviewButton'
@@ -37,6 +40,7 @@ import {
   PublishButton,
   RoomMessage,
   type RoomNotice,
+  RoomSyncProvider,
   SaveState,
   StatusLabel,
 } from './room-status'
@@ -117,74 +121,94 @@ function LoadedRoom({
     return () => clearTimeout(timer)
   }, [notice])
 
-  const details = <DetailsButton handle={handle} />
+  const view = useRoomView(handle)
+  const {hasDetails, inDetails} = view
+
+  const details = hasDetails ? (
+    <QuietButton aria-pressed={inDetails} onClick={() => (inDetails ? view.toProse() : view.openDetails())}>
+      Details
+    </QuietButton>
+  ) : null
   const preview = (
     <PreviewButton documentType={handle.documentType} slug={data?.slug} onProblem={onProblem} />
   )
 
   return (
     <EditorProvider initialConfig={{schemaDefinition}}>
-      <Layout>
-        {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
-        <RoomControls
-          receded={receded}
-          start={
-            <Recedes>
-              <LeaveButton handle={handle} isPublished={isPublished} />
-            </Recedes>
-          }
-          end={
-            <>
-              <Presence handle={handle} />
-              <SaveState handle={handle} />
+      <RoomSyncProvider handle={handle}>
+        <Layout>
+          {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
+          <RoomControls
+            receded={receded && !inDetails}
+            start={
               <Recedes>
-                <WideOnly>
-                  <StatusLabel status={status} />
-                </WideOnly>
-                <RoomSettingsMenu
-                  scheme={scheme}
-                  more={
-                    <>
-                      {details}
-                      {preview}
-                    </>
-                  }
-                />
-                <WideOnly>
-                  {details}
-                  {preview}
-                </WideOnly>
-                <PublishButton
-                  handle={handle}
-                  status={status}
-                  scheme={scheme}
-                  onProblem={onProblem}
-                  onNotice={setNotice}
-                />
+                {inDetails ? (
+                  <BackToProse onBack={view.toProse} />
+                ) : (
+                  <LeaveButton handle={handle} isPublished={isPublished} />
+                )}
               </Recedes>
-            </>
-          }
-        />
-        <Main>
-          <Page as="article" ref={page} $textSize={settings.textSize}>
-            <Title handle={handle} fields={fields} isPublished={isPublished} />
-            <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
-          </Page>
-        </Main>
-        <Foot>
-          <Count data-receded={receded}>
-            <WordCount />
-          </Count>
-          <Messages>
-            <RoomMessage
-              handle={handle}
-              problem={problem}
-              onDismissProblem={() => onProblem(null)}
-              notice={notice}
-            />
-          </Messages>
-        </Foot>
-      </Layout>
+            }
+            end={
+              <>
+                <Presence handle={handle} />
+                <SaveState />
+                <Recedes>
+                  <WideOnly>
+                    <StatusLabel status={status} />
+                  </WideOnly>
+                  <RoomSettingsMenu
+                    scheme={scheme}
+                    more={
+                      <>
+                        {details}
+                        {preview}
+                      </>
+                    }
+                  />
+                  <WideOnly>
+                    {details}
+                    {preview}
+                  </WideOnly>
+                  <PublishButton
+                    handle={handle}
+                    status={status}
+                    scheme={scheme}
+                    onProblem={onProblem}
+                    onNotice={setNotice}
+                  />
+                </Recedes>
+              </>
+            }
+          />
+          <Main>
+            <Page as="article" ref={page} $textSize={settings.textSize}>
+              <Title handle={handle} fields={fields} isPublished={isPublished} inDetails={inDetails} />
+              <Pages
+                handle={handle}
+                fields={fields}
+                scheme={scheme}
+                page={page}
+                inDetails={inDetails}
+                focusField={view.field}
+                onUploadFailed={onProblem}
+              />
+            </Page>
+          </Main>
+          <Foot>
+            <Count data-receded={receded && !inDetails}>
+              <WordCount />
+            </Count>
+            <Messages>
+              <RoomMessage
+                problem={problem}
+                onDismissProblem={() => onProblem(null)}
+                notice={notice}
+              />
+            </Messages>
+          </Foot>
+        </Layout>
+      </RoomSyncProvider>
     </EditorProvider>
   )
 }
@@ -193,19 +217,63 @@ function Title({
   handle,
   fields,
   isPublished,
+  inDetails,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
+  inDetails: boolean
 }) {
   const editor = useEditor()
+  // Enter goes on to whatever is under the title: the body, or the first of the Details.
+  const onEnter = useCallback(() => {
+    if (inDetails) askForFirstDetail()
+    else editor.send({type: 'focus'})
+  }, [editor, inDetails])
+  return <TitleField handle={handle} fields={fields} isPublished={isPublished} onEnter={onEnter} />
+}
+
+/** The body and Details take turns under the title. The editor stays mounted, so the caret keeps its place. */
+function Pages({
+  handle,
+  fields,
+  scheme,
+  page,
+  inDetails,
+  focusField,
+  onUploadFailed,
+}: {
+  handle: DocumentHandle
+  fields: WritingFields
+  scheme: string
+  page: RefObject<HTMLElement | null>
+  inDetails: boolean
+  focusField: string | undefined
+  onUploadFailed: (problem: string | null) => void
+}) {
+  const editor = useEditor()
+  const openInStructure = useOpenInStructure(handle)
+  const backToCaret = useCallback(() => {
+    if (editor.getSnapshot().context.selection) editor.send({type: 'focus'})
+  }, [editor])
+  const {shown, leaving, entering} = useSwap(inDetails ? 'details' : 'prose', page, backToCaret)
+
   return (
-    <TitleField
-      handle={handle}
-      fields={fields}
-      isPublished={isPublished}
-      onEnter={() => editor.send({type: 'focus'})}
-    />
+    <>
+      {/* Inert as soon as it starts to go, so nothing typed lands in an editor that can't be seen. */}
+      <Swap hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
+        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onUploadFailed} />
+      </Swap>
+      {shown === 'details' && (
+        <Swap inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
+          <DetailsBoundary onOpenInStructure={openInStructure}>
+            <Suspense fallback={<Placeholder $height="12rem" />}>
+              <DetailsView handle={handle} fields={fields} focusField={focusField} />
+            </Suspense>
+          </DetailsBoundary>
+        </Swap>
+      )}
+    </>
   )
 }
 
@@ -213,21 +281,23 @@ function Title({
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
+  // Details saves through the Studio's store, so what was just typed there is in its draft first.
+  const {draft: detailsDraft} = useEditState(handle.documentId, handle.documentType)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
-  const openDetails = useOpenDetails(handle)
+  const openInStructure = useOpenInStructure(handle)
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post, fields)) {
+    if (!isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
       void apply(discardDocument(handle))
       router.navigate({})
     } else if (toForm) {
-      openDetails()
+      openInStructure()
     } else {
       router.navigate({})
     }
-  }, [apply, handle, isPublished, post, fields, router, toForm, openDetails])
+  }, [apply, handle, isPublished, post, detailsDraft, fields, router, toForm, openInStructure])
   useEscape(leave)
 
   const label = toForm ? 'Back to the form' : 'Back to the Lobby'
@@ -238,10 +308,51 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
   )
 }
 
-function DetailsButton({handle}: {handle: DocumentHandle}) {
-  const openDetails = useOpenDetails(handle)
-  return <QuietButton onClick={openDetails}>Details</QuietButton>
+/** One step out: from Details, the arrow and Escape return to the Prose. */
+function BackToProse({onBack}: {onBack: () => void}) {
+  useEscape(onBack)
+  return (
+    <QuietButton icon={ArrowLeftIcon} aria-label="Back to writing" title="Back to writing" onClick={onBack}>
+      <WideOnly>Back</WideOnly>
+    </QuietButton>
+  )
 }
+
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
+  }
+`
+
+const rise = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+`
+
+/** Out over `press`, then in over `gentle`; Details rises 4px as it arrives. Instant under reduced motion. */
+const Swap = styled.div`
+  &[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity var(--calm-motion-press) var(--calm-motion-easing);
+
+    &[data-leaving='true'] {
+      opacity: 0;
+    }
+
+    &[data-entering='true'] {
+      animation: ${fadeIn} var(--calm-motion-gentle) var(--calm-motion-easing) both;
+    }
+
+    &[data-entering='true'][data-rises] {
+      animation-name: ${rise};
+    }
+  }
+`
 
 const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
   font-family: var(--calm-font-prose);

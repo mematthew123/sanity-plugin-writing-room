@@ -1,10 +1,12 @@
 import {type ComponentType, type ReactNode, type Ref} from 'react'
 import styled from 'styled-components'
 
+/** The room's one scroller. Its scrollbar's space is always kept, so nothing moves sideways when a short page follows a long one. */
 export const Surface = styled.div`
   position: relative;
   height: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--calm-color-paper);
   color: var(--calm-color-ink);
   font-family: var(--calm-font-ui);
@@ -200,4 +202,50 @@ export const Placeholder = styled.div<{$height: string}>`
   border-radius: var(--calm-radius-large);
   background: var(--calm-color-surface);
   opacity: 0.6;
+`
+
+/** A checkbox drawn as a switch; give it `type="checkbox"` and `role="switch"`. */
+export const Switch = styled.input`
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.375rem;
+  margin: 0;
+  border-radius: var(--calm-radius-pill);
+  background: var(--calm-color-ink-faint);
+  appearance: none;
+  cursor: pointer;
+  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.375rem - 4px);
+    height: calc(1.375rem - 4px);
+    border-radius: 50%;
+    background: var(--calm-color-paper);
+    transition: transform var(--calm-motion-gentle) var(--calm-motion-easing);
+  }
+
+  &:checked {
+    background: var(--calm-color-accent);
+  }
+
+  &:checked::before {
+    transform: translateX(0.875rem);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &::before {
+      transition: none;
+    }
+  }
 `

@@ -2,6 +2,7 @@ import {type DocumentHandle, useDocument, useEditDocument} from '@sanity/sdk-rea
 import {type KeyboardEvent, useLayoutEffect, useRef} from 'react'
 import styled from 'styled-components'
 import {followingSlug} from '../lib/slug'
+import {slugByHand} from './details/slug-by-hand'
 import {type WritingFields} from './fields'
 
 type Slug = {_type: 'slug'; current?: string}
@@ -57,9 +58,11 @@ export function TitleField({
           : followingSlug({
               previousTitle,
               nextTitle,
-              currentSlug: (post[fields.slug] as Slug | undefined)?.current,
+              // A slug typed in Details a moment ago may not have reached this copy yet.
+              currentSlug: slugByHand.read(handle.documentId) ?? (post[fields.slug] as Slug | undefined)?.current,
             })
       if (nextSlug === undefined || !fields.slug) return {...post, [fields.title]: nextTitle}
+      slugByHand.forget(handle.documentId)
       return {
         ...post,
         [fields.title]: nextTitle,

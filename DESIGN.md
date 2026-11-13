@@ -205,7 +205,7 @@ The room has its own vocabulary. Use these words in the interface, in code and i
 
 - **Writer**: the person writing. Never "user" or "editor".
 - **Prose**: what the Writer writes: the title and the body.
-- **Details**: everything else about a document (slug, excerpt, cover image, tags). They live in the Studio's standard form, never in the room.
+- **Details**: everything about a document that isn't Prose: every other field its schema has (slug, excerpt, cover image, tags, a Studio's own fields). The Writer edits them without leaving the room, and they stay out of sight until asked for.
 - **Lobby**: the entrance. A doorway to the writing, not a document browser.
 - **The room**: one document, open for writing.
 - **Room Controls**: the few controls in the room's corners.
@@ -276,6 +276,13 @@ Nothing but the column, with three things around it.
 - **The foot**, pinned to the bottom of the window: the word count in the start margin, and the room's one **message** slot in the middle.
 - The Studio's navbar is hidden while a document is open.
 
+The column has two views of the one document, and only one is ever on screen:
+
+- **The Prose**: the title and the body.
+- **Details**: the same title, with every other field beneath it in place of the body, on one page in the order the schema gives them. No tabs.
+
+The bar is the same in both. In Details the arrow at the start reads "Back" and returns to the Prose, as does Esc; the Details button shows as current and toggles. One step out at a time: Details to the Prose, the Prose to wherever the Writer came from.
+
 ### The Lobby
 
 The same column, under the Studio's navbar. From the top:
@@ -343,7 +350,8 @@ Soft, consistent corners.
 - **Embed card** — a quiet surface card with the provider's name, the caption or URL, and a "Preview" toggle. Never a live, autoplaying player by default.
 - **Code Block** — surface tint, monospace, no line numbers and no syntax colouring in the room. Language label in Figtree, ink muted, top-end.
 - **Section Break** — a centred `✦ ✦ ✦` in ink faint with a full `xl` of space either side.
-- **Unknown block** — a Studio's own block the room can't show keeps its place as a dashed, quiet card with its name and "Edit in Details". The Writer can move or delete it; the room never pretends to render it.
+- **Details button** — a quiet button that swaps the body for the Details view and back. A kind of document with nothing but a title and a body has no Details, so it has no button.
+- **Unknown block** — a Studio's own block the room can't show keeps its place as a dashed, quiet card with its name and "Edit in Structure". The Writer can move or delete it; the room never pretends to render it.
 
 ### In the Lobby
 
@@ -353,6 +361,16 @@ Soft, consistent corners.
 - **Row** — the title in Newsreader at body size on one line, then one Figtree line: status and relative time. A small muted dot marks anything readers haven't seen yet ("Draft", "Unpublished changes"); "Published" has none. An untitled document reads "Untitled" in ink muted.
 - **Discard** — appears on a row only when the document was never published and is completely empty, Details included. It's the same tidy-up the room does by itself on Leave, so it doesn't ask first. See the last Don't.
 - **Nothing written yet** — one surface card, one sentence, and the only filled clay button the Lobby ever shows: "Start your first Post".
+### In Details
+
+Out of sight until asked for, and as quiet as a form can be.
+
+- **Field** — a label in Figtree at UI size, strong; an optional description beneath it in ink muted, small; then the input. A validation message sits under the input: caution for an error, ink muted for a warning. Whitespace separates fields, never a rule or a card.
+- **The room's own inputs** — for the simple fields: one line of text, longer text, a number, a date, a date and time, a slug, tags and a yes/no switch. Text inputs are Newsreader at body size on the paper, with only a `rule` line beneath that turns clay on focus. Longer text grows with what's written. Tags are surface pills; Enter or a comma adds one.
+- **Sanity's inputs** — for everything else: references, images, files, arrays of objects, lists of choices, and any input a Studio wrote itself. They keep their own behaviour and the Studio's theme, so they match the room only in a Studio that uses the room's theme. The room never redraws these, and never replaces a Studio's own input or field component.
+- **Steady controls** — Room Controls don't recede in Details. It is short bursts between fields, and the next thing the Writer wants (Back, Publish) is in the bar.
+- **Text size** — the `Aa` text size is for the Prose. Details stay at one size.
+- **If Details can't be shown** — one surface card: "Details couldn’t open here." and a quiet button, "Open in Structure". The Prose is never affected.
 
 ## Motion
 
@@ -362,6 +380,7 @@ Unhurried and small. Motion explains a change; it never decorates.
 - `gentle` (200ms) for small responses: hover, a floating panel or the message appearing, a switch moving.
 - `recede` (700ms) for Room Controls fading out and back, and for focus dimming. Slow enough that the Writer feels it rather than sees it.
 - One easing everywhere: `cubic-bezier(0.22, 1, 0.36, 1)` — quick to start, soft to settle.
+- Between the Prose and Details: what's on screen fades out over `press`, then the other fades in over `gentle`; Details rises 4px as it arrives. The title and the bar don't move. Coming back, the Prose is where the Writer left it: same scroll position, same caret.
 - Opacity and small translations (≤ 4px) only. No bouncing or sliding panels. The one scale is a press: a control shrinks slightly while held (0.97 for small buttons, 0.99 for cards and rows, whose text would otherwise read as moving).
 - Under `prefers-reduced-motion`, changes are instant, and Room Controls never drop below readable contrast while they have keyboard focus.
 

@@ -6,7 +6,8 @@ export const RoomDocumentContext = createContext<{handle: DocumentHandle; bodyFi
   null,
 )
 
-export function useOpenBlockDetails(blockKey: string) {
+/** Opens one block of the body in the standard form in Structure. */
+export function useOpenBlockInStructure(blockKey: string) {
   const room = useContext(RoomDocumentContext)
   const {navigateIntent} = useRouter()
   return useCallback(() => {

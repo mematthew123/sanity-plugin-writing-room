@@ -1,6 +1,7 @@
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
 // From source, so edits reload live and the Studio shares one copy of the App SDK.
+import {fieldNote} from './e2e/field-note'
 import {writingRoom, writingRoomSchemaTypes} from './src'
 import {writingRoomTheme} from './src/theme'
 
@@ -16,13 +17,14 @@ export default defineConfig({
   plugins: [
     structureTool(),
     writingRoom({
-      types: ['post'],
+      // The Field Note is there for the browser tests; see e2e/field-note.ts.
+      types: ['post', 'fieldNote'],
       // Set SANITY_STUDIO_PREVIEW_ORIGIN to a site with a draft-mode route to try Preview.
       preview: process.env.SANITY_STUDIO_PREVIEW_ORIGIN
         ? {origin: process.env.SANITY_STUDIO_PREVIEW_ORIGIN}
         : undefined,
     }),
   ],
-  schema: {types: writingRoomSchemaTypes},
+  schema: {types: [...writingRoomSchemaTypes, fieldNote]},
   theme: writingRoomTheme,
 })

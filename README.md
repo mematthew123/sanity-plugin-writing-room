@@ -2,7 +2,7 @@
 
 A calm, full-screen place to write long-form content inside Sanity Studio: Posts, articles, case studies, whatever your Studio writes.
 
-Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags) stays in the standard form, one click away. It works with the document types you already have.
+Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags, any field of your own) is under **Details**: one click swaps the body for those fields, without leaving the room. It works with the document types you already have.
 
 - **The Lobby**: a doorway, not a document browser. Continue the piece you were last in, start something new, or pick from a few recent ones. The Studio's navbar stays above it, and Structure is one link away for everything else.
 - **Controls that recede**: Leave on one side; status, Details, Preview and Publish on the other. They fade after a few keystrokes and return when you pause. The word count sits at the foot of the page, and anything the room needs to tell you appears there too.
@@ -132,7 +132,22 @@ The room reads each type's schema to find what it writes:
 | Published date | `publishedAt`, else the first date field whose name contains "publish" | No date is stamped on publish |
 | Cover image | `coverImage`, else `mainImage`, else the first image field | No "Add a cover image" nudge after a publish |
 
-If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content', title: 'headline'}}`. Anything else (excerpt, tags, a client name…) stays in the standard form under **Details**.
+If it guesses wrong, name the field: `{type: 'article', fields: {body: 'content', title: 'headline'}}`. Every other field (excerpt, tags, a client name…) shows up under **Details**, with nothing to configure.
+
+### Details
+
+**Details** in the room's controls swaps the body for the document's other fields, on one page in the order your schema gives them. The title stays where it is, and the arrow or Esc goes back to the writing.
+
+- **Simple fields get the room's own inputs**: strings, text, numbers, booleans, dates, slugs and tag lists.
+- **Everything else is Sanity's own input**, looking as it does in the rest of your Studio: references, images, files, arrays of objects, and lists of choices. With the [matching theme](#a-matching-studio-theme-optional) they sit closer to the room's look.
+- **Your custom inputs are used as they are.** A field with its own `components.input` or `components.field` is never replaced.
+- **List the Writing Room last in `plugins` if another plugin wraps every input.** For simple fields the room's inputs take the place of Sanity's, which ends Sanity's chain of input components there. A plugin listed before the Writing Room still wraps the room's inputs in Details; one listed after it, and a `form.components.input` in your own Studio config, does not. Everything still appears in the Structure form.
+- **Your schema's rules apply**: `hidden`, `readOnly` and validation behave as they do in the standard form. Field groups are not shown as tabs; fieldsets are kept.
+- A type with only a title and a body has no Details button.
+
+Details are saved as you type, like the writing. If a required field blocks a publish, the room opens Details at that field.
+
+If the Details view can't be shown in your Studio, the room says so and offers **Open in Structure** instead.
 
 ### The body
 
@@ -152,7 +167,7 @@ defineType({
 
 Your site then renders them as `writingRoomEmbed`, `writingRoomCodeBlock` and `writingRoomSectionBreak`. (The starter `writingRoomSchemaTypes` uses the original names, `embed`, `codeBlock` and `sectionBreak`; the room handles both.)
 
-Blocks of your own that the room doesn't know (a `callout`, a product card…) keep their place in the text as a quiet placeholder: the Writer can move or delete them, and **Edit in Details** opens that block in the standard form.
+Blocks of your own that the room doesn't know (a `callout`, a product card…) keep their place in the text as a quiet placeholder: the Writer can move or delete them, and **Edit in Structure** opens that block in the standard form.
 
 ### Labels and URLs
 
@@ -252,7 +267,7 @@ pnpm smoke 6.12.0 --loose      # an older one, ignoring the declared range
 
 CI runs it on every pull request against the declared minimum (6.22.0) and the latest release, embedded too.
 
-It can't open the room itself, because that needs a logged-in Studio. Check that by hand.
+It can't open the room itself, because that needs a logged-in Studio. The browser tests under [Develop](#develop) do that.
 
 **Embedding the Studio in Next.js:** put `'use client'` at the top of `sanity.config.ts`, as Sanity's guide for the App Router says; without it, Next tries to bundle the whole Studio for the server.
 
@@ -275,7 +290,30 @@ pnpm typecheck
 pnpm lint
 pnpm build       # tsdown → dist/
 pnpm smoke       # pack, install into a fresh Studio, type-check and build it
+pnpm e2e         # Playwright: the room in a real, logged-in Studio
 ```
+
+### Browser tests
+
+`pnpm e2e` opens the dev Studio in Chromium and writes in the room: typing, Details, publishing. It needs `SANITY_STUDIO_DATASET` set in `.env.local` (the tests won't fall back to `production` on their own) and one more line:
+
+```sh
+SANITY_E2E_TOKEN=   # an Editor token for the project (sanity.io/manage → API → Tokens)
+```
+
+and the browser, once: `pnpm exec playwright install chromium`.
+
+- **It writes real documents.** Each test makes its own Post, with an id starting `e2e-`, in the dataset from `.env.local`, and deletes it afterwards, published copy included. Anything an interrupted run leaves behind is removed at the start of the next run, once it's an hour old. Use a dataset you don't mind testing in.
+- **Publishing is real too**: a test that publishes will fire the dataset's webhooks.
+- It starts `pnpm dev` itself, or uses the one already running on port 3333.
+- Without the token every test is skipped, with a line saying what to set.
+- `pnpm e2e:ui` opens Playwright's own runner, to watch a test or step through it. After a failure, `pnpm exec playwright show-report` has the trace.
+
+The dev Studio has a second kind of writing, **Field Note** (`e2e/field-note.ts`), for the tests: it has a number, a switch, a date, a list of choices and a required Details field, which the starter Post doesn't. The published plugin doesn't include it.
+
+Tests live in `e2e/`, named `*.e2e.ts` (`*.phone.e2e.ts` for the ones that run at phone width only). `e2e/room.ts` knows where things are in the room; `e2e/fixtures.ts` signs in and makes each test its Post.
+
+In CI they run on pushes and on pull requests from this repository, when the `SANITY_E2E_PROJECT_ID`, `SANITY_E2E_DATASET` and `SANITY_E2E_TOKEN` secrets are set; without them the job passes without running anything. The project needs `http://localhost:3333` as a CORS origin.
 
 `publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published, so always publish with `pnpm publish`. Releases are made with Changesets; see [RELEASING.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/RELEASING.md).
 

@@ -5,6 +5,7 @@ import {withPostDetailsOnPublish} from './actions/publish-post'
 import {resolveConfig, type WritingRoomOptions} from './config'
 import {roomBlockTypes} from './schema/room-blocks'
 import {TOOL_NAME, WRITE_INTENT} from './room/constants'
+import {RoomField, RoomInput} from './room/details/room-form'
 import {OpenInWritingRoomAction} from './room/OpenInWritingRoomAction'
 import {RoomAwareNavbar} from './room/RoomAwareNavbar'
 import {resolveKinds} from './room/kinds'
@@ -46,6 +47,7 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
         navbar: RoomAwareNavbar,
       },
     },
+    form: {components: {field: RoomField, input: RoomInput}},
     document: {
       actions: (prev, context) => {
         if (!isWritingType(context.schemaType)) return prev
