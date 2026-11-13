@@ -8,6 +8,7 @@ import {missing, projectId, studioUrl, token} from '../e2e/env'
 import {type TestPost} from '../e2e/fixtures'
 import {Room} from '../e2e/room'
 import {essay, essayBody, pictureHtml} from './essay'
+import {ID_PREFIX, PICTURE_FILENAME} from './global-setup'
 
 /**
  * Captures of the room for writingroom.studio. Each one seeds the essay as a draft Post (ids
@@ -16,7 +17,6 @@ import {essay, essayBody, pictureHtml} from './essay'
  */
 
 const OUT = resolve(process.env.SHOTS_OUT || 'shots/out')
-const ID_PREFIX = 'shots-'
 
 async function signIn(context: BrowserContext) {
   // Init scripts run on every page and every frame the context opens, and one capture leaves the
@@ -39,6 +39,9 @@ async function signIn(context: BrowserContext) {
   })
 }
 
+// Before any fixture: the picture is uploaded ahead of the first capture, and needs the token too.
+base.skip(!!missing, missing ?? '')
+
 const test = base.extend<{post: TestPost; shot: (name: string) => Promise<void>}, {picture: string}>({
   // The essay's one picture, uploaded once. The same bytes always get the same asset id.
   picture: [
@@ -48,9 +51,9 @@ const test = base.extend<{post: TestPost; shot: (name: string) => Promise<void>}
       const png = await page.screenshot()
       await page.close()
       const content = contentClient()
-      const asset = await content.assets.upload('image', png, {filename: 'shots-desk.png'})
+      const asset = await content.assets.upload('image', png, {filename: PICTURE_FILENAME})
       await provide(asset._id)
-      // Still referenced if a capture was interrupted; the next run removes it.
+      // Still referenced if a capture was interrupted; a later run sweeps both up (see global-setup.ts).
       await content.delete(asset._id).catch(() => undefined)
     },
     {scope: 'worker'},
@@ -61,8 +64,7 @@ const test = base.extend<{post: TestPost; shot: (name: string) => Promise<void>}
     await provide(context)
   },
 
-  post: async ({page, picture}, provide, testInfo) => {
-    testInfo.skip(!!missing, missing ?? '')
+  post: async ({page, picture}, provide) => {
     const content = contentClient()
     const id = `${ID_PREFIX}${randomUUID()}`
     await content.create({

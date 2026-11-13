@@ -11,6 +11,7 @@ export default defineConfig({
   testDir: 'shots',
   testMatch: '**/*.shots.ts',
   outputDir: 'test-results/shots',
+  globalSetup: './shots/global-setup.ts',
   // One at a time: each capture wants the machine to itself, and the loop records in real time.
   workers: 1,
   fullyParallel: false,
