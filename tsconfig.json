@@ -17,6 +17,7 @@
   },
   "include": [
     "src",
+    "e2e",
     "*.ts"
   ],
   "exclude": [

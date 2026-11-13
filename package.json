@@ -60,6 +60,8 @@
     "test": "vitest run",
     "prepack": "tsdown",
     "smoke": "node scripts/smoke-test.mjs",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "changeset": "changeset",
     "release": "changeset publish"
   },
@@ -93,7 +95,9 @@
     "@changesets/cli": "^3.0.3",
     "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
+    "@playwright/test": "^1.65.0",
     "@portabletext/editor": "^8.2.12",
+    "@sanity/client": "^8.15.1",
     "@sanity/eslint-config-studio": "^7",
     "@sanity/sdk-react": "^3.12.0",
     "@sanity/themer": "^0.10.6",

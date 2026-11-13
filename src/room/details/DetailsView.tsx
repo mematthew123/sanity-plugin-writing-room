@@ -1,6 +1,12 @@
 import {type DocumentHandle} from '@sanity/sdk-react'
 import {useEffect, useMemo, useState} from 'react'
-import {ALL_FIELDS_GROUP, createPatchChannel, FormBuilder, useDocumentForm} from 'sanity'
+import {
+  ALL_FIELDS_GROUP,
+  ChangeIndicatorsTracker,
+  createPatchChannel,
+  FormBuilder,
+  useDocumentForm,
+} from 'sanity'
 import styled from 'styled-components'
 import {type WritingFields} from '../fields'
 import {Placeholder} from '../primitives'
@@ -46,7 +52,8 @@ export function DetailsView({
   return (
     <InRoomDetails.Provider value>
       <Root data-calm-details="">
-        <FormBuilder
+        <ChangeIndicatorsTracker>
+          <FormBuilder
           __internal_patchChannel={patchChannel}
           id="writing-room-details"
           changed={formState.changed}
@@ -70,7 +77,8 @@ export function DetailsView({
           value={form.value}
           hasUpstreamVersion={false}
           hasBaseVariant={false}
-        />
+          />
+        </ChangeIndicatorsTracker>
       </Root>
     </InRoomDetails.Provider>
   )

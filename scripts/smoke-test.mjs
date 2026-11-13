@@ -19,6 +19,7 @@ const pluginDir = resolve(import.meta.dirname, '..')
 const studioDir = mkdtempSync(join(tmpdir(), 'writing-room-smoke-'))
 const FORM_EXPORTS = [
   'ALL_FIELDS_GROUP',
+  'ChangeIndicatorsTracker',
   'FormBuilder',
   'createPatchChannel',
   'useDocumentForm',

@@ -31,7 +31,7 @@
 - [ ] **Try the room by hand in a real Studio** (writing, the Insert Menu on a `blockContent` body, publishing, Preview). Everything since the extraction is covered by tests and builds, not by someone writing in it.
 - [ ] **README screenshot or GIF**, and a **Sanity Exchange** listing.
 - [ ] **Sanity's inputs in the room's theme.** In Details, references, images and arrays take the Studio's theme, so they only match the room in a Studio that uses `sanity-plugin-writing-room/theme`. Wrap them in the room's theme without making `@sanity/themer` a required dependency.
-- [ ] **A logged-in browser test** of the room in CI (needs a test project and a token).
+- [ ] **Browser tests in CI.** The Playwright tests (`pnpm e2e`) exist and the CI job is written; it needs a test project and the three `SANITY_E2E_*` secrets to do anything.
 - [ ] **Widen the `sanity` range?** 6.12.0 through 6.21.x pass the smoke test with `--loose` (6.12 is the first release on App SDK v3 and `@portabletext/editor` 8); 6.11 and older get a second SDK and editor copy. Try writing, publishing and previewing in a 6.12 Studio before lowering the peer from `^6.22.0`.
 - [ ] **Auto-updates.** Revisit the `autoUpdates: false` requirement whenever Sanity ships an App SDK that shares context with an auto-updated Studio.
 

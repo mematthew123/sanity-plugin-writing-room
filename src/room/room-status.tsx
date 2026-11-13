@@ -178,6 +178,36 @@ interface PublishPlan {
   slug: string | undefined
 }
 
+const VALIDATION_QUIET_MS = 1500
+
+/**
+ * Whether `validation` is a verdict on the document as it is now. For a moment after the room
+ * opens, and after each edit, it reports no problems and isn't validating yet: that isn't a pass.
+ * So it counts once a validation of this revision has been seen to finish, or, for a result that
+ * was already there when the room opened, once it has stayed put for a while.
+ */
+function useValidated({isValidating, revision}: {isValidating: boolean; revision?: string}): boolean {
+  const [settled, setSettled] = useState<string | undefined>(undefined)
+  const sawValidating = useRef(false)
+
+  useEffect(() => {
+    if (isValidating) {
+      sawValidating.current = true
+      return undefined
+    }
+    if (!revision) return undefined
+    if (sawValidating.current) {
+      sawValidating.current = false
+      setSettled(revision)
+      return undefined
+    }
+    const timer = setTimeout(() => setSettled(revision), VALIDATION_QUIET_MS)
+    return () => clearTimeout(timer)
+  }, [isValidating, revision])
+
+  return !isValidating && revision !== undefined && settled === revision
+}
+
 /** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
 export function PublishButton({
   handle,
@@ -198,6 +228,7 @@ export function PublishButton({
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   const isSynced = useRoomSynced(handle)
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
+  const validated = useValidated(validation)
   const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
@@ -218,7 +249,7 @@ export function PublishButton({
 
   useEffect(() => {
     if (phase !== 'checking') return
-    if (!isSynced || validation.isValidating) {
+    if (!isSynced || !validated) {
       // Never publish on stale sync or validation: the SDK's publish doesn't enforce the schema.
       if (timedOut) {
         setPhase('idle')
@@ -256,7 +287,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, post, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, validated, post, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
