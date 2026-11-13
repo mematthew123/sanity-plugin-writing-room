@@ -35,6 +35,11 @@ export const essay = {
   imageCaption: 'A desk, before the first sentence.',
   /** The words the selection capture selects. They must appear once, and fit on one line. */
   selected: 'the next sentence',
+  /** What the `writing` loop types, as new paragraphs after the second. */
+  written: [
+    'So the first thing I want from a tool is less of it. One line, held still, and the rest of the page gone quiet until I need it.',
+    'The room I write in now does that. The sentence I am on stays where my eyes already are, the paragraphs around it step back, and the buttons wait until I stop.',
+  ],
 }
 
 /** The body, given the asset for its one image. */

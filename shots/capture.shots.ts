@@ -1,8 +1,8 @@
 import {execFileSync} from 'node:child_process'
 import {randomUUID} from 'node:crypto'
-import {mkdirSync, rmSync} from 'node:fs'
+import {mkdirSync, rmSync, writeFileSync} from 'node:fs'
 import {join, resolve} from 'node:path'
-import {expect, test as base, type BrowserContext, type Page} from '@playwright/test'
+import {chromium, expect, test as base, type BrowserContext, type Page} from '@playwright/test'
 import {contentClient} from '../e2e/content'
 import {missing, projectId, studioUrl, token} from '../e2e/env'
 import {type TestPost} from '../e2e/fixtures'
@@ -14,6 +14,8 @@ import {ID_PREFIX, PICTURE_FILENAME} from './global-setup'
  * Captures of the room for writingroom.studio. Each one seeds the essay as a draft Post (ids
  * starting `shots-`), photographs the room in one state, and removes the Post again. Nothing is
  * published. The `dark` and `light` projects make one file each: `room-dark.png`, `room-light.png`.
+ * Two captures are loops, and `writing` comes with its first frame as a still, for the site to
+ * show before the loop plays.
  */
 
 const OUT = resolve(process.env.SHOTS_OUT || 'shots/out')
@@ -238,6 +240,120 @@ test('controls-recede: a loop of the controls fading while typing', async ({brow
     join(OUT, `controls-recede-${testInfo.project.name}.mp4`),
   ])
   rmSync(dir, {recursive: true, force: true})
+})
+
+/** A Writer's pace: uneven, with a breath after each clause. */
+async function typeLikeAWriter(page: Page, text: string) {
+  let beat = 7
+  for (const char of text) {
+    await page.keyboard.type(char)
+    beat = (beat * 31 + 11) % 97
+    await page.waitForTimeout(/[.,]/.test(char) ? 260 + beat : 12 + (beat % 36))
+  }
+}
+
+/**
+ * Films the page while `scene` plays, into `<name>.mp4` and its first frame, `<name>.jpg`.
+ * Playwright's own recording is soft; this takes the frames the browser sends as the page
+ * changes, each held for as long as it was on screen. The loop closes on the frame it opens with.
+ */
+/** How long a loop takes to dissolve back into its first frame, and how long it rests there. */
+const DISSOLVE = 1.1
+const REST = 0.4
+
+async function film(page: Page, name: string, scene: () => Promise<void>) {
+  const dir = join(OUT, `.${name}-frames`)
+  rmSync(dir, {recursive: true, force: true})
+  mkdirSync(dir, {recursive: true})
+  const frames: Array<{file: string; at: number}> = []
+  const browser = await page.context().newCDPSession(page)
+  browser.on('Page.screencastFrame', (frame) => {
+    const file = `${String(frames.length).padStart(5, '0')}.jpg`
+    writeFileSync(join(dir, file), Buffer.from(frame.data, 'base64'))
+    frames.push({file, at: frame.metadata.timestamp ?? Date.now() / 1000})
+    void browser.send('Page.screencastFrameAck', {sessionId: frame.sessionId}).catch(() => undefined)
+  })
+  await browser.send('Page.startScreencast', {format: 'jpeg', quality: 100, everyNthFrame: 1})
+  const started = Date.now()
+  await scene()
+  const length = (Date.now() - started) / 1000
+  await browser.send('Page.stopScreencast')
+  await browser.detach()
+  if (frames.length === 0) throw new Error('The browser sent no frames to film.')
+
+  // The browser sends a frame when something changes, so the last one is held to the scene's end,
+  // and then for as long as it takes to dissolve.
+  const first = frames[0]!.at
+  const end = Math.max(first + length, frames[frames.length - 1]!.at + 0.04)
+  const list = frames.flatMap(({file, at}, index) => {
+    const until = frames[index + 1]?.at ?? end + DISSOLVE
+    return [`file '${file}'`, `duration ${Math.max(until - at, 0.001).toFixed(4)}`]
+  })
+  list.push(`file '${frames[frames.length - 1]!.file}'`)
+  writeFileSync(join(dir, 'frames.txt'), list.join('\n'))
+  // Without sound, at the width the site shows it on a dense screen, small enough to play at once.
+  // It ends by dissolving into its own first frame, so the loop comes round without a cut.
+  const sized = 'fps=30,scale=1920:-2:flags=lanczos,format=yuv420p'
+  execFileSync('ffmpeg', [
+    '-y', '-loglevel', 'error',
+    '-f', 'concat', '-i', join(dir, 'frames.txt'),
+    '-loop', '1', '-t', (DISSOLVE + REST).toFixed(2), '-i', join(dir, frames[0]!.file),
+    '-filter_complex',
+    `[0:v]${sized}[scene];[1:v]${sized}[opening];[scene][opening]xfade=transition=fade:duration=${DISSOLVE}:offset=${(end - first).toFixed(2)}`,
+    '-an', '-c:v', 'libx264', '-crf', '25', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+    join(OUT, `${name}.mp4`),
+  ])
+  execFileSync('ffmpeg', [
+    '-y', '-loglevel', 'error',
+    '-i', join(dir, frames[0]!.file),
+    '-vf', 'scale=1920:-2:flags=lanczos', '-q:v', '3',
+    join(OUT, `${name}.jpg`),
+  ])
+  rmSync(dir, {recursive: true, force: true})
+}
+
+test('writing: a loop of the room in use, with every setting on', async ({post}, testInfo) => {
+  // A browser of its own, because fullscreen takes the whole screen and a headless screen is the
+  // size its browser was launched at: 1280 by 800 here, at two pixels a point. The frames `film`
+  // is sent are the screen's pixels, so they come out at 2560 by 1600.
+  const browser = await chromium.launch({args: ['--force-device-scale-factor=2', '--window-size=2560,1600']})
+  const context = await browser.newContext({
+    // The window as it was launched, not the project's.
+    viewport: null,
+    deviceScaleFactor: undefined,
+    colorScheme: testInfo.project.use.colorScheme,
+  })
+  await signIn(context)
+  // The `Aa` menu's switches, as the room keeps them (see src/room/room-settings.ts).
+  await context.addInitScript(
+    ([studio, settings]) => {
+      if (window.location.origin === studio) window.localStorage.setItem('sanity-plugin-writing-room:settings', settings)
+    },
+    [new URL(studioUrl).origin, JSON.stringify({textSize: 'medium', typewriter: true, focusDimming: true})] as const,
+  )
+  const page = await context.newPage()
+  await new Room(page).open(post)
+  await settle(page)
+  await tidy(page)
+  // Fullscreen is the room's own shortcut, and the last of the menu's switches.
+  await page.keyboard.press('Control+Shift+F')
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement && window.innerWidth)).toBe(1280)
+  await caretAfter(page, 'one at a time.')
+  await tidy(page)
+  await settle(page)
+
+  mkdirSync(OUT, {recursive: true})
+  await film(page, `writing-${testInfo.project.name}`, async () => {
+    await page.waitForTimeout(1200)
+    for (const paragraph of essay.written) {
+      await page.keyboard.press('Enter')
+      await page.waitForTimeout(500)
+      await typeLikeAWriter(page, paragraph)
+      // Long enough for the controls to come back.
+      await page.waitForTimeout(2600)
+    }
+  })
+  await browser.close()
 })
 
 // Not the room: what a reader sees once a Post is published, on the Calm Editor demo.
