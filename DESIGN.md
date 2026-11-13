@@ -343,7 +343,7 @@ Soft, consistent corners.
 - **Embed card** — a quiet surface card with the provider's name, the caption or URL, and a "Preview" toggle. Never a live, autoplaying player by default.
 - **Code Block** — surface tint, monospace, no line numbers and no syntax colouring in the room. Language label in Figtree, ink muted, top-end.
 - **Section Break** — a centred `✦ ✦ ✦` in ink faint with a full `xl` of space either side.
-- **Unknown block** — a Studio's own block the room can't show keeps its place as a dashed, quiet card with its name and "Edit in Details". The Writer can move or delete it; the room never pretends to render it.
+- **Unknown block** — a Studio's own block the room can't show keeps its place as a dashed, quiet card with its name and "Edit in Structure". The Writer can move or delete it; the room never pretends to render it.
 
 ### In the Lobby
 

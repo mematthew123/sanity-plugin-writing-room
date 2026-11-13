@@ -7,19 +7,21 @@ import {
   useDocument,
   useDocumentProjection,
 } from '@sanity/sdk-react'
-import {Component, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useColorSchemeValue, useDataset, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import styled, {keyframes} from 'styled-components'
+import {DetailsBoundary} from './details/DetailsBoundary'
 import {DetailsView} from './details/DetailsView'
+import {useSwap} from './details/use-swap'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
 import {didComeFromForm} from './came-from'
-import {useWritingKind} from './kinds'
+import {useHasDetails, useWritingKind} from './kinds'
 import {rememberLastOpened} from './last-opened'
 import {isEmptyPost} from './empty-post'
 import {type WritingFields} from './fields'
-import {useOpenDetails} from './navigation'
+import {useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
 import {PreviewButton} from './PreviewButton'
@@ -118,17 +120,15 @@ function LoadedRoom({
     return () => clearTimeout(timer)
   }, [notice])
 
-  const [view, setView] = useState<'prose' | 'details'>('prose')
-  const [detailsSyncing, setDetailsSyncing] = useState(false)
-  const toProse = useCallback(() => setView('prose'), [])
-  const inDetails = view === 'details'
+  const view = useRoomView(handle)
+  const hasDetails = useHasDetails(handle.documentType)
+  const inDetails = view.inDetails && hasDetails
 
-  const openInStructure = useOpenDetails(handle)
-  const details = (
-    <QuietButton aria-pressed={inDetails} onClick={() => setView(inDetails ? 'prose' : 'details')}>
+  const details = hasDetails ? (
+    <QuietButton aria-pressed={inDetails} onClick={() => (inDetails ? view.toProse() : view.openDetails())}>
       Details
     </QuietButton>
-  )
+  ) : null
   const preview = (
     <PreviewButton documentType={handle.documentType} slug={data?.slug} onProblem={onProblem} />
   )
@@ -142,7 +142,7 @@ function LoadedRoom({
           start={
             <Recedes>
               {inDetails ? (
-                <BackToProse onBack={toProse} />
+                <BackToProse onBack={view.toProse} />
               ) : (
                 <LeaveButton handle={handle} isPublished={isPublished} />
               )}
@@ -183,19 +183,15 @@ function LoadedRoom({
         <Main>
           <Page as="article" ref={page} $textSize={settings.textSize}>
             <Title handle={handle} fields={fields} isPublished={isPublished} />
-            <Swap data-shown={!inDetails} inert={inDetails}>
-              <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onProblem} />
-            </Swap>
-            {inDetails && (
-              <Swap data-shown data-entering="">
-                <SetuplessBoundary onOpenInStructure={openInStructure}>
-                  <Suspense fallback={<Placeholder $height="12rem" />}>
-                    <DetailsView handle={handle} fields={fields} onSyncing={setDetailsSyncing} />
-                  </Suspense>
-                </SetuplessBoundary>
-                {detailsSyncing && <SpikeNote>Details: saving…</SpikeNote>}
-              </Swap>
-            )}
+            <Pages
+              handle={handle}
+              fields={fields}
+              scheme={scheme}
+              page={page}
+              inDetails={inDetails}
+              focusField={view.field}
+              onUploadFailed={onProblem}
+            />
           </Page>
         </Main>
         <Foot>
@@ -236,13 +232,56 @@ function Title({
   )
 }
 
+/** The body and Details take turns under the title. The editor stays mounted, so the caret keeps its place. */
+function Pages({
+  handle,
+  fields,
+  scheme,
+  page,
+  inDetails,
+  focusField,
+  onUploadFailed,
+}: {
+  handle: DocumentHandle
+  fields: WritingFields
+  scheme: string
+  page: RefObject<HTMLElement | null>
+  inDetails: boolean
+  focusField: string | undefined
+  onUploadFailed: (problem: string | null) => void
+}) {
+  const editor = useEditor()
+  const openInStructure = useOpenInStructure(handle)
+  const backToCaret = useCallback(() => {
+    if (editor.getSnapshot().context.selection) editor.send({type: 'focus'})
+  }, [editor])
+  const {shown, leaving, entering} = useSwap(inDetails ? 'details' : 'prose', page, backToCaret)
+
+  return (
+    <>
+      <Swap hidden={shown !== 'prose'} data-leaving={leaving} data-entering={entering}>
+        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onUploadFailed} />
+      </Swap>
+      {shown === 'details' && (
+        <Swap data-leaving={leaving} data-entering={entering} data-rises="">
+          <DetailsBoundary onOpenInStructure={openInStructure}>
+            <Suspense fallback={<Placeholder $height="12rem" />}>
+              <DetailsView handle={handle} fields={fields} focusField={focusField} />
+            </Suspense>
+          </DetailsBoundary>
+        </Swap>
+      )}
+    </>
+  )
+}
+
 /** Returns to wherever the Writer came from; a never-published, empty document is discarded on the way out. */
 function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
-  const openDetails = useOpenDetails(handle)
+  const openInStructure = useOpenInStructure(handle)
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
@@ -250,11 +289,11 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
       void apply(discardDocument(handle))
       router.navigate({})
     } else if (toForm) {
-      openDetails()
+      openInStructure()
     } else {
       router.navigate({})
     }
-  }, [apply, handle, isPublished, post, fields, router, toForm, openDetails])
+  }, [apply, handle, isPublished, post, fields, router, toForm, openInStructure])
   useEscape(leave)
 
   const label = toForm ? 'Back to the form' : 'Back to the Lobby'
@@ -275,30 +314,12 @@ function BackToProse({onBack}: {onBack: () => void}) {
   )
 }
 
-/** Fails soft: a form that can't render never takes the Prose down with it. */
-class SetuplessBoundary extends Component<
-  {children: ReactNode; onOpenInStructure: () => void},
-  {failed: boolean}
-> {
-  state = {failed: false}
-  static getDerivedStateFromError() {
-    return {failed: true}
+const fadeIn = keyframes`
+  from {
+    opacity: 0;
   }
-  componentDidCatch(error: unknown) {
-    console.error('[sanity-plugin-writing-room] Details couldn’t render.', error)
-  }
-  render() {
-    if (!this.state.failed) return this.props.children
-    return (
-      <SpikeNote>
-        Details couldn’t open here.{' '}
-        <QuietButton onClick={this.props.onOpenInStructure}>Open in Structure</QuietButton>
-      </SpikeNote>
-    )
-  }
-}
+`
 
-/** Fades in over `gentle` with a 4px rise; instant under reduced motion. */
 const rise = keyframes`
   from {
     opacity: 0;
@@ -306,23 +327,27 @@ const rise = keyframes`
   }
 `
 
+/** Out over `press`, then in over `gentle`; Details rises 4px as it arrives. Instant under reduced motion. */
 const Swap = styled.div`
-  &[data-shown='false'] {
+  &[hidden] {
     display: none;
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    &[data-shown='true'] {
-      animation: ${rise} var(--calm-motion-gentle) var(--calm-motion-easing) both;
+    transition: opacity var(--calm-motion-press) var(--calm-motion-easing);
+
+    &[data-leaving='true'] {
+      opacity: 0;
+    }
+
+    &[data-entering='true'] {
+      animation: ${fadeIn} var(--calm-motion-gentle) var(--calm-motion-easing) both;
+    }
+
+    &[data-entering='true'][data-rises] {
+      animation-name: ${rise};
     }
   }
-`
-
-const SpikeNote = styled.p`
-  margin: var(--calm-space-md) 0 0;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size-small);
 `
 
 const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`

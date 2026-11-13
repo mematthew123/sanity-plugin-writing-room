@@ -14,6 +14,18 @@ export function roomState(documentId: string, documentType: string, types: reado
   return documentType === types[0] ? {documentId} : {documentId, documentType}
 }
 
+/** Details is a view of the open document, kept in the query so both URL shapes stay as they are. */
+export function detailsState(room: RoomState, field?: string): RoomState & {_searchParams: [string, string][]} {
+  return {...room, _searchParams: field ? [['view', 'details'], ['field', field]] : [['view', 'details']]}
+}
+
+/** Which view of the open document, and the Details field to go to, if one was asked for. */
+export function openedView(state: Record<string, unknown>): {details: boolean; field?: string} {
+  const params = new Map(Array.isArray(state._searchParams) ? (state._searchParams as [string, string][]) : [])
+  if (params.get('view') !== 'details') return {details: false}
+  return {details: true, field: params.get('field') || undefined}
+}
+
 /** Null for the Lobby. */
 export function openedDocument(
   state: Record<string, unknown>,

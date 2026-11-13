@@ -1,7 +1,7 @@
 import {createSchema, type SchemaType} from 'sanity'
 import {describe, expect, it} from 'vitest'
 import {schemaTypes} from '../schema'
-import {detectFields} from './fields'
+import {detectFields, hasDetails} from './fields'
 
 const schema = createSchema({
   name: 'test',
@@ -83,5 +83,17 @@ describe('detectFields', () => {
     expect(detectFields(get('note'), {slug: 'permalink'})).toEqual({
       problem: expect.stringMatching(/no field by that name/),
     })
+  })
+})
+
+describe('hasDetails', () => {
+  it('is true when the type has any field besides its title and body', () => {
+    expect(hasDetails(get('post'), {title: 'title', body: 'body'})).toBe(true)
+    expect(hasDetails(get('article'), {title: 'headline', body: 'content'})).toBe(true)
+  })
+
+  it('is false when the title and body are all there is', () => {
+    expect(hasDetails(get('note'), {title: 'title', body: 'body'})).toBe(false)
+    expect(hasDetails(undefined, {title: 'title', body: 'body'})).toBe(false)
   })
 })

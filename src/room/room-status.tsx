@@ -14,6 +14,7 @@ import {useCallback, useEffect, useRef, useState, useSyncExternalStore} from 're
 import {
   useClient,
   useCurrentUser,
+  useSyncState,
   useValidationStatus,
 } from 'sanity'
 import styled, {keyframes} from 'styled-components'
@@ -25,7 +26,7 @@ import {addImageLabel, detailsPatch, readPublishable} from './fields'
 import {goToProblem} from './go-to-problem'
 import {Floating, FloatingSurface, useViewportChanges} from './editor/floating'
 import {useWritingKind} from './kinds'
-import {useOpenDetails} from './navigation'
+import {useRoomView} from './navigation'
 import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
@@ -55,8 +56,18 @@ const SAVED_VISIBLE_MS = 2000
 const SAVING_DELAY_MS = 800
 
 /** Offline, it stays until the connection returns. */
+/**
+ * The Prose saves through the App SDK and Details through the Studio's own store, so the room is
+ * only saved once both have caught up.
+ */
+function useRoomSynced(handle: DocumentHandle): boolean {
+  const proseSynced = useDocumentSyncStatus(handle) ?? true
+  const details = useSyncState(handle.documentId, handle.documentType)
+  return proseSynced && !details.isSyncing
+}
+
 export function SaveState({handle}: {handle: DocumentHandle}) {
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+  const isSynced = useRoomSynced(handle)
   const online = useOnline()
   const [shown, setShown] = useState<'saving' | 'saved' | null>(null)
   const wasSynced = useRef(isSynced)
@@ -101,7 +112,7 @@ export function RoomMessage({
   notice: RoomNotice | null
 }) {
   const online = useOnline()
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+  const isSynced = useRoomSynced(handle)
 
   if (problem) {
     return (
@@ -185,9 +196,9 @@ export function PublishButton({
   const client = useClient({apiVersion: API_VERSION})
   const apply = useApplyDocumentActions()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
-  const isSynced = useDocumentSyncStatus(handle) ?? true
+  const isSynced = useRoomSynced(handle)
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
-  const openDetails = useOpenDetails(handle)
+  const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
   const [phase, setPhase] = useState<'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing'>('idle')
@@ -229,7 +240,8 @@ export function PublishButton({
     void (async () => {
       try {
         const {fields} = kind
-        const publishable = readPublishable(post, fields)
+        const saved = await client.getDocument<Record<string, unknown>>(`drafts.${handle.documentId}`)
+        const publishable = readPublishable(saved ?? post, fields)
         const details = await detailsForPublish({
           post: publishable,
           isFirstPublish,
@@ -297,7 +309,7 @@ export function PublishButton({
         action:
           !fields.image || image?.asset
             ? undefined
-            : {label: addImageLabel(kind.imageTitle), onClick: openDetails},
+            : {label: addImageLabel(kind.imageTitle), onClick: () => openDetails(fields.image)},
       })
     } catch {
       onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)

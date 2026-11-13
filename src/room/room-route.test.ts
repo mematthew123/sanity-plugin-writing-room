@@ -1,6 +1,6 @@
 import {route} from 'sanity/router'
 import {describe, expect, it} from 'vitest'
-import {openedDocument, ROOM_ROUTES, roomState} from './room-route'
+import {detailsState, openedDocument, openedView, ROOM_ROUTES, roomState} from './room-route'
 
 const router = route.create(
   '/',
@@ -31,6 +31,25 @@ describe('room routes', () => {
       documentId: 'abc',
       documentType: 'article',
     })
+  })
+
+  it('keeps Details in the query, so the document’s URL is the same in both views', () => {
+    const url = router.encode(detailsState(roomState('abc', 'caseStudy', TYPES)))
+    expect(url).toBe('/caseStudy/abc?view=details')
+    const state = router.decode(url) ?? {}
+    expect(openedDocument(state, TYPES)).toEqual({documentId: 'abc', documentType: 'caseStudy'})
+    expect(openedView(state)).toEqual({details: true, field: undefined})
+  })
+
+  it('can ask for one Details field', () => {
+    const url = router.encode(detailsState(roomState('abc', 'post', TYPES), 'coverImage'))
+    expect(url).toBe('/abc?view=details&field=coverImage')
+    expect(openedView(router.decode(url) ?? {})).toEqual({details: true, field: 'coverImage'})
+  })
+
+  it('opens on the Prose unless Details was asked for', () => {
+    expect(openedView(router.decode('/abc') ?? {})).toEqual({details: false})
+    expect(openedView(router.decode('/abc?view=history&field=slug') ?? {})).toEqual({details: false})
   })
 
   it('shows the Lobby when no document is open', () => {

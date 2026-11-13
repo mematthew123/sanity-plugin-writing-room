@@ -86,6 +86,12 @@ export function detectFields(
   }
 }
 
+/** Whether the type has anything for the Details view to show. */
+export function hasDetails(schemaType: SchemaType | undefined, {title, body}: Pick<WritingFields, 'title' | 'body'>): boolean {
+  const fields: ObjectField[] = schemaType && 'fields' in schemaType ? schemaType.fields : []
+  return fields.some((field) => field.name !== title && field.name !== body && field.type.hidden !== true)
+}
+
 export function readPublishable(
   document: Record<string, unknown> | null | undefined,
   fields: WritingFields,

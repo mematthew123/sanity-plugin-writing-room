@@ -1,7 +1,7 @@
 import {useMemo} from 'react'
 import {type SchemaType, useSchema} from 'sanity'
 import {useWritingRoomConfig, type WritingRoomTypeOptions} from '../config'
-import {detectFields, type WritingFields} from './fields'
+import {detectFields, hasDetails, type WritingFields} from './fields'
 
 export interface WritingKind {
   type: string
@@ -83,6 +83,13 @@ export function useWritingKind(documentType: string): WritingKind {
       fields: FALLBACK_FIELDS,
     }
   )
+}
+
+/** False when a type is only its title and body, so there's nothing for Details to show. */
+export function useHasDetails(documentType: string): boolean {
+  const schema = useSchema()
+  const {fields} = useWritingKind(documentType)
+  return useMemo(() => hasDetails(schema.get(documentType), fields), [schema, documentType, fields])
 }
 
 /** Default first. */

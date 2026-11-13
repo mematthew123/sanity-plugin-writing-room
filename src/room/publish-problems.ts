@@ -8,7 +8,7 @@ export type ProblemTarget =
   | {kind: 'title'}
   | {kind: 'body'}
   | {kind: 'block'; key: string; field?: string}
-  | {kind: 'details'}
+  | {kind: 'details'; field?: string}
 
 export interface PublishProblem {
   target: ProblemTarget
@@ -22,7 +22,7 @@ function isKeyed(segment: unknown): segment is {_key: string} {
 function targetFor(path: unknown[], fields: {title: string; body: string}): ProblemTarget {
   const [field, item, child] = path
   if (field === fields.title) return {kind: 'title'}
-  if (field !== fields.body) return {kind: 'details'}
+  if (field !== fields.body) return typeof field === 'string' ? {kind: 'details', field} : {kind: 'details'}
   if (!isKeyed(item)) return {kind: 'body'}
   return typeof child === 'string' && child !== 'markDefs' && child !== 'children'
     ? {kind: 'block', key: item._key, field: child}

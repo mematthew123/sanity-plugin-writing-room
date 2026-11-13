@@ -7,9 +7,9 @@ function reveal(element: Element | null) {
   element?.scrollIntoView({block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth'})
 }
 
-export function goToProblem(target: ProblemTarget, editor: Editor, openDetails: () => void) {
+export function goToProblem(target: ProblemTarget, editor: Editor, openDetails: (field?: string) => void) {
   if (target.kind === 'details') {
-    openDetails()
+    openDetails(target.field)
     return
   }
   if (target.kind === 'title') {

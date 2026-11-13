@@ -1,19 +1,19 @@
 import {type BlockObjectRenderProps} from '@portabletext/editor'
 import styled from 'styled-components'
 import {QuietButton} from '../../primitives'
-import {useOpenBlockDetails} from '../room-document'
+import {useOpenBlockInStructure} from '../room-document'
 import {BlockFrame, Controls} from './frame'
 
-/** Keeps an unrecognised block's place in the text; it's edited in Details. */
+/** Keeps an unrecognised block's place in the text; it's edited in Structure. */
 export function UnknownBlock({attributes, children, node, selected, title}: BlockObjectRenderProps & {title: string}) {
-  const openDetails = useOpenBlockDetails(node._key)
+  const openInStructure = useOpenBlockInStructure(node._key)
   return (
     <BlockFrame {...attributes} data-calm-block={node._key} $selected={selected}>
       {children}
       <Card contentEditable={false}>
         <Name>{title}</Name>
         <Controls>
-          <QuietButton onClick={openDetails}>Edit in Details</QuietButton>
+          <QuietButton onClick={openInStructure}>Edit in Structure</QuietButton>
         </Controls>
       </Card>
     </BlockFrame>

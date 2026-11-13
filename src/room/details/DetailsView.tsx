@@ -13,26 +13,25 @@ import {InRoomDetails} from './room-form'
 export function DetailsView({
   handle,
   fields,
-  onSyncing,
+  focusField,
 }: {
   handle: DocumentHandle
   fields: WritingFields
-  /** The form saves through the Studio's store, which the App SDK's sync status doesn't see. */
-  onSyncing?: (syncing: boolean) => void
+  /** A publish problem or a nudge can send the Writer to one field. */
+  focusField?: string
 }) {
   const [patchChannel] = useState(() => createPatchChannel())
   const form = useDocumentForm({documentId: handle.documentId, documentType: handle.documentType})
-  const {formState, onSetActiveFieldGroup, syncState} = form
+  const {formState, onSetActiveFieldGroup, onProgrammaticFocus, ready} = form
 
   useEffect(() => {
     onSetActiveFieldGroup([], ALL_FIELDS_GROUP.name)
   }, [onSetActiveFieldGroup])
 
-  const syncing = syncState !== 'synced'
+  const hasForm = !!formState && ready
   useEffect(() => {
-    onSyncing?.(syncing)
-    return () => onSyncing?.(false)
-  }, [onSyncing, syncing])
+    if (hasForm && focusField) onProgrammaticFocus([focusField])
+  }, [hasForm, focusField, onProgrammaticFocus])
 
   const members = useMemo(
     () =>
@@ -42,7 +41,7 @@ export function DetailsView({
     [formState?.members, fields.title, fields.body],
   )
 
-  if (!formState || !form.ready) return <Placeholder $height="12rem" />
+  if (!formState || !ready) return <Placeholder $height="12rem" />
 
   return (
     <InRoomDetails.Provider value>
