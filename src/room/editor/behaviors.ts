@@ -4,7 +4,7 @@ import {isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineInputRule} from '@portabletext/plugin-input-rule'
 import {parseEmbedUrl} from '../../embed'
 import {bodyAllows} from './allows'
-import {PICK_IMAGE_EVENT} from './commands'
+import {CHOOSE_IMAGE_EVENT, PICK_IMAGE_EVENT} from './commands'
 
 export const exitStyleOnEmptyEnter = defineBehavior({
   on: 'insert.break',
@@ -68,6 +68,13 @@ export function pickImageBehavior(pickImage: () => void) {
   return defineBehavior({
     on: PICK_IMAGE_EVENT,
     actions: [() => [effect(pickImage)]],
+  })
+}
+
+export function chooseImageBehavior(chooseImage: () => void) {
+  return defineBehavior({
+    on: CHOOSE_IMAGE_EVENT,
+    actions: [() => [effect(chooseImage)]],
   })
 }
 

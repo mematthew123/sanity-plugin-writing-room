@@ -13,6 +13,7 @@ import styled from 'styled-components'
 import {API_VERSION} from '../../lib/api-version'
 import {useRoomSettings} from '../room-settings'
 import {
+  chooseImageBehavior,
   codeFenceRule,
   exitStyleOnEmptyEnter,
   imageFileBehaviors,
@@ -20,6 +21,9 @@ import {
   pickImageBehavior,
 } from './behaviors'
 import {type BodyAllows, bodyAllows} from './allows'
+import {type AssetFromSource, type AssetSource} from 'sanity'
+import {type ChosenImage, chosenImage, useBodyImages} from './image-sources'
+import {ImageSourceDialog} from './ImageSourceDialog'
 import {InsertMenu} from './InsertMenu'
 import {LinkPopover} from './LinkPopover'
 import {bodyNodes} from './nodes'
@@ -47,17 +51,20 @@ export function BodyEditor({
   handle,
   path,
   scheme,
-  onUploadFailed,
+  onProblem,
 }: {
   handle: DocumentHandle
   path: string
   scheme: string
-  onUploadFailed: (message: string) => void
+  onProblem: (message: string) => void
 }) {
   const editor = useEditor()
   const [focused, setFocused] = useState(false)
-  const upload = useImageUpload(onUploadFailed)
+  const images = useBodyImages(handle.documentType, path)
+  const {upload, place} = useImageInsert(onProblem)
   const fileInput = useRef<HTMLInputElement>(null)
+  // 'sources' while the Writer is picking which image source to open, then the one that is open.
+  const [choosing, setChoosing] = useState<'sources' | AssetSource | null>(null)
 
   useEffect(() => {
     const subscriptions = [
@@ -76,15 +83,40 @@ export function BodyEditor({
   const nodes = useMemo(() => bodyNodes(schema), [schema])
   const roomDocument = useMemo(() => ({handle, bodyField: path}), [handle, path])
   const pickImage = useCallback(() => fileInput.current?.click(), [])
+  const {sources} = images
+  const chooseImage = useCallback(
+    () => setChoosing(sources.length === 1 ? sources[0]! : sources.length > 1 ? 'sources' : null),
+    [sources],
+  )
   const behaviors = useMemo(
     () => [
       exitStyleOnEmptyEnter,
       pasteLinkAsEmbed,
-      ...imageFileBehaviors(upload),
+      // A Studio that has turned uploads off means it for a paste and a drop too.
+      ...(images.upload ? imageFileBehaviors(upload) : []),
       pickImageBehavior(pickImage),
+      chooseImageBehavior(chooseImage),
     ],
-    [upload, pickImage],
+    [images.upload, upload, pickImage, chooseImage],
   )
+
+  const backToLine = useCallback(() => {
+    setChoosing(null)
+    editor.send({type: 'focus'})
+  }, [editor])
+  const onChosen = useCallback(
+    (chosen: AssetFromSource[]) => {
+      setChoosing(null)
+      const first = chosen[0]
+      if (first) place(() => chosenImage(first), 'That image couldn’t be added just now. Trying again is fine.')
+      else editor.send({type: 'focus'})
+    },
+    [editor, place],
+  )
+  const onSourceFailed = useCallback(() => {
+    backToLine()
+    onProblem('Images couldn’t be opened just now. Trying again is fine.')
+  }, [backToLine, onProblem])
 
   return (
     <RoomDocumentContext.Provider value={roomDocument}>
@@ -123,7 +155,23 @@ export function BodyEditor({
       />
       <SelectionBubble scheme={scheme} editorFocused={focused} />
       <LinkPopover scheme={scheme} editorFocused={focused} />
-      <InsertMenu scheme={scheme} editorFocused={focused} />
+      <InsertMenu
+        scheme={scheme}
+        editorFocused={focused}
+        images={images}
+        choosingSource={choosing === 'sources'}
+        // Backing out of the list never closes a source that has since opened.
+        onChooseSource={(source) => setChoosing((current) => (current === 'sources' ? source : current))}
+      />
+      {choosing && choosing !== 'sources' && (
+        <ImageSourceDialog
+          source={choosing}
+          type={images.type}
+          onSelect={onChosen}
+          onClose={backToLine}
+          onFailed={onSourceFailed}
+        />
+      )}
       <input
         ref={fileInput}
         type="file"
@@ -160,37 +208,64 @@ function useTypewriterScrolling(enabled: boolean) {
   }, [editor, enabled])
 }
 
-/** Inserts a placeholder per image at once, fills in the asset after upload, and removes it on failure. */
-function useImageUpload(onUploadFailed: (message: string) => void) {
+/** However an image arrives, it holds its place at once, fills in when it's ready, and goes if it can't be had. */
+function useImageInsert(onProblem: (message: string) => void) {
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
 
-  return useCallback(
+  const place = useCallback(
+    (image: () => ChosenImage, failed: string) => {
+      let chosen: ChosenImage
+      try {
+        chosen = image()
+      } catch {
+        editor.send({type: 'focus'})
+        onProblem(failed)
+        return
+      }
+      editor.send({type: 'focus'})
+      editor.send({
+        type: 'insert.block',
+        block: {_type: 'image', ...(chosen.kind === 'block' && chosen.props)},
+        placement: 'auto',
+        select: 'start',
+      })
+      if (chosen.kind === 'block') return
+      const placed = getFocusBlock(editor.getSnapshot())
+      if (!placed || placed.node._type !== 'image') return
+      const at = placed.path
+      const {file, options} = chosen
+
+      file()
+        .then((ready) => client.assets.upload('image', ready, options))
+        .then((asset) => {
+          editor.send({
+            type: 'block.set',
+            at,
+            props: {asset: {_type: 'reference', _ref: asset._id}},
+          })
+        })
+        .catch(() => {
+          editor.send({type: 'delete.block', at})
+          onProblem(failed)
+        })
+    },
+    [editor, client, onProblem],
+  )
+
+  const upload = useCallback(
     (files: File[]) => {
       for (const file of files) {
-        editor.send({type: 'focus'})
-        editor.send({type: 'insert.block', block: {_type: 'image'}, placement: 'auto', select: 'start'})
-        const placed = getFocusBlock(editor.getSnapshot())
-        if (!placed || placed.node._type !== 'image') continue
-        const at = placed.path
-
-        client.assets
-          .upload('image', file, {filename: file.name})
-          .then((asset) => {
-            editor.send({
-              type: 'block.set',
-              at,
-              props: {asset: {_type: 'reference', _ref: asset._id}},
-            })
-          })
-          .catch(() => {
-            editor.send({type: 'delete.block', at})
-            onUploadFailed(`“${file.name}” couldn’t be uploaded. Try again in a moment.`)
-          })
+        place(
+          () => ({kind: 'file', file: () => Promise.resolve(file), options: {filename: file.name}}),
+          `“${file.name}” couldn’t be uploaded. Try again in a moment.`,
+        )
       }
     },
-    [editor, client, onUploadFailed],
+    [place],
   )
+
+  return {upload, place}
 }
 
 const Placeholder = styled.span`
@@ -277,8 +352,9 @@ const Prose = styled(SDKPortableTextEditable)`
     content: '◦';
   }
 
+  /* Set, not reset: a reset here starts a counter the items after this one don't count on ("1, 1, 2"). */
   :not([data-list-item='number']) + [data-list-item='number'][data-level='1'] {
-    counter-reset: calm-l1 calm-l2;
+    counter-set: calm-l1 1;
   }
 
   [data-list-item='number'][data-level='1'] {

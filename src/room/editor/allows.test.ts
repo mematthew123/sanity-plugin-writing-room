@@ -41,6 +41,8 @@ const compiled = createSchema({
     },
   ],
 })
+/** A Studio with uploads on and no image sources. */
+const images = {upload: true, sources: []}
 const allowsFor = (name: string) =>
   bodyAllows(sanitySchemaToPortableTextSchema(compiled.get(name) as ArraySchemaType<unknown>))
 
@@ -49,8 +51,8 @@ describe('bodyAllows', () => {
     const allows = allowsFor('body')
     expect(['image', 'embed', 'codeBlock', 'sectionBreak'].every(allows.block)).toBe(true)
     expect(allows.blockField('image', 'alt')).toBe(true)
-    expect(matchCommands('', allows).map((command) => command.id)).toEqual([
-      'image',
+    expect(matchCommands('', allows, images).map((command) => command.id)).toEqual([
+      'uploadImage',
       'embed',
       'codeBlock',
       'sectionBreak',
@@ -66,14 +68,14 @@ describe('bodyAllows', () => {
     expect(allows.decorator('strong') && allows.annotation('link')).toBe(true)
     expect(allows.list('number') || allows.block('embed') || allows.block('codeBlock')).toBe(false)
     expect(allows.blockField('image', 'alt')).toBe(false)
-    expect(matchCommands('', allows).map((command) => command.id)).toEqual(['image', 'quote', 'bulletList'])
-    expect(matchCommands('list', allows).map((command) => command.id)).toEqual(['bulletList'])
+    expect(matchCommands('', allows, images).map((command) => command.id)).toEqual(['uploadImage', 'quote', 'bulletList'])
+    expect(matchCommands('list', allows, images).map((command) => command.id)).toEqual(['bulletList'])
   })
 
   it('offers the room’s blocks to a body that opts in, under the plugin’s prefixed names', () => {
     const allows = allowsFor('optedIn')
     // A plain `{type: 'block'}` also has Sanity's default quote and lists.
-    expect(matchCommands('', allows).map((command) => command.id)).toEqual([
+    expect(matchCommands('', allows, images).map((command) => command.id)).toEqual([
       'embed',
       'codeBlock',
       'sectionBreak',

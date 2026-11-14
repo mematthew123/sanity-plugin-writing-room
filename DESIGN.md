@@ -210,6 +210,7 @@ The room has its own vocabulary. Use these words in the interface, in code and i
 - **The room**: one document, open for writing.
 - **Room Controls**: the few controls in the room's corners.
 - **Post**: the default kind of document. The room names each kind by its schema title ("Case Study"); never say "document" to a Writer.
+- **Image source**: a place the Studio offers existing images from: its own uploads, Media Library, or one a plugin adds. Each goes by the name it gives itself in the Studio. Never "asset", "asset source" or "media" to a Writer.
 
 ## Overview
 
@@ -312,7 +313,7 @@ Things that live in the margin (the Insert Menu's `+`) move inside the column wh
 
 Almost flat. Depth comes from the paper/surface tint, not shadows.
 
-- Five things float, and only one at a time: the **Selection Bubble**, the **Insert Menu**, **Room Settings**, the **publish confirmation**, and the **message** at the foot. In light mode they carry the soft `floatingShadow` token; in dusk they drop the shadow and use a `rule` border instead (shadows don't read on dark paper).
+- Five things float, and only one at a time: the **Selection Bubble**, the **Insert Menu**, **Room Settings**, the **publish confirmation**, and the **message** at the foot. In light mode they carry the soft `floatingShadow` token; in dusk they drop the shadow and use a `rule` border instead (shadows don't read on dark paper). An image source's dialog is not one of the five: it is the Studio's, borrowed while the Writer chooses.
 - Code Blocks, Embed cards and the Lobby's Continue card sit *on* the page: surface tint, no shadow, no border.
 - Never stack elevations (no card inside a card inside a panel).
 
@@ -344,9 +345,11 @@ Soft, consistent corners.
 - **Message** — the one place the room speaks up, at the foot of the window and clear of the controls. One at a time, in this order of precedence: a problem (caution; stays until dismissed or resolved), offline (caution; stays), a notice (ink; passes after a few seconds, longer when it offers somewhere to go). Never a stack of toasts.
 - **Word count** — "1,240 words · 6 min read", in ink muted, in the margin at the foot. It recedes with the controls. It is information, never a goal.
 - **Selection Bubble** — a surface pill above selected text: Bold, Italic, Link, Heading, Subheading, Quote. Appears with the `gentle` motion, never covers the selected line.
-- **Insert Menu** — opened from the faint `+` beside an empty line, or `/` at the start of one. A short list with an icon and a plain-language label each: Image, Embed, Code block, Section break, Quote, lists.
+- **Insert Menu** — opened from the faint `+` beside an empty line, or `/` at the start of one. A short list with an icon and a plain-language label each: Upload an image, Choose an image, Embed, Code block, Section break, Quote, lists.
 - **Only what the body can store.** The Selection Bubble, Insert Menu and markdown shortcuts offer exactly what the document's own body field allows. Never show a control that would write something the schema can't hold.
 - **Image** — at the measure, `sm` corners. Beneath it, in Figtree: "Describe this image for people who can't see it" and "Add a caption (optional)" as quiet inline placeholders until clicked. A soft shimmer holds its place while it uploads.
+- **Choosing an image** — "Choose an image" offers the image sources the Studio has set up for the body's images. With one, it opens; with several, the Insert Menu's list gives way, in the same panel, to their names. Each row is there only when it can work: no "Upload an image" in a Studio that has turned uploads off, no "Choose an image" where there is nothing to choose from. A chosen image arrives like an uploaded one, with its description and caption still to write.
+- **An image source's dialog** — Sanity's, or a plugin's, like Sanity's inputs in Details: it keeps its own behaviour and the Studio's theme, and the room never redraws or wraps it. The Insert Menu closes before it opens. When it closes, by a choice or by backing out, the caret is on the line the Writer left. If it can't open, the message says so and the Prose is untouched.
 - **Embed card** — a quiet surface card with the provider's name, the caption or URL, and a "Preview" toggle. Never a live, autoplaying player by default.
 - **Code Block** — surface tint, monospace, no line numbers and no syntax colouring in the room. Language label in Figtree, ink muted, top-end.
 - **Section Break** — a centred `✦ ✦ ✦` in ink faint with a full `xl` of space either side.

@@ -7,7 +7,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **The Lobby**: a doorway, not a document browser. Continue the piece you were last in, start something new, or pick from a few recent ones. The Studio's navbar stays above it, and Structure is one link away for everything else.
 - **Controls that recede**: Leave on one side; status, Details, Preview and Publish on the other. They fade after a few keystrokes and return when you pause. The word count sits at the foot of the page, and anything the room needs to tell you appears there too.
 - **Formatting on selection**: bold, italic, headings, quotes and links in a small bubble above selected text.
-- **An insert menu**: click the `+` beside an empty line, or type `/`, for images, embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
+- **An insert menu**: click the `+` beside an empty line, or type `/`, for images (uploaded, or chosen from the image sources your Studio already has), embeds (YouTube, Vimeo, Spotify), code blocks, section breaks, quotes and lists.
 - **Markdown as you type**: `##`, `>`, `-`, `1.`, `---` and code fences.
 - **Room settings**: one `Aa` menu for text size, typewriter scrolling and focus dimming (kept per Writer in the browser, no setup), dark mode and fullscreen.
 - **Any screen**: on a phone or a narrow window the controls keep to Leave, `Aa` and Publish, and the rest moves into the `Aa` menu.
@@ -152,6 +152,8 @@ If the Details view can't be shown in your Studio, the room says so and offers *
 ### The body
 
 The editor is built from the body field's own type, so the room only offers what that type can store. A `blockContent` with headings, quotes, bullets, links and images gets exactly those: no code blocks, embeds or numbered lists in the Insert Menu, selection bubble or markdown shortcuts. Image description and caption inputs appear only when your image type has `alt` and `caption` fields.
+
+**Choose an image** in the Insert Menu offers the same image sources as the **Select** menu on an image field in your Studio: the Studio's own uploads, Media Library if you've turned it on, and any a plugin adds. There is nothing to set up. The room follows `form.image.assetSources` and `form.image.directUploads` in your Studio config, and `options.sources` and `options.disableNew` on the body's image type, so a row the Studio wouldn't offer isn't offered in the room either. Each source opens in its own dialog, in your Studio's theme.
 
 To offer the room's own blocks (YouTube/Vimeo/Spotify embeds, code blocks, section breaks), add them to your body type. The plugin registers them for you, under prefixed names that can't clash with yours:
 

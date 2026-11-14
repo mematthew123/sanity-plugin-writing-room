@@ -2,6 +2,7 @@ import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
 // From source, so edits reload live and the Studio shares one copy of the App SDK.
 import {fieldNote} from './e2e/field-note'
+import {testPictures} from './e2e/test-pictures'
 import {writingRoom, writingRoomSchemaTypes} from './src'
 import {writingRoomTheme} from './src/theme'
 
@@ -26,5 +27,7 @@ export default defineConfig({
     }),
   ],
   schema: {types: [...writingRoomSchemaTypes, fieldNote]},
+  // A second image source is there for the browser tests; see e2e/test-pictures.tsx.
+  form: {image: {assetSources: (previous) => [...previous, testPictures]}},
   theme: writingRoomTheme,
 })
