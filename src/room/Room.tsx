@@ -40,7 +40,6 @@ import {
 import {
   Presence,
   PublishButton,
-  ReportSynced,
   RoomMessage,
   type RoomNotice,
   RoomSyncProvider,
@@ -49,7 +48,7 @@ import {
 } from './room-status'
 import {useRoomSettings} from './room-settings'
 import {takeOffSchedule} from './schedule'
-import {type JustPromised, type PostCopy, PostCopyProvider, scheduleClient, useCanSchedule} from './scheduling'
+import {type PostCopy, PostCopyProvider, scheduleClient, ScheduleMemoryProvider, useCanSchedule} from './scheduling'
 import {TitleField} from './TitleField'
 import {useEscape} from './use-escape'
 import {useRecede} from './use-recede'
@@ -58,10 +57,6 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
   const [problem, setProblem] = useState<string | null>(null)
   // Out here so "Scheduled for…" outlasts the room starting over on the Scheduled copy.
   const [notice, setNotice] = useState<RoomNotice | null>(null)
-  const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
-  const caughtUp = useCallback(() => setJustPromised(null), [])
-  const [making, setMaking] = useState<string | null>(null)
-  const [synced, setSynced] = useState(true)
 
   useEffect(() => {
     if (!notice) return undefined
@@ -71,33 +66,26 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
   }, [notice])
 
   return (
-    <Suspense fallback={<LoadingRoom />}>
-      <PostCopyProvider
-        documentId={documentId}
-        documentType={documentType}
-        making={making}
-        synced={synced}
-        justPromised={justPromised}
-        onCaughtUp={caughtUp}
-      >
-        {(copy) => (
-          <Suspense fallback={<LoadingRoom />}>
-            {/* Another copy is another document to the editor. */}
-            <LoadedRoom
-              key={copy.openId}
-              copy={copy}
-              problem={problem}
-              onProblem={setProblem}
-              notice={notice}
-              onNotice={setNotice}
-              onSynced={setSynced}
-              onMaking={setMaking}
-              onPromised={setJustPromised}
-            />
-          </Suspense>
-        )}
-      </PostCopyProvider>
-    </Suspense>
+    // Outside the boundary, so a room that is still loading can't lose it.
+    <ScheduleMemoryProvider>
+      <Suspense fallback={<LoadingRoom />}>
+        <PostCopyProvider documentId={documentId} documentType={documentType}>
+          {(copy) => (
+            <Suspense fallback={<LoadingRoom />}>
+              {/* Another copy is another document to the editor. */}
+              <LoadedRoom
+                key={copy.openId}
+                copy={copy}
+                problem={problem}
+                onProblem={setProblem}
+                notice={notice}
+                onNotice={setNotice}
+              />
+            </Suspense>
+          )}
+        </PostCopyProvider>
+      </Suspense>
+    </ScheduleMemoryProvider>
   )
 }
 
@@ -141,18 +129,12 @@ function LoadedRoom({
   onProblem,
   notice,
   onNotice: setNotice,
-  onSynced,
-  onMaking,
-  onPromised,
 }: {
   copy: PostCopy
   problem: string | null
   onProblem: (problem: string | null) => void
   notice: RoomNotice | null
   onNotice: (notice: RoomNotice | null) => void
-  onSynced: (synced: boolean) => void
-  onMaking: (releaseId: string | null) => void
-  onPromised: (promised: JustPromised) => void
 }) {
   const {handle} = copy
   const scheme = useColorSchemeValue()
@@ -231,7 +213,6 @@ function LoadedRoom({
   return (
     <EditorProvider initialConfig={{schemaDefinition}}>
       <RoomSyncProvider handle={handle} releaseId={copy.releaseId}>
-        <ReportSynced onChange={onSynced} />
         <Layout>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
@@ -274,8 +255,6 @@ function LoadedRoom({
                     canSchedule={canSchedule}
                     onProblem={onProblem}
                     onNotice={setNotice}
-                    onMaking={onMaking}
-                    onPromised={onPromised}
                     onTakeOff={takeOff}
                   />
                 </Recedes>

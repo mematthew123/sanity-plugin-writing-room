@@ -3,6 +3,7 @@ import {createContext, type ReactNode, useContext, useEffect, useMemo, useState}
 import {type SanityClient, useClient, useSchema, useSource} from 'sanity'
 import {API_VERSION} from '../lib/api-version'
 import {type Promised} from './post-status'
+import {foldPhase, isFolding} from './fold'
 import {findPromise, type ReleaseLike} from './promised'
 import {copyId, draftId, foldBack, type ScheduleClient, tidyDraft} from './schedule'
 import {isAhead, waitUntil} from '../lib/promised-time'
@@ -89,43 +90,57 @@ export interface JustPromised {
   promise: Promised
 }
 
-/** Finds the Post's schedule, and tidies what a schedule leaves behind: a matching draft, or a promise whose time has gone by. */
-export function PostCopyProvider({
+interface ScheduleMemory {
+  /** The release of a schedule still being made, or one that failed and is being taken away. */
+  making: string | null
+  justPromised: JustPromised | null
+  /** Everything typed in the room has been saved. */
+  synced: boolean
+  setMaking: (releaseId: string | null) => void
+  setJustPromised: (promised: JustPromised | null) => void
+  setSynced: (synced: boolean) => void
+}
+
+const Memory = createContext<ScheduleMemory | null>(null)
+
+/**
+ * What scheduling has to know while the room starts over on another copy. The room is keyed by its
+ * copy, so this sits above it.
+ */
+export function ScheduleMemoryProvider({children}: {children: ReactNode}) {
+  const [making, setMaking] = useState<string | null>(null)
+  const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
+  const [synced, setSynced] = useState(true)
+  const memory = useMemo(
+    () => ({making, justPromised, synced, setMaking, setJustPromised, setSynced}),
+    [making, justPromised, synced],
+  )
+  return <Memory.Provider value={memory}>{children}</Memory.Provider>
+}
+
+export function useScheduleMemory(): ScheduleMemory {
+  const memory = useContext(Memory)
+  if (!memory) throw new Error('useScheduleMemory must be used inside the room')
+  return memory
+}
+
+type Found = ReturnType<typeof findPromise>
+
+/** Tidies what a schedule leaves behind: a matching draft, or a promise whose time has gone by. */
+function useTidy({
   documentId,
   documentType,
-  making,
-  synced,
-  justPromised,
-  onCaughtUp,
-  children,
+  found,
+  hasDraft,
 }: {
   documentId: string
   documentType: string
-  /** The release of a schedule still being made, or one that failed and is being taken away. */
-  making: string | null
-  /** Everything typed in the room has been saved. */
-  synced: boolean
-  justPromised: JustPromised | null
-  onCaughtUp: () => void
-  children: (copy: PostCopy) => ReactNode
-}) {
+  found: Found
+  hasDraft: boolean
+}): {otherChanges: boolean; folding: boolean} {
   const client = useClient({apiVersion: API_VERSION})
-  const releases = useActiveReleases() as unknown as ReleaseLike[]
-  const {data: copyIds} = useQuery<string[]>({
-    query: '*[sanity::versionOf($id)]._id',
-    params: {id: documentId},
-    perspective: 'raw',
-  })
-  const found = useMemo(() => findPromise(releases, copyIds ?? []), [releases, copyIds])
-  const releaseId = found?.release.name ?? justPromised?.releaseId ?? null
-  const promise = found?.promise ?? justPromised?.promise ?? null
-  const hasDraft = (copyIds ?? []).includes(draftId(documentId))
+  const {making, synced} = useScheduleMemory()
   const [otherChanges, setOtherChanges] = useState(false)
-
-  const caughtUp = !!found && !!justPromised
-  useEffect(() => {
-    if (caughtUp) onCaughtUp()
-  }, [caughtUp, onCaughtUp])
 
   // Never tidy a promise the room is still making: the release shows up here before it is one, and
   // a schedule that fails takes the copy away again.
@@ -150,23 +165,20 @@ export function PostCopyProvider({
   const dateField = fields.publishedAt
   const promisedAt = found?.promise.at
 
-  // Folding back takes away the copy the Writer may be typing in. So it waits until the room is
-  // saved, holds the page still, and folds only once it is both. `leftAsIs` is a fold given up on.
   const [held, setHeld] = useState<string | null>(null)
   const [leftAsIs, setLeftAsIs] = useState<string | null>(null)
-  const toFold = expired && !!settled && leftAsIs !== settled
+  const phase = foldPhase({release: settled, expired, synced, held, leftAsIs})
   useEffect(() => {
-    if (toFold && synced) setHeld(settled)
-  }, [toFold, synced, settled])
-  const folding = toFold && held === settled
-  const still = folding && synced
+    if (phase === 'hold') setHeld(settled)
+  }, [phase, settled])
+  const fold = phase === 'fold'
 
   useEffect(() => {
     if (!settled) {
       setOtherChanges(false)
       return undefined
     }
-    if (expired && !still) return undefined
+    if (expired && !fold) return undefined
     let stale = false
     const tidy = scheduleClient(client)
     const target = {documentId, releaseId: settled, roomWrites}
@@ -202,7 +214,39 @@ export function PostCopyProvider({
     return () => {
       stale = true
     }
-  }, [client, documentId, settled, expired, still, hasDraft, looks, roomWrites, dateField, promisedAt])
+  }, [client, documentId, settled, expired, fold, hasDraft, looks, roomWrites, dateField, promisedAt])
+
+  return {otherChanges, folding: isFolding(phase)}
+}
+
+/** Finds the Post's schedule, and which copy of the Post the room opens. */
+export function PostCopyProvider({
+  documentId,
+  documentType,
+  children,
+}: {
+  documentId: string
+  documentType: string
+  children: (copy: PostCopy) => ReactNode
+}) {
+  const {justPromised, setJustPromised} = useScheduleMemory()
+  const releases = useActiveReleases() as unknown as ReleaseLike[]
+  const {data: copyIds} = useQuery<string[]>({
+    query: '*[sanity::versionOf($id)]._id',
+    params: {id: documentId},
+    perspective: 'raw',
+  })
+  const found = useMemo(() => findPromise(releases, copyIds ?? []), [releases, copyIds])
+  const releaseId = found?.release.name ?? justPromised?.releaseId ?? null
+  const promise = found?.promise ?? justPromised?.promise ?? null
+  const hasDraft = (copyIds ?? []).includes(draftId(documentId))
+
+  const caughtUp = !!found && !!justPromised
+  useEffect(() => {
+    if (caughtUp) setJustPromised(null)
+  }, [caughtUp, setJustPromised])
+
+  const {otherChanges, folding} = useTidy({documentId, documentType, found, hasDraft})
 
   const copy = useMemo<PostCopy>(
     () => ({

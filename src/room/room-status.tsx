@@ -42,7 +42,7 @@ import {
   schedulePost,
   StillScheduled,
 } from './schedule'
-import {type JustPromised, type PostCopy, scheduleClient} from './scheduling'
+import {type PostCopy, scheduleClient, useScheduleMemory} from './scheduling'
 import {fromLocalDateTime, toLocalDateTime} from './details/values'
 
 export interface RoomNotice {
@@ -85,17 +85,14 @@ export function RoomSyncProvider({
 }) {
   const proseSynced = useDocumentSyncStatus(handle) ?? true
   const details = useSyncState(handle.documentId, handle.documentType, releaseId ?? undefined)
-  return <RoomSynced.Provider value={proseSynced && !details.isSyncing}>{children}</RoomSynced.Provider>
+  const isSynced = proseSynced && !details.isSyncing
+  // For folding back, which sits outside the room and has to wait for it to be saved.
+  const {setSynced} = useScheduleMemory()
+  useEffect(() => setSynced(isSynced), [isSynced, setSynced])
+  return <RoomSynced.Provider value={isSynced}>{children}</RoomSynced.Provider>
 }
 
 const useRoomSynced = () => useContext(RoomSynced)
-
-/** For what sits outside the room and has to wait for it to be saved. */
-export function ReportSynced({onChange}: {onChange: (synced: boolean) => void}) {
-  const isSynced = useRoomSynced()
-  useEffect(() => onChange(isSynced), [isSynced, onChange])
-  return null
-}
 
 /** Offline, it stays until the connection returns. */
 export function SaveState() {
@@ -259,8 +256,6 @@ export function PublishButton({
   canSchedule,
   onProblem,
   onNotice,
-  onMaking,
-  onPromised,
   onTakeOff,
 }: {
   copy: PostCopy
@@ -270,13 +265,11 @@ export function PublishButton({
   canSchedule: boolean
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
-  /** The release of a schedule being made, so nothing is tidied against it until it holds. */
-  onMaking: (releaseId: string | null) => void
-  onPromised: (promised: JustPromised) => void
   /** "Edit it" */
   onTakeOff: () => Promise<void>
 }) {
   const {handle, openId, releaseId} = copy
+  const {setMaking, setJustPromised} = useScheduleMemory()
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
   const apply = useApplyDocumentActions()
@@ -497,11 +490,11 @@ export function PublishButton({
       } else {
         // Named before it exists. If this fails it stays named: what is left of it is on its way out.
         const making = newReleaseId()
-        onMaking(making)
+        setMaking(making)
         const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at, releaseId: making})
-        onPromised({releaseId: made.releaseId, promise: {at, held: false}})
+        setJustPromised({releaseId: made.releaseId, promise: {at, held: false}})
       }
-      onMaking(null)
+      setMaking(null)
       onProblem(null)
       onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
     } catch (error) {
