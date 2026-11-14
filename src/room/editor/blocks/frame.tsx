@@ -11,14 +11,14 @@ export function BlockFrame({
   return <div {...props} className={cx(styles.frame, className)} data-selected={selected || undefined} />
 }
 
-export function FieldInput(props: ComponentProps<'input'>) {
-  return <input {...props} className={styles.input} />
+export function FieldInput({className, ...props}: ComponentProps<'input'>) {
+  return <input {...props} className={cx(styles.input, className)} />
 }
 
 export function Controls({children, className}: {children: ReactNode; className?: string}) {
   return <Isolate className={cx(styles.controls, className)}>{children}</Isolate>
 }
 
-export function Caution(props: ComponentProps<'p'>) {
-  return <p {...props} className={styles.caution} />
+export function Caution({className, ...props}: ComponentProps<'p'>) {
+  return <p {...props} className={cx(styles.caution, className)} />
 }

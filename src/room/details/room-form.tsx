@@ -320,6 +320,9 @@ function TagsField({
   )
 }
 
-function TextInput(props: React.InputHTMLAttributes<HTMLInputElement> & {ref?: React.Ref<HTMLInputElement>}) {
-  return <input {...props} className={styles.textInput} />
+function TextInput({
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {ref?: React.Ref<HTMLInputElement>}) {
+  return <input {...props} className={cx(styles.textInput, className)} />
 }

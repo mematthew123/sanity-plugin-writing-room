@@ -65,19 +65,24 @@ export function QuietButton({
   )
 }
 
-export function SectionLabel({children, ...props}: ComponentProps<'h2'>) {
+export function SectionLabel({children, className, ...props}: ComponentProps<'h2'>) {
   return (
-    <h2 {...props} className={styles.sectionLabel}>
+    <h2 {...props} className={cx(styles.sectionLabel, className)}>
       {children}
     </h2>
   )
 }
 
-export function Placeholder({height, ...props}: {height: string} & ComponentProps<'div'>) {
-  return <div {...props} className={styles.placeholder} style={{height}} />
+export function Placeholder({
+  height,
+  className,
+  style,
+  ...props
+}: {height: string} & ComponentProps<'div'>) {
+  return <div {...props} className={cx(styles.placeholder, className)} style={{...style, height}} />
 }
 
 /** A checkbox drawn as a switch; give it `type="checkbox"` and `role="switch"`. */
-export function Switch(props: ComponentProps<'input'>) {
-  return <input {...props} className={styles.switch} />
+export function Switch({className, ...props}: ComponentProps<'input'>) {
+  return <input {...props} className={cx(styles.switch, className)} />
 }
