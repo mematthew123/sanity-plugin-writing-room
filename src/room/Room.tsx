@@ -59,6 +59,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
   const [notice, setNotice] = useState<RoomNotice | null>(null)
   const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
   const caughtUp = useCallback(() => setJustPromised(null), [])
+  const [making, setMaking] = useState<string | null>(null)
 
   useEffect(() => {
     if (!notice) return undefined
@@ -72,6 +73,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
       <PostCopyProvider
         documentId={documentId}
         documentType={documentType}
+        making={making}
         justPromised={justPromised}
         onCaughtUp={caughtUp}
       >
@@ -85,6 +87,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
               onProblem={setProblem}
               notice={notice}
               onNotice={setNotice}
+              onMaking={setMaking}
               onPromised={setJustPromised}
             />
           </Suspense>
@@ -134,6 +137,7 @@ function LoadedRoom({
   onProblem,
   notice,
   onNotice: setNotice,
+  onMaking,
   onPromised,
 }: {
   copy: PostCopy
@@ -141,6 +145,7 @@ function LoadedRoom({
   onProblem: (problem: string | null) => void
   notice: RoomNotice | null
   onNotice: (notice: RoomNotice | null) => void
+  onMaking: (releaseId: string | null) => void
   onPromised: (promised: JustPromised) => void
 }) {
   const {handle} = copy
@@ -261,6 +266,7 @@ function LoadedRoom({
                     canSchedule={canSchedule}
                     onProblem={onProblem}
                     onNotice={setNotice}
+                    onMaking={onMaking}
                     onPromised={onPromised}
                     onTakeOff={takeOff}
                   />

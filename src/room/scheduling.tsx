@@ -84,12 +84,15 @@ export interface JustPromised {
 export function PostCopyProvider({
   documentId,
   documentType,
+  making,
   justPromised,
   onCaughtUp,
   children,
 }: {
   documentId: string
   documentType: string
+  /** The release of a schedule still being made, or one that failed and is being taken away. */
+  making: string | null
   justPromised: JustPromised | null
   onCaughtUp: () => void
   children: (copy: PostCopy) => ReactNode
@@ -112,8 +115,9 @@ export function PostCopyProvider({
     if (caughtUp) onCaughtUp()
   }, [caughtUp, onCaughtUp])
 
-  // Never tidy a promise the room is still making.
-  const settled = found ? found.release.name : null
+  // Never tidy a promise the room is still making: the release shows up here before it is one, and
+  // a schedule that fails takes the copy away again.
+  const settled = found && found.release.name !== making ? found.release.name : null
   // Nothing else changes when a held promise runs out, so look again then.
   const [looks, lookAgain] = useState(0)
   const heldUntil = found?.promise.held ? found.promise.at : undefined

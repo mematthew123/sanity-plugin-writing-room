@@ -36,6 +36,7 @@ import {
   ChangedSinceChecked,
   changeTime,
   OffTheSchedule,
+  newReleaseId,
   publishHeld,
   scheduleAgain,
   schedulePost,
@@ -251,6 +252,7 @@ export function PublishButton({
   canSchedule,
   onProblem,
   onNotice,
+  onMaking,
   onPromised,
   onTakeOff,
 }: {
@@ -261,6 +263,8 @@ export function PublishButton({
   canSchedule: boolean
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
+  /** The release of a schedule being made, so nothing is tidied against it until it holds. */
+  onMaking: (releaseId: string | null) => void
   onPromised: (promised: JustPromised) => void
   /** "Edit it" */
   onTakeOff: () => Promise<void>
@@ -482,9 +486,13 @@ export function PublishButton({
       if (releaseId) {
         await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at, checked: planned.revision})
       } else {
-        const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at})
+        // Named before it exists. If this fails it stays named: what is left of it is on its way out.
+        const making = newReleaseId()
+        onMaking(making)
+        const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at, releaseId: making})
         onPromised({releaseId: made.releaseId, promise: {at, held: false}})
       }
+      onMaking(null)
       onProblem(null)
       onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
     } catch (error) {
