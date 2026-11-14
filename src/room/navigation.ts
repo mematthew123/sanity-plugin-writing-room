@@ -53,7 +53,6 @@ export function useRoomView(handle: DocumentHandle) {
   const opened = openedView(state)
   const inDetails = opened.details && hasDetails
   const field = opened.field
-  // Both views are of the same copy: one opened in a Release stays in it.
   const release = openedRelease(state)
   const room = useMemo(
     () => roomState(documentId, documentType, types, release),

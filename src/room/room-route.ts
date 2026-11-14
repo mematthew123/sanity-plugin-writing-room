@@ -10,10 +10,7 @@ export type RoomState = {
 
 export const ROOM_ROUTES = ['/:documentId', '/:documentType/:documentId'] as const
 
-/**
- * `types` are the room's types, default first. `release` is the Release whose copy of the document
- * to open, when the Writer came from Structure with one chosen; it rides in the query, like the view.
- */
+/** `types` are the room's types, default first. `release` rides in the query, like the view. */
 export function roomState(
   documentId: string,
   documentType: string,
@@ -33,7 +30,6 @@ export function detailsState(room: RoomState, field?: string): RoomState & {_sea
   return {...room, _searchParams: [...(room._searchParams ?? []), ...view]}
 }
 
-/** The Release whose copy was asked for, if one was. */
 export function openedRelease(state: Record<string, unknown>): string | undefined {
   const params = Array.isArray(state._searchParams) ? (state._searchParams as [string, string][]) : []
   return params.find(([name]) => name === 'release')?.[1] || undefined

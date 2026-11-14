@@ -58,7 +58,7 @@ export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
           <Suspense fallback={null}>
             {opened ? (
               <Room
-                // Another Release's copy is another room: nothing said or offered about the last one carries over.
+                // A notice about one copy must never act on another.
                 key={`${opened.documentId}:${openedRelease(state) ?? ''}`}
                 documentId={opened.documentId}
                 documentType={opened.documentType}

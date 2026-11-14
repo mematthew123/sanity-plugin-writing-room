@@ -60,7 +60,7 @@ export function Room({
 }: {
   documentId: string
   documentType: string
-  /** The Release whose copy to open, when the Writer came from Structure with one chosen. */
+  /** The Release chosen in Structure, if one was. */
   release?: string
 }) {
   const [problem, setProblem] = useState<string | null>(null)
@@ -174,7 +174,7 @@ function LoadedRoom({
   const {releaseId} = copy
   const inRelease = copy.release
   const takeOff = useCallback(async () => {
-    // Only the Post's own schedule is the room's to change. A Release is the Studio's.
+    // A Release's schedule is the Studio's.
     if (!releaseId || inRelease) return
     try {
       await takeOffSchedule(scheduleClient(client), {releaseId})
@@ -209,8 +209,7 @@ function LoadedRoom({
     })
   }, [otherChanges, singular, setNotice, openInStructure])
 
-  // A scheduled Release locks every copy in it, and unscheduling it is the Studio's. The room says
-  // so on the way in, and again if the Writer tries to type.
+  // A scheduled Release locks its copies: say so on the way in, and again if the Writer types.
   const releaseTitle = inRelease?.title
   const releaseLockedFor = inRelease?.scheduledFor
   useEffect(() => {
@@ -228,7 +227,7 @@ function LoadedRoom({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [releaseTitle, releaseLockedFor, singular, setNotice, openInStructure])
 
-  // Asked for a Release the Post has no copy in: the room never adds to one, so it says which copy this is.
+  // The room never adds a Post to a Release, so it says which copy this is.
   const {notIn} = copy
   useEffect(() => {
     if (notIn === null) return
@@ -240,8 +239,7 @@ function LoadedRoom({
   const projectId = useProjectId()
   const dataset = useDataset()
 
-  // So the Lobby can offer to continue this one. Not a Release's copy: the Lobby only ever opens
-  // the Writer's own, and a Release is found again through Structure.
+  // So the Lobby can offer to continue this one. It only ever opens the Writer's own copy.
   const isReleaseCopy = !!copy.release
   useEffect(() => {
     if (isReleaseCopy) return
@@ -282,7 +280,7 @@ function LoadedRoom({
                 <Presence handle={handle} />
                 <SaveState />
                 <Recedes>
-                  {/* On a phone the button's label says the status. A Release's copy has no button, so it keeps its words. */}
+                  {/* On a phone the button says the status. A Release's copy has no button. */}
                   {copy.release ? (
                     <StatusLabel status={status} />
                   ) : (

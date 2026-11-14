@@ -11,7 +11,6 @@ export const OpenInWritingRoomAction: DocumentActionComponent = (props) => {
     icon: ComposeIcon,
     onHandle: () => {
       cameFromForm(props.id)
-      // With a Release chosen in the Studio, the room opens the document's copy in that Release.
       navigateIntent(WRITE_INTENT, {id: props.id, type: props.type, ...(props.release && {release: props.release})})
       props.onComplete()
     },

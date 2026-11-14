@@ -4,16 +4,12 @@ import {Room} from './room'
 
 const TITLE = 'E2E summer drop'
 
-/** The platform refusing a feature the project's plan doesn't have, as far as an error can say so. */
 function isPlanRefusal(error: unknown): boolean {
   const {statusCode, message} = error as {statusCode?: number; message?: string}
   return statusCode === 402 || (statusCode === 403 && /plan|feature|not (available|enabled)|upgrade|quota|limit/i.test(message ?? ''))
 }
 
-/**
- * A Release of many with the Post's copy in it, as Structure leaves one. Null only where the plan
- * has no Releases; anything else that goes wrong is a failure, not a reason to skip.
- */
+/** Null only where the plan has no Releases; any other failure is a failure, not a reason to skip. */
 async function releaseWith(content: SanityClient, post: TestPost): Promise<string | null> {
   const releaseId = `rE2E${post.id.slice(-8).replace(/[^a-zA-Z0-9]/g, 'x')}`
   try {
@@ -43,7 +39,7 @@ test('opens a Post’s copy in a Release, by the Release’s own title, with not
 
   await room.title.fill(`${post.title}, for summer`)
 
-  // The words go into the Release's copy, and the Writer's own draft is as it was.
+  // The Writer's own draft is as it was.
   await expect(async () => {
     const copy = await content.getDocument<{title?: string}>(`versions.${releaseId}.${post.id}`)
     expect(copy?.title).toBe(`${post.title}, for summer`)

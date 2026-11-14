@@ -95,7 +95,7 @@ export function PostCopyProvider({
 }: {
   documentId: string
   documentType: string
-  /** The Release the Writer chose in Structure before opening the room, if they did. */
+  /** The Release chosen in Structure, if one was. */
   inRelease?: string
   justPromised: JustPromised | null
   onCaughtUp: () => void
@@ -108,9 +108,7 @@ export function PostCopyProvider({
     params: {id: documentId},
     perspective: 'raw',
   })
-  // A Release of many is opened only when asked for, and only if the Post already has a copy in
-  // it: the room writes into Releases, and never adds to one (ADR-0003). A one-Post release isn't
-  // asked for; the room finds that itself.
+  // Only a Release the Post already has a copy in: the room never adds to one.
   const asked = inRelease ? releases.find((release) => release.name === inRelease) : undefined
   const theirs = asked && !isOnePostRelease(asked) ? asked : undefined
   const within = theirs && (copyIds ?? []).includes(copyId(documentId, theirs.name)) ? theirs : null
