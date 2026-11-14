@@ -86,7 +86,7 @@ export function promisedPosts(
   return [...posts.values()].sort((a, b) => (b.editedAt ?? '').localeCompare(a.editedAt ?? ''))
 }
 
-export function isSame(a: unknown, b: unknown): boolean {
+function isSame(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) !== Array.isArray(b)) return false

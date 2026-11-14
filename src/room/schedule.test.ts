@@ -11,6 +11,7 @@ import {
   scheduleAgain,
   type ScheduleClient,
   schedulePost,
+  StillScheduled,
   takeOffSchedule,
   tidyDraft,
 } from './schedule'
@@ -292,22 +293,80 @@ describe('takeOffSchedule, then scheduleAgain', () => {
     expect(documents.get(copyId(ID, R))).toMatchObject({title: '', publishedAt: FRIDAY})
   })
 
-  it('comes back off if the copy changed in the moment before it was locked', async () => {
-    const {client, documents, releases} = await scheduled()
+  /** Off the schedule and checked, with a colleague who clears the title just before the platform locks the copy. */
+  async function editedBeforeTheLock() {
+    const data = await scheduled()
+    const {client, documents} = data
     await takeOffSchedule(client, {releaseId: R})
+    data.steps.length = 0
     const checked = documents.get(copyId(ID, R))!._rev as string
-    // After every check the room can make, and before the platform locks the copy.
     const setReleaseTime = client.setReleaseTime
     client.setReleaseTime = async (args) => {
       await client.setFields(copyId(ID, R), {title: ''})
       return setReleaseTime(args)
     }
+    return {...data, checked}
+  }
 
-    for (const set of [{}, {publishedAt: MONDAY}]) {
-      const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set, at: MONDAY, checked})
-      await expect(attempt).rejects.toBeInstanceOf(ChangedSinceChecked)
-      expect(releases.get(R)?.state).toBe('active')
+  it.each([
+    ['with nothing of its own to write', {}],
+    ['after writing its own date', {publishedAt: MONDAY}],
+  ])('comes back off if the copy changed in the moment before it was locked, %s', async (_, set) => {
+    const {client, releases, steps, checked} = await editedBeforeTheLock()
+
+    const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set, at: MONDAY, checked})
+
+    await expect(attempt).rejects.toBeInstanceOf(ChangedSinceChecked)
+    // It got as far as the lock, and was taken back off.
+    expect(steps.slice(-2)).toEqual(['schedule', 'unschedule'])
+    expect(releases.get(R)?.state).toBe('active')
+  })
+
+  it('says so when the changed copy can’t be taken back off the schedule', async () => {
+    const {client, releases, checked} = await editedBeforeTheLock()
+    client.unschedule = async () => {
+      throw new Error('unschedule failed')
     }
+
+    const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set: {}, at: MONDAY, checked})
+
+    await expect(attempt).rejects.toBeInstanceOf(StillScheduled)
+    expect(releases.get(R)?.state).toBe('scheduled')
+  })
+
+  it('comes back off when the locked copy can’t be read, since nothing says it is the checked one', async () => {
+    const {client, documents, releases} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    const checked = documents.get(copyId(ID, R))!._rev as string
+    const read = client.read
+    client.read = async (id) => {
+      if (releases.get(R)?.state === 'scheduled') throw new Error('read failed')
+      return read(id)
+    }
+
+    const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set: {}, at: MONDAY, checked})
+
+    await expect(attempt).rejects.toThrow('read failed')
+    expect(releases.get(R)?.state).toBe('active')
+  })
+
+  it('says so when the locked copy can’t be read or taken back off', async () => {
+    const {client, documents, releases} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    const checked = documents.get(copyId(ID, R))!._rev as string
+    client.unschedule = async () => {
+      throw new Error('unschedule failed')
+    }
+    const read = client.read
+    client.read = async (id) => {
+      if (releases.get(R)?.state === 'scheduled') throw new Error('read failed')
+      return read(id)
+    }
+
+    const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set: {}, at: MONDAY, checked})
+
+    await expect(attempt).rejects.toBeInstanceOf(StillScheduled)
+    expect(releases.get(R)?.state).toBe('scheduled')
   })
 
   it('goes back on when it is still the revision that was checked', async () => {
@@ -416,6 +475,25 @@ describe('changeTime', () => {
     await expect(attempt).rejects.toBeInstanceOf(OffTheSchedule)
     expect(documents.get(copyId(ID, R))).toMatchObject({publishedAt: '2026-12-01T00:00:00.000Z'})
     expect(releases.get(R)?.state).toBe('active')
+  })
+
+  it('leaves the Post off the schedule if its words changed before the old time could be restored', async () => {
+    const {client, documents, releases} = await scheduled()
+    // The date is moved, then a colleague edits the title, then the new time doesn't take.
+    const schedule = client.schedule
+    client.schedule = async (args) => {
+      if (args.at === MONDAY) {
+        await client.setFields(copyId(ID, R), {title: 'Unchecked words'})
+        throw new Error('schedule failed')
+      }
+      return schedule(args)
+    }
+
+    const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {publishedAt: MONDAY}, at: MONDAY, was: FRIDAY})
+
+    await expect(attempt).rejects.toBeInstanceOf(OffTheSchedule)
+    expect(releases.get(R)?.state).toBe('active')
+    expect(documents.get(copyId(ID, R))).toMatchObject({title: 'Unchecked words'})
   })
 
   it('says so when the Post has ended up off the schedule', async () => {

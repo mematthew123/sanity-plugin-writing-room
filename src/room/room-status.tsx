@@ -32,7 +32,15 @@ import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
-import {ChangedSinceChecked, changeTime, OffTheSchedule, publishHeld, scheduleAgain, schedulePost} from './schedule'
+import {
+  ChangedSinceChecked,
+  changeTime,
+  OffTheSchedule,
+  publishHeld,
+  scheduleAgain,
+  schedulePost,
+  StillScheduled,
+} from './schedule'
 import {type JustPromised, type PostCopy, scheduleClient} from './scheduling'
 import {fromLocalDateTime, toLocalDateTime} from './details/values'
 
@@ -283,6 +291,8 @@ export function PublishButton({
   // Unless the Studio has since turned scheduling off.
   const next = status.next === 'schedule-again' && !canSchedule ? (isFirstPublish ? 'publish' : 'publish-changes') : status.next
   const couldnt = (what: string) => `This ${kind.singular} couldn’t be ${what} just now. Try again in a moment.`
+  // The one case the room can't put right: it has to be looked at before it goes live.
+  const stillScheduled = `This ${kind.singular} changed while it was being scheduled, and may still be on the schedule. Look it over before it goes live.`
 
   useEffect(() => {
     if (phase !== 'checking') return undefined
@@ -479,9 +489,11 @@ export function PublishButton({
       onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
     } catch (error) {
       onProblem(
-        error instanceof ChangedSinceChecked
-          ? `This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`
-          : couldnt('scheduled'),
+        error instanceof StillScheduled
+          ? stillScheduled
+          : error instanceof ChangedSinceChecked
+            ? `This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`
+            : couldnt('scheduled'),
       )
     } finally {
       setPhase('idle')
@@ -509,7 +521,9 @@ export function PublishButton({
       onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
     } catch (error) {
       onProblem(
-        error instanceof OffTheSchedule
+        error instanceof StillScheduled
+          ? stillScheduled
+          : error instanceof OffTheSchedule
           ? `The time couldn’t be changed, and this ${kind.singular} is off the schedule for now. Schedule it again when you’re ready.`
           : `The time couldn’t be changed just now. It is still scheduled for ${describePromisedTime(was)}.`,
       )

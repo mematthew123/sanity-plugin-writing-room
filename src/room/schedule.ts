@@ -1,4 +1,4 @@
-import {isSame, sameWords} from './promised'
+import {sameWords} from './promised'
 
 type Doc = Record<string, unknown>
 
@@ -121,10 +121,68 @@ export async function takeOffSchedule(client: ScheduleClient, {releaseId}: {rele
   await client.unschedule({releaseId})
 }
 
+/** The copy changed while it was being scheduled, and couldn't be taken back off: it may go live unchecked. */
+export class StillScheduled extends Error {
+  constructor(cause?: unknown) {
+    super('The copy changed and may still be scheduled', {cause})
+    this.name = 'StillScheduled'
+  }
+}
+
+/** Writes `set` to the copy only if it is still at `checked`. Resolves to the revision that is now the checked one. */
+async function writeChecked(
+  client: ScheduleClient,
+  id: string,
+  set: Doc,
+  checked: string | undefined,
+): Promise<string | undefined> {
+  if (Object.keys(set).length === 0) {
+    if (checked && (await client.read(id))?._rev !== checked) throw new ChangedSinceChecked()
+    return checked
+  }
+  try {
+    const written = await client.setFields(id, set, checked ? {ifRevision: checked} : undefined)
+    if (!checked) return undefined
+    return typeof written?._rev === 'string' ? written._rev : ((await client.read(id))?._rev as string | undefined)
+  } catch (error) {
+    if (checked && (await client.read(id))?._rev !== checked) throw new ChangedSinceChecked(error)
+    throw error
+  }
+}
+
 /**
- * With `checked`, the revision that passed the publish check, only that revision (with `set`) is
- * promised. Scheduling takes no revision, so the copy is read once it is locked and can't change:
- * if it isn't what was checked, it comes back off the schedule and `ChangedSinceChecked` is thrown.
+ * Schedules the release, then makes sure what it locked is `expected`. Scheduling takes no
+ * revision, so the copy is read once it is locked and can't change. If it isn't `expected`, or
+ * can't be read, it comes back off the schedule; if even that fails, `StillScheduled` says so.
+ */
+async function lock(
+  client: ScheduleClient,
+  {id, releaseId, at, expected}: {id: string; releaseId: string; at: string; expected: string | undefined},
+): Promise<void> {
+  await client.setReleaseTime({releaseId, at})
+  await client.schedule({releaseId, at})
+  if (!expected) return
+
+  const backOff = async (reason: unknown) => {
+    try {
+      await client.unschedule({releaseId})
+    } catch (error) {
+      throw new StillScheduled(error)
+    }
+    throw reason
+  }
+  let locked: Doc | undefined
+  try {
+    locked = await client.read(id)
+  } catch (error) {
+    return backOff(error)
+  }
+  if (locked?._rev !== expected) return backOff(new ChangedSinceChecked())
+}
+
+/**
+ * Puts a Post that was taken off the schedule back on it. With `checked`, the revision that passed
+ * the publish check, only that revision (with `set`) is promised: otherwise `ChangedSinceChecked`.
  */
 export async function scheduleAgain(
   client: ScheduleClient,
@@ -137,60 +195,40 @@ export async function scheduleAgain(
   }: {documentId: string; releaseId: string; set: Doc; at: string; checked?: string},
 ): Promise<void> {
   const id = copyId(documentId, releaseId)
-  let expected = checked
-  if (Object.keys(set).length > 0) {
-    try {
-      const written = await client.setFields(id, set, checked ? {ifRevision: checked} : undefined)
-      if (checked) expected = typeof written?._rev === 'string' ? written._rev : (await client.read(id))?._rev as string
-    } catch (error) {
-      if (checked && (await client.read(id))?._rev !== checked) throw new ChangedSinceChecked(error)
-      throw error
-    }
-  } else if (checked && (await client.read(id))?._rev !== checked) {
-    throw new ChangedSinceChecked()
-  }
-  await client.setReleaseTime({releaseId, at})
-  await client.schedule({releaseId, at})
-  if (expected && (await client.read(id))?._rev !== expected) {
-    await client.unschedule({releaseId})
-    throw new ChangedSinceChecked()
-  }
+  const expected = await writeChecked(client, id, set, checked)
+  await lock(client, {id, releaseId, at, expected})
 }
 
 /**
  * The platform locks the time with the words, so the Post comes off the schedule and goes back on.
- * A new time that doesn't take restores the old one, or throws `OffTheSchedule` if it can't.
+ * A new time that doesn't take restores the old one. Off the schedule anyone can edit the copy, so
+ * at every step it must still be the revision this change knows: if it isn't, or the old time
+ * can't be restored, the Post stays off the schedule and `OffTheSchedule` is thrown.
  */
 export async function changeTime(
   client: ScheduleClient,
   {documentId, releaseId, set, at, was}: {documentId: string; releaseId: string; set: Doc; at: string; was: string},
 ): Promise<void> {
-  const before = (await client.read(copyId(documentId, releaseId))) ?? {}
+  const id = copyId(documentId, releaseId)
+  const before = (await client.read(id)) ?? {}
   const previous = Object.fromEntries(Object.keys(set).map((field) => [field, before[field]]))
   // Locked, so this is the revision that was checked when it was scheduled.
   const checked = typeof before._rev === 'string' ? before._rev : undefined
   await client.unschedule({releaseId})
+
+  let known = checked
   try {
-    await scheduleAgain(client, {documentId, releaseId, set, at, checked})
+    known = await writeChecked(client, id, set, checked)
+    await lock(client, {id, releaseId, at, expected: known})
   } catch (error) {
-    // Someone edited it while it was off the schedule: those words haven't been checked, so it stays off.
+    if (error instanceof StillScheduled) throw error
     if (error instanceof ChangedSinceChecked) throw new OffTheSchedule(error)
     try {
-      // Take back only what this change wrote. A field someone else has since set is theirs.
-      const now = (await client.read(copyId(documentId, releaseId))) ?? {}
-      const undo: Doc = {}
-      for (const field of Object.keys(set)) {
-        if (isSame(now[field], previous[field])) continue
-        if (!isSame(now[field], set[field])) throw new Error(`${field} was changed by someone else`, {cause: error})
-        undo[field] = previous[field]
-      }
-      if (Object.keys(undo).length > 0) {
-        const ifRevision = typeof now._rev === 'string' ? now._rev : undefined
-        await client.setFields(copyId(documentId, releaseId), undo, {ifRevision})
-      }
-      await client.setReleaseTime({releaseId, at: was})
-      await client.schedule({releaseId, at: was})
-    } catch {
+      // Only this change's own write is taken back, and only from the revision it left.
+      const restored = known === checked ? known : await writeChecked(client, id, previous, known)
+      await lock(client, {id, releaseId, at: was, expected: restored})
+    } catch (failed) {
+      if (failed instanceof StillScheduled) throw failed
       throw new OffTheSchedule(error)
     }
     throw error
