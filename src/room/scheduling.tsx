@@ -5,7 +5,7 @@ import {API_VERSION} from '../lib/api-version'
 import {type Promised} from './post-status'
 import {findPromise, type ReleaseLike} from './promised'
 import {copyId, draftId, foldBack, type ScheduleClient, tidyDraft} from './schedule'
-import {isAhead} from '../lib/promised-time'
+import {isAhead, waitUntil} from '../lib/promised-time'
 
 export function scheduleClient(client: SanityClient): ScheduleClient {
   return {
@@ -49,8 +49,6 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
     },
   }
 }
-
-const MAX_TIMER_MS = 2 ** 31 - 1
 
 /** A patch has to do something to carry a revision condition. */
 const NO_SUCH_FIELD = 'writingRoomNoSuchField'
@@ -117,16 +115,15 @@ export function PostCopyProvider({
   // Never tidy a promise the room is still making.
   const settled = found ? found.release.name : null
   // Nothing else changes when a held promise runs out, so look again then.
-  const [, lookAgain] = useState(0)
+  const [looks, lookAgain] = useState(0)
   const heldUntil = found?.promise.held ? found.promise.at : undefined
   useEffect(() => {
-    if (!heldUntil) return undefined
-    const wait = new Date(heldUntil).getTime() - Date.now()
-    if (!(wait > 0)) return undefined
-    if (wait > MAX_TIMER_MS) return undefined
-    const timer = setTimeout(() => lookAgain((count) => count + 1), wait + 1000)
+    // A time further off than a timer can count is reached in steps: each look sets the next.
+    const wait = heldUntil ? waitUntil(heldUntil) : null
+    if (wait === null) return undefined
+    const timer = setTimeout(() => lookAgain((count) => count + 1), wait)
     return () => clearTimeout(timer)
-  }, [heldUntil])
+  }, [heldUntil, looks])
   const expired = !!found?.promise.held && !isAhead(found.promise.at)
   useEffect(() => {
     if (!settled) {

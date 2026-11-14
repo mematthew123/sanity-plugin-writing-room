@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {clockName, defaultPromisedTime, describePromisedTime, isAhead} from './promised-time'
+import {clockName, defaultPromisedTime, describePromisedTime, isAhead, MAX_TIMER_MS, waitUntil} from './promised-time'
 
 // A Wednesday morning in Lisbon, where winter time is UTC.
 const lisbon = {now: new Date('2026-11-11T10:00:00Z'), timeZone: 'Europe/Lisbon', hour12: false}
@@ -65,6 +65,39 @@ describe('isAhead', () => {
   it('is false for no time, or one that can’t be read', () => {
     expect(isAhead(undefined, now)).toBe(false)
     expect(isAhead('soon', now)).toBe(false)
+  })
+})
+
+describe('waitUntil', () => {
+  const now = new Date('2026-11-11T10:00:00Z')
+  const after = (ms: number) => new Date(now.getTime() + ms).toISOString()
+
+  it('waits until just past the time', () => {
+    expect(waitUntil(after(60_000), now)).toBe(61_000)
+  })
+
+  it('never waits longer than a timer can count', () => {
+    expect(waitUntil(after(MAX_TIMER_MS - 1000), now)).toBe(MAX_TIMER_MS)
+    expect(waitUntil(after(MAX_TIMER_MS - 999), now)).toBe(MAX_TIMER_MS)
+    expect(waitUntil(after(MAX_TIMER_MS * 3), now)).toBe(MAX_TIMER_MS)
+  })
+
+  it('gets there in capped steps, however far off the time is', () => {
+    const at = after(MAX_TIMER_MS * 2.5)
+    let clock = now
+    const waits: number[] = []
+    for (let wait = waitUntil(at, clock); wait !== null; wait = waitUntil(at, clock)) {
+      waits.push(wait)
+      clock = new Date(clock.getTime() + wait)
+    }
+    expect(waits).toHaveLength(3)
+    expect(clock.getTime()).toBeGreaterThan(new Date(at).getTime())
+  })
+
+  it('has nothing to wait for once the time has come', () => {
+    expect(waitUntil(after(0), now)).toBeNull()
+    expect(waitUntil(after(-1), now)).toBeNull()
+    expect(waitUntil('soon', now)).toBeNull()
   })
 })
 

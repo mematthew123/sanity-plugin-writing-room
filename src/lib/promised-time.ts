@@ -68,3 +68,16 @@ export function clockName(timeZone: string = Intl.DateTimeFormat().resolvedOptio
   const place = timeZone.includes('/') ? timeZone.slice(timeZone.lastIndexOf('/') + 1).replace(/_/g, ' ') : ''
   return place && place !== 'UTC' ? `${place} time` : 'UTC'
 }
+
+/** The longest a browser timer can count: about 24.8 days. */
+export const MAX_TIMER_MS = 2 ** 31 - 1
+
+/**
+ * How long to wait before looking again at a time that is still ahead: just past it, or as long as
+ * a timer can count when it is further off than that. Null once the time has come.
+ */
+export function waitUntil(at: string, now: Date = new Date()): number | null {
+  const remaining = new Date(at).getTime() - now.getTime()
+  if (!(remaining > 0)) return null
+  return Math.min(remaining + 1000, MAX_TIMER_MS)
+}

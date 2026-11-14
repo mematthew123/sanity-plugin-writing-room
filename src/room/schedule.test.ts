@@ -402,6 +402,22 @@ describe('changeTime', () => {
     expect(documents.get(copyId(ID, R))).toMatchObject({title: 'Unchecked words'})
   })
 
+  it('never writes its date over one set in the moment after the Post came off the schedule', async () => {
+    const {client, documents, releases} = await scheduled()
+    const unschedule = client.unschedule
+    client.unschedule = async (args) => {
+      await unschedule(args)
+      client.unschedule = unschedule
+      await client.setFields(copyId(ID, R), {publishedAt: '2026-12-01T00:00:00.000Z'})
+    }
+
+    const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {publishedAt: MONDAY}, at: MONDAY, was: FRIDAY})
+
+    await expect(attempt).rejects.toBeInstanceOf(OffTheSchedule)
+    expect(documents.get(copyId(ID, R))).toMatchObject({publishedAt: '2026-12-01T00:00:00.000Z'})
+    expect(releases.get(R)?.state).toBe('active')
+  })
+
   it('says so when the Post has ended up off the schedule', async () => {
     const {client, releases} = await scheduled({failOn: ['schedule', 'schedule']})
     const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {}, at: MONDAY, was: FRIDAY})
