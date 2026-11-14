@@ -9,6 +9,5 @@ export default defineCliConfig({
   },
   // Required by the plugin (see the README's Install section).
   deployment: {autoUpdates: false},
-  // The room's CSS Modules, compiled as the built package compiles them (see tsdown.config.ts).
   vite: {css: {transformer: 'lightningcss', lightningcss: {cssModules, include}}},
 })

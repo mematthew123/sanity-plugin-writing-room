@@ -247,10 +247,7 @@ function expectOneSdk(dir, label) {
   }
 }
 
-/**
- * The room's CSS travels inside its JavaScript, with the call that puts it on the page. A bundler
- * that dropped either as unused would leave the room unstyled, and the build would still pass.
- */
+/** A bundler that dropped the room's CSS as unused would still build. */
 function expectRoomStyles(dir, label) {
   const all = scripts(dir)
   const rules = all.some((script) => /\.calm-[\w-]+\{/.test(script))
@@ -260,7 +257,7 @@ function expectRoomStyles(dir, label) {
     console.error(`\n✗ ${label} lost the room's CSS${rules ? "'s way onto the page" : ''}.`)
     process.exit(1)
   }
-  // The build renames each `@keyframes`; an animation it left under its old name would never run.
+  // Each animation must name a `@keyframes` the build renamed.
   const css = all.join('\n')
   const keyframes = new Set(Array.from(css.matchAll(/@keyframes (calm-[\w-]+)/g), (match) => match[1]))
   const stray = new Set()

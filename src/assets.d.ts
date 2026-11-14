@@ -4,7 +4,7 @@ declare module '*.woff2' {
   export default url
 }
 
-/** Its class names. The build puts its rules on the page (see tsdown.config.ts). */
+/** Class names; the build injects the rules (see tsdown.config.ts). */
 declare module '*.module.css' {
   const classes: Readonly<Record<string, string>>
   export default classes

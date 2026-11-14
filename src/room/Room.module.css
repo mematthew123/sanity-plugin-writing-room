@@ -11,7 +11,6 @@
   }
 }
 
-/* Out over `press`, then in over `gentle`; Details rises 4px as it arrives. Instant under reduced motion. */
 .swap {
   &[hidden] {
     display: none;
@@ -49,7 +48,6 @@
   }
 }
 
-/* The room from top to bottom: Room Controls, the page, and a foot that stays in view. */
 .layout {
   display: flex;
   flex-direction: column;
@@ -60,10 +58,7 @@
   flex: 1;
 }
 
-/*
- * The foot of the room: the word count in the margin, and the room's one message slot in the
- * middle. Clicks pass through everywhere but the message.
- */
+/* Clicks pass through everywhere but the message. */
 .foot {
   position: sticky;
   bottom: 0;
@@ -83,7 +78,7 @@
   }
 }
 
-/* Recedes with the Room Controls. Without a margin to sit in, it's in the `Aa` menu instead. */
+/* Without a margin to sit in, it's in the `Aa` menu instead. */
 .count {
   transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
 

@@ -1,4 +1,4 @@
-/* The room's one scroller. Its scrollbar's space is always kept, so nothing moves sideways when a short page follows a long one. */
+/* The scrollbar's space is always kept, so nothing moves sideways between pages. */
 .surface {
   position: relative;
   height: 100%;
@@ -28,7 +28,6 @@
   }
 }
 
-/* Shown only where there's room for it; elsewhere it isn't there at all. */
 .wideOnly {
   display: contents;
 
@@ -46,7 +45,7 @@
   justify-content: space-between;
   gap: var(--calm-space-md);
   padding: var(--calm-space-md) var(--calm-space-lg) var(--calm-space-lg);
-  /* Paper behind the controls, fading out below them, so Prose never scrolls through them. */
+  /* Paper behind the controls, so Prose never shows through. */
   background: linear-gradient(to bottom, var(--calm-color-paper) 60%, transparent);
   pointer-events: none;
 
@@ -84,7 +83,7 @@
   align-items: center;
   gap: var(--calm-space-xs);
 
-  /* The end group gives way first: its status text shortens before anything wraps. */
+  /* The end group gives way first. */
   &:last-child {
     flex-shrink: 1;
     min-width: 0;
@@ -156,7 +155,6 @@
   opacity: 0.6;
 }
 
-/* A checkbox drawn as a switch. */
 .switch {
   position: relative;
   flex-shrink: 0;

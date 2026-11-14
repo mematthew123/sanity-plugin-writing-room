@@ -82,7 +82,7 @@
     content: '◦';
   }
 
-  /* Set, not reset: a reset here starts a counter the items after this one don't count on ("1, 1, 2"). */
+  /* Set, not reset: a reset would restart the numbering ("1, 1, 2"). */
   :not([data-list-item='number']) + [data-list-item='number'][data-level='1'] {
     counter-set: calm-l1 1;
   }

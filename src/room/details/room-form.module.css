@@ -35,7 +35,6 @@
   }
 }
 
-/* How anything typed in Details looks: the prose face, on the paper, with the room's caret. */
 .textInput,
 .tagInput {
   border: 0;

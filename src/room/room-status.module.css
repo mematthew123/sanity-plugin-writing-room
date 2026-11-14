@@ -100,7 +100,7 @@
     opacity: 0.7;
   }
 
-  /* While the room asks "Publish this?", the answer is the one clay thing; the question steps back. */
+  /* The answer is the one clay thing; the question steps back. */
   &[aria-expanded='true'] {
     background: var(--calm-color-surface);
     color: var(--calm-color-ink);
@@ -151,7 +151,6 @@
   color: var(--calm-color-ink-muted);
 }
 
-/* The address, or the slug: the one fact worth a second look before saying yes. */
 .where {
   margin: var(--calm-space-xs) 0 0;
   color: var(--calm-color-ink);
