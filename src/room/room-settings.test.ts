@@ -8,10 +8,10 @@ describe('parseRoomSettings', () => {
   })
 
   it('keeps valid stored choices and ignores anything unexpected', () => {
-    expect(parseRoomSettings(JSON.stringify({textSize: 'large', typewriter: true, focusDimming: 'yes', extra: 1}))).toEqual({
+    expect(parseRoomSettings(JSON.stringify({textSize: 'large', typewriter: false, focusDimming: 'yes', extra: 1}))).toEqual({
       ...DEFAULT_ROOM_SETTINGS,
       textSize: 'large',
-      typewriter: true,
+      typewriter: false,
     })
   })
 })
