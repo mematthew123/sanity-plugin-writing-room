@@ -4,13 +4,23 @@ import {Room} from './room'
 
 const TITLE = 'E2E summer drop'
 
-/** A Release of many with the Post's copy in it, as Structure leaves one. Null where the plan has no Releases. */
+/** The platform refusing a feature the project's plan doesn't have, as far as an error can say so. */
+function isPlanRefusal(error: unknown): boolean {
+  const {statusCode, message} = error as {statusCode?: number; message?: string}
+  return statusCode === 402 || (statusCode === 403 && /plan|feature|not (available|enabled)|upgrade|quota|limit/i.test(message ?? ''))
+}
+
+/**
+ * A Release of many with the Post's copy in it, as Structure leaves one. Null only where the plan
+ * has no Releases; anything else that goes wrong is a failure, not a reason to skip.
+ */
 async function releaseWith(content: SanityClient, post: TestPost): Promise<string | null> {
   const releaseId = `rE2E${post.id.slice(-8).replace(/[^a-zA-Z0-9]/g, 'x')}`
   try {
     await content.releases.create({releaseId, metadata: {title: TITLE, releaseType: 'undecided'}})
-  } catch {
-    return null
+  } catch (error) {
+    if (isPlanRefusal(error)) return null
+    throw error
   }
   await content.createVersion({baseId: `drafts.${post.id}`, publishedId: post.id, releaseId})
   return releaseId
