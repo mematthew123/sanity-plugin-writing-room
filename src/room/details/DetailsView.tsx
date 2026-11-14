@@ -23,15 +23,26 @@ export function DetailsView({
   handle,
   fields,
   focusField,
+  releaseId,
+  readOnly = false,
 }: {
   handle: DocumentHandle
   fields: WritingFields
+  /** The release whose copy is open, when it isn't the draft: the form reads and writes that copy. */
+  releaseId?: string
+  /** A Scheduled Post's Details are locked with its Prose. */
+  readOnly?: boolean
   /** A publish problem or a nudge can send the Writer to one field, named by its path. */
   focusField?: string
 }) {
   const root = useRef<HTMLDivElement>(null)
   const [patchChannel] = useState(() => createPatchChannel())
-  const form = useDocumentForm({documentId: handle.documentId, documentType: handle.documentType})
+  const form = useDocumentForm({
+    documentId: handle.documentId,
+    documentType: handle.documentType,
+    ...(releaseId && {releaseId, selectedPerspectiveName: releaseId}),
+    readOnly,
+  })
   const {formState, onSetActiveFieldGroup, onProgrammaticFocus, ready} = form
 
   useEffect(() => {

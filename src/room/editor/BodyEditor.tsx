@@ -51,11 +51,14 @@ export function BodyEditor({
   handle,
   path,
   scheme,
+  readOnly = false,
   onProblem,
 }: {
   handle: DocumentHandle
   path: string
   scheme: string
+  /** A Scheduled Post's words are locked: they can be read, selected and copied, not changed. */
+  readOnly?: boolean
   onProblem: (message: string) => void
 }) {
   const editor = useEditor()
@@ -148,6 +151,7 @@ export function BodyEditor({
       <Prose
         {...handle}
         path={path}
+        readOnly={readOnly}
         renderCursor={null}
         spellCheck
         aria-label="Body"

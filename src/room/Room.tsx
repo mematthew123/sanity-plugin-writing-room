@@ -7,10 +7,12 @@ import {
   useDocument,
   useDocumentProjection,
 } from '@sanity/sdk-react'
-import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
+import {type RefObject, Suspense, useCallback, useEffect, useRef, useState} from 'react'
+import {useClient, useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import styled, {keyframes} from 'styled-components'
+import {API_VERSION} from '../lib/api-version'
+import {describePromisedTime} from '../lib/promised-time'
 import {DetailsBoundary} from './details/DetailsBoundary'
 import {DetailsView} from './details/DetailsView'
 import {useSwap} from './details/use-swap'
@@ -45,17 +47,50 @@ import {
   StatusLabel,
 } from './room-status'
 import {useRoomSettings} from './room-settings'
+import {takeOffSchedule} from './schedule'
+import {type JustPromised, type PostCopy, PostCopyProvider, scheduleClient, useCanSchedule} from './scheduling'
 import {TitleField} from './TitleField'
 import {useEscape} from './use-escape'
 import {useRecede} from './use-recede'
 
 export function Room({documentId, documentType}: {documentId: string; documentType: string}) {
-  const handle = useMemo<DocumentHandle>(() => ({documentId, documentType}), [documentId, documentType])
   const [problem, setProblem] = useState<string | null>(null)
+  // Kept out here: when a Post is scheduled the room opens its Scheduled copy, and "Scheduled for…"
+  // has to outlast the change.
+  const [notice, setNotice] = useState<RoomNotice | null>(null)
+  const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
+  const caughtUp = useCallback(() => setJustPromised(null), [])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
+    const timer = setTimeout(() => setNotice(null), visibleFor)
+    return () => clearTimeout(timer)
+  }, [notice])
 
   return (
     <Suspense fallback={<LoadingRoom />}>
-      <LoadedRoom handle={handle} problem={problem} onProblem={setProblem} />
+      <PostCopyProvider
+        documentId={documentId}
+        documentType={documentType}
+        justPromised={justPromised}
+        onCaughtUp={caughtUp}
+      >
+        {(copy) => (
+          <Suspense fallback={<LoadingRoom />}>
+            {/* Another copy is another document to the editor, so the room starts over on it. */}
+            <LoadedRoom
+              key={copy.openId}
+              copy={copy}
+              problem={problem}
+              onProblem={setProblem}
+              notice={notice}
+              onNotice={setNotice}
+              onPromised={setJustPromised}
+            />
+          </Suspense>
+        )}
+      </PostCopyProvider>
     </Suspense>
   )
 }
@@ -84,28 +119,86 @@ const NOTICE_VISIBLE_MS = 8000
 /** Long enough to reach for a notice that offers somewhere to go. */
 const NOTICE_WITH_NEXT_STEP_MS = 16000
 
+/** Typing that could never land: a letter, or a key that edits, pressed where the Prose is. */
+function isTypingAtProse(event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false
+  if (event.key.length !== 1 && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter') return false
+  const target = event.target as HTMLElement | null
+  if (!target || target.closest('[data-calm-floating], [data-calm-details], button, a, select')) return false
+  if (target instanceof HTMLInputElement) return false
+  return !(target instanceof HTMLTextAreaElement) || target.readOnly
+}
+
 function LoadedRoom({
-  handle,
+  copy,
   problem,
   onProblem,
+  notice,
+  onNotice: setNotice,
+  onPromised,
 }: {
-  handle: DocumentHandle
+  copy: PostCopy
   problem: string | null
   onProblem: (problem: string | null) => void
+  notice: RoomNotice | null
+  onNotice: (notice: RoomNotice | null) => void
+  onPromised: (promised: JustPromised) => void
 }) {
+  const {handle} = copy
   const scheme = useColorSchemeValue()
-  const {fields} = useWritingKind(handle.documentType)
+  const {fields, singular} = useWritingKind(handle.documentType)
   const schemaDefinition = useBodySchema(handle.documentType, fields.body)
   const {data} = useDocumentProjection<{_id: string; slug?: string}>({
     ...handle,
     projection: fields.slug ? `{_id, "slug": ${fields.slug}.current}` : '{_id}',
   })
-  const status = describePostStatus(data?._status)
-  const isPublished = status.label !== 'Draft'
+  const status = describePostStatus(data?._status, {promise: copy.promise})
+  const {isPublished, locked} = status
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
-  const [notice, setNotice] = useState<RoomNotice | null>(null)
   const [settings] = useRoomSettings()
+  const client = useClient({apiVersion: API_VERSION})
+  const canSchedule = useCanSchedule(handle.documentId, handle.documentType)
+  const openInStructure = useOpenInStructure(handle)
+
+  // "Edit it": off the schedule, which makes it a Draft that remembers its time.
+  const {releaseId} = copy
+  const takeOff = useCallback(async () => {
+    if (!releaseId) return
+    try {
+      await takeOffSchedule(scheduleClient(client), {releaseId})
+      setNotice(null)
+      onProblem(null)
+    } catch {
+      onProblem(`This ${singular} couldn’t be taken off the schedule just now. Try again in a moment.`)
+    }
+  }, [client, releaseId, singular, setNotice, onProblem])
+
+  // A page that silently ignores keys reads as broken, so the room says why, where it speaks.
+  const promisedFor = locked ? status.promisedFor : undefined
+  useEffect(() => {
+    if (!promisedFor) return undefined
+    const say = (event: KeyboardEvent) => {
+      if (!isTypingAtProse(event)) return
+      setNotice({
+        text: `This ${singular} is scheduled for ${describePromisedTime(promisedFor)}.`,
+        action: {label: 'Edit it', onClick: () => void takeOff()},
+      })
+    }
+    // Before anything in the room can take the key for itself.
+    window.addEventListener('keydown', say, true)
+    return () => window.removeEventListener('keydown', say, true)
+  }, [promisedFor, singular, setNotice, takeOff])
+
+  // The room never picks between two people's words: it says the others are there, once.
+  const {otherChanges} = copy
+  useEffect(() => {
+    if (!otherChanges) return
+    setNotice({
+      text: `This ${singular} has other changes waiting in Structure.`,
+      action: {label: 'Open in Structure', onClick: openInStructure},
+    })
+  }, [otherChanges, singular, setNotice, openInStructure])
   const projectId = useProjectId()
   const dataset = useDataset()
 
@@ -113,13 +206,6 @@ function LoadedRoom({
   useEffect(() => {
     rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
   }, [projectId, dataset, handle.documentId, handle.documentType])
-
-  useEffect(() => {
-    if (!notice) return undefined
-    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
-    const timer = setTimeout(() => setNotice(null), visibleFor)
-    return () => clearTimeout(timer)
-  }, [notice])
 
   const view = useRoomView(handle)
   const {hasDetails, inDetails} = view
@@ -135,17 +221,18 @@ function LoadedRoom({
 
   return (
     <EditorProvider initialConfig={{schemaDefinition}}>
-      <RoomSyncProvider handle={handle}>
+      <RoomSyncProvider handle={handle} releaseId={copy.releaseId}>
         <Layout>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
-            receded={receded && !inDetails}
+            // Nothing can be typed into a Scheduled Post, so its controls stay where they can be found.
+            receded={receded && !inDetails && !locked}
             start={
               <Recedes>
                 {inDetails ? (
                   <BackToProse onBack={view.toProse} />
                 ) : (
-                  <LeaveButton handle={handle} isPublished={isPublished} />
+                  <LeaveButton handle={handle} releaseId={copy.releaseId} isPublished={isPublished} />
                 )}
               </Recedes>
             }
@@ -171,11 +258,14 @@ function LoadedRoom({
                     {preview}
                   </WideOnly>
                   <PublishButton
-                    handle={handle}
+                    copy={copy}
                     status={status}
                     scheme={scheme}
+                    canSchedule={canSchedule}
                     onProblem={onProblem}
                     onNotice={setNotice}
+                    onPromised={onPromised}
+                    onTakeOff={takeOff}
                   />
                 </Recedes>
               </>
@@ -183,9 +273,11 @@ function LoadedRoom({
           />
           <Main>
             <Page as="article" ref={page} $textSize={settings.textSize}>
-              <Title handle={handle} fields={fields} isPublished={isPublished} inDetails={inDetails} />
+              <Title handle={handle} fields={fields} isPublished={isPublished} locked={locked} inDetails={inDetails} />
               <Pages
                 handle={handle}
+                releaseId={copy.releaseId}
+                locked={locked}
                 fields={fields}
                 scheme={scheme}
                 page={page}
@@ -196,7 +288,7 @@ function LoadedRoom({
             </Page>
           </Main>
           <Foot>
-            <Count data-receded={receded && !inDetails}>
+            <Count data-receded={receded && !inDetails && !locked}>
               <WordCount />
             </Count>
             <Messages>
@@ -217,11 +309,13 @@ function Title({
   handle,
   fields,
   isPublished,
+  locked,
   inDetails,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
+  locked: boolean
   inDetails: boolean
 }) {
   const editor = useEditor()
@@ -230,12 +324,14 @@ function Title({
     if (inDetails) askForFirstDetail()
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
-  return <TitleField handle={handle} fields={fields} isPublished={isPublished} onEnter={onEnter} />
+  return <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={locked} onEnter={onEnter} />
 }
 
 /** The body and Details take turns under the title. The editor stays mounted, so the caret keeps its place. */
 function Pages({
   handle,
+  releaseId,
+  locked,
   fields,
   scheme,
   page,
@@ -244,6 +340,8 @@ function Pages({
   onProblem,
 }: {
   handle: DocumentHandle
+  releaseId: string | null
+  locked: boolean
   fields: WritingFields
   scheme: string
   page: RefObject<HTMLElement | null>
@@ -262,13 +360,19 @@ function Pages({
     <>
       {/* Inert as soon as it starts to go, so nothing typed lands in an editor that can't be seen. */}
       <Swap hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
-        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onProblem={onProblem} />
+        <BodyEditor handle={handle} path={fields.body} scheme={scheme} readOnly={locked} onProblem={onProblem} />
       </Swap>
       {shown === 'details' && (
         <Swap inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
           <DetailsBoundary onOpenInStructure={openInStructure}>
             <Suspense fallback={<Placeholder $height="12rem" />}>
-              <DetailsView handle={handle} fields={fields} focusField={focusField} />
+              <DetailsView
+                handle={handle}
+                fields={fields}
+                focusField={focusField}
+                releaseId={releaseId ?? undefined}
+                readOnly={locked}
+              />
             </Suspense>
           </DetailsBoundary>
         </Swap>
@@ -278,18 +382,27 @@ function Pages({
 }
 
 /** Returns to wherever the Writer came from; a never-published, empty document is discarded on the way out. */
-function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
+function LeaveButton({
+  handle,
+  releaseId,
+  isPublished,
+}: {
+  handle: DocumentHandle
+  releaseId: string | null
+  isPublished: boolean
+}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   // Details saves through the Studio's store, so what was just typed there is in its draft first.
-  const {draft: detailsDraft} = useEditState(handle.documentId, handle.documentType)
+  const {draft: detailsDraft} = useEditState(handle.documentId, handle.documentType, 'default', releaseId ?? undefined)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
   const openInStructure = useOpenInStructure(handle)
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
+    // Only ever a draft: a Post with a promised time is not an abandoned start.
+    if (!releaseId && !isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
       void apply(discardDocument(handle))
       router.navigate({})
     } else if (toForm) {
@@ -297,7 +410,7 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
     } else {
       router.navigate({})
     }
-  }, [apply, handle, isPublished, post, detailsDraft, fields, router, toForm, openInStructure])
+  }, [apply, handle, releaseId, isPublished, post, detailsDraft, fields, router, toForm, openInStructure])
   useEscape(leave)
 
   const label = toForm ? 'Back to the form' : 'Back to the Lobby'

@@ -14,17 +14,27 @@ export interface PublishDetails {
   publishedAt?: string
 }
 
-/** Settles a unique slug on the first publish and stamps a missing published date. */
+const sameMoment = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime()
+
+/**
+ * Settles a unique slug on the first publish and stamps a missing published date.
+ *
+ * `now` is when readers first see the Post: this moment for a publish, the promised time for a
+ * schedule. `promisedBefore` is the time it was last scheduled for, if it was: a date that still
+ * equals it is one the room wrote, so it moves to `now`. Any other date is the Writer's, and stays.
+ */
 export async function detailsForPublish({
   post,
   isFirstPublish,
   isTaken,
   now = new Date().toISOString(),
+  promisedBefore,
 }: {
   post: PublishablePost
   isFirstPublish: boolean
   isTaken: (slug: string) => Promise<boolean>
   now?: string
+  promisedBefore?: string
 }): Promise<PublishDetails> {
   const details: PublishDetails = {}
   const current = post.slug?.current
@@ -35,5 +45,8 @@ export async function detailsForPublish({
     if (settled !== current) details.slug = {_type: 'slug', current: settled}
   }
   if (!post.publishedAt) details.publishedAt = now
+  else if (promisedBefore && sameMoment(post.publishedAt, promisedBefore) && !sameMoment(post.publishedAt, now)) {
+    details.publishedAt = now
+  }
   return details
 }

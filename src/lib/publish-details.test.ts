@@ -52,4 +52,53 @@ describe('detailsForPublish', () => {
       }),
     ).toEqual({slug: {_type: 'slug', current: 'post-2'}, publishedAt: NOW})
   })
+
+  describe('for a time promised ahead', () => {
+    const FRIDAY = '2026-11-13T09:00:00.000Z'
+    const MONDAY = '2026-11-16T09:00:00.000Z'
+    const scheduled = {title: 'Hello', slug: {current: 'hello'}}
+
+    it('stamps the promised time, when readers first see it, not the moment of scheduling', async () => {
+      expect(await detailsForPublish({post: {title: 'Hello'}, isFirstPublish: true, isTaken: free, now: FRIDAY})).toEqual({
+        slug: {_type: 'slug', current: 'hello'},
+        publishedAt: FRIDAY,
+      })
+    })
+
+    it('moves the date with the promise, while it is still the one the room wrote', async () => {
+      expect(
+        await detailsForPublish({
+          post: {...scheduled, publishedAt: '2026-11-13T09:00:00Z'},
+          isFirstPublish: false,
+          isTaken: free,
+          now: MONDAY,
+          promisedBefore: FRIDAY,
+        }),
+      ).toEqual({publishedAt: MONDAY})
+    })
+
+    it('leaves a date the Writer set by hand where it is', async () => {
+      expect(
+        await detailsForPublish({
+          post: {...scheduled, publishedAt: '2026-11-01T00:00:00.000Z'},
+          isFirstPublish: false,
+          isTaken: free,
+          now: MONDAY,
+          promisedBefore: FRIDAY,
+        }),
+      ).toEqual({})
+    })
+
+    it('writes nothing when the promise is made again for the same time', async () => {
+      expect(
+        await detailsForPublish({
+          post: {...scheduled, publishedAt: FRIDAY},
+          isFirstPublish: false,
+          isTaken: free,
+          now: FRIDAY,
+          promisedBefore: FRIDAY,
+        }),
+      ).toEqual({})
+    })
+  })
 })

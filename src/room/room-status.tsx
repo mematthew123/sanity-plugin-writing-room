@@ -19,6 +19,7 @@ import {
 import styled, {keyframes} from 'styled-components'
 import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
+import {clockName, defaultPromisedTime, describePromisedTime, isAhead} from '../lib/promised-time'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {addImageLabel, detailsPatch, readPublishable} from './fields'
@@ -31,6 +32,9 @@ import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
+import {changeTime, OffTheSchedule, publishHeld, scheduleAgain, schedulePost} from './schedule'
+import {type JustPromised, type PostCopy, scheduleClient} from './scheduling'
+import {fromLocalDateTime, toLocalDateTime} from './details/values'
 
 export interface RoomNotice {
   text: string
@@ -61,9 +65,18 @@ const RoomSynced = createContext(true)
  * The Prose saves through the App SDK and Details through the Studio's own store, so the room is
  * only saved once both have caught up. Watched once here, for everything in the room that asks.
  */
-export function RoomSyncProvider({handle, children}: {handle: DocumentHandle; children: ReactNode}) {
+export function RoomSyncProvider({
+  handle,
+  releaseId,
+  children,
+}: {
+  handle: DocumentHandle
+  /** The release whose copy is open, when it isn't the draft. */
+  releaseId: string | null
+  children: ReactNode
+}) {
   const proseSynced = useDocumentSyncStatus(handle) ?? true
-  const details = useSyncState(handle.documentId, handle.documentType)
+  const details = useSyncState(handle.documentId, handle.documentType, releaseId ?? undefined)
   return <RoomSynced.Provider value={proseSynced && !details.isSyncing}>{children}</RoomSynced.Provider>
 }
 
@@ -170,7 +183,7 @@ export function Presence({handle}: {handle: DocumentHandle}) {
   return sentence ? <Quiet role="status">{sentence}</Quiet> : null
 }
 
-/** Long enough for a save, a read of the saved draft, and a validation of it. */
+/** Long enough for a save, a read of the saved copy, and a validation of it. */
 const SETTLE_TIMEOUT_MS = 6000
 
 interface PublishPlan {
@@ -181,9 +194,11 @@ interface PublishPlan {
   slug: string | undefined
   /** The slug and date the plan was made from. If they've moved by the time the Writer says yes, the plan is off. */
   basis: PublishablePost
+  /** The revision that was checked. Scheduling copies the Post, so it copies exactly this. */
+  revision: string | undefined
 }
 
-type SavedDraft = Record<string, unknown> & {_rev?: string}
+type SavedCopy = Record<string, unknown> & {_rev?: string}
 
 const VALIDATION_QUIET_MS = 1500
 
@@ -215,38 +230,65 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
-/** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
+/**
+ * What the one panel under the button is showing. It asks once whether to publish; "Choose a time"
+ * gives way, in place, to a date and time; and on a Scheduled Post it says when, and what can be done.
+ */
+type PanelView = 'ask' | 'time' | 'promised'
+
+/**
+ * The one thing to do next. For a Draft: waits for the latest words to sync and validate, goes to
+ * any problem, then asks once before publishing, now or at a time. For a Scheduled Post there is
+ * nothing to do, so the button is quiet and says so; its panel is where the promise can be changed.
+ */
 export function PublishButton({
-  handle,
+  copy,
   status,
   scheme,
+  canSchedule,
   onProblem,
   onNotice,
+  onPromised,
+  onTakeOff,
 }: {
-  handle: DocumentHandle
+  copy: PostCopy
   status: PostStatus
   scheme: string
+  /** Whether the Studio offers scheduling here. Without it there is no "Choose a time". */
+  canSchedule: boolean
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
+  /** The Post has just been scheduled into a release of its own. */
+  onPromised: (promised: JustPromised) => void
+  /** "Edit it": takes a Scheduled Post off the schedule. */
+  onTakeOff: () => Promise<void>
 }) {
+  const {handle, openId, releaseId} = copy
   const editor = useEditor()
   const client = useClient({apiVersion: API_VERSION})
   const apply = useApplyDocumentActions()
   const isSynced = useRoomSynced()
-  const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
+  const validation = useValidationStatus(openId, handle.documentType)
   const settled = useValidated(validation)
-  const [draft, setDraft] = useState<SavedDraft | null>(null)
+  const [saved, setSaved] = useState<SavedCopy | null>(null)
   const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
-  const [phase, setPhase] = useState<'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing' | 'scheduling'>('idle')
+  const [view, setView] = useState<PanelView>('ask')
+  const [time, setTime] = useState('')
   const [timedOut, setTimedOut] = useState(false)
   const [plan, setPlan] = useState<PublishPlan | null>(null)
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
-  const confirmButton = useRef<HTMLButtonElement>(null)
-  const isFirstPublish = status.label === 'Draft'
+  const firstAnswer = useRef<HTMLButtonElement>(null)
+  const timeInput = useRef<HTMLInputElement>(null)
+  const isFirstPublish = !status.isPublished
+  const promisedFor = status.promisedFor
+  // A Post that was taken off the schedule goes back on it, unless the Studio has since turned scheduling off.
+  const next = status.next === 'schedule-again' && !canSchedule ? (isFirstPublish ? 'publish' : 'publish-changes') : status.next
+  const couldnt = (what: string) => `This ${kind.singular} couldn’t be ${what} just now. Try again in a moment.`
 
   useEffect(() => {
     if (phase !== 'checking') return undefined
@@ -254,14 +296,14 @@ export function PublishButton({
     return () => clearTimeout(timer)
   }, [phase])
 
-  // The draft as it is saved, read again whenever validation moves on to another revision. Both
+  // The copy as it is saved, read again whenever validation moves on to another revision. Both
   // stores write to it, so only the server knows which revision is the latest.
   useEffect(() => {
     if (phase !== 'checking' || !isSynced) return undefined
     let superseded = false
-    client.getDocument<SavedDraft>(`drafts.${handle.documentId}`).then(
-      (saved) => {
-        if (!superseded) setDraft(saved ?? null)
+    client.getDocument<SavedCopy>(openId).then(
+      (document) => {
+        if (!superseded) setSaved(document ?? null)
       },
       () => {
         if (superseded) return
@@ -272,22 +314,22 @@ export function PublishButton({
     return () => {
       superseded = true
     }
-  }, [phase, isSynced, validation.revision, client, handle.documentId, kind.singular, onProblem])
+  }, [phase, isSynced, validation.revision, client, openId, kind.singular, onProblem])
 
   useEffect(() => {
     if (phase !== 'checking') return
     // Two things make validation a verdict on what would be published. It has settled: `revision`
-    // moves on the moment the draft does, before the markers do. And its revision is the saved
-    // draft's: the Prose saves through another store, which the Studio's hears of a moment later.
-    const validated = settled && !!draft?._rev && validation.revision === draft._rev
-    if (!isSynced || !draft || !validated) {
+    // moves on the moment the copy does, before the markers do. And its revision is the saved
+    // copy's: the Prose saves through another store, which the Studio's hears of a moment later.
+    const validated = settled && !!saved?._rev && validation.revision === saved._rev
+    if (!isSynced || !saved || !validated) {
       // Never publish on stale sync or validation: the SDK's publish doesn't enforce the schema.
       if (timedOut) {
         setPhase('idle')
         onProblem(
           isSynced
-            ? `Still checking this ${kind.singular}. Try publishing again in a moment.`
-            : 'Still saving your latest changes. Try publishing again in a moment.',
+            ? `Still checking this ${kind.singular}. Try again in a moment.`
+            : 'Still saving your latest changes. Try again in a moment.',
         )
       }
       return
@@ -306,43 +348,55 @@ export function PublishButton({
     void (async () => {
       try {
         const {fields} = kind
-        const basis = readPublishable(draft, fields)
+        const basis = readPublishable(saved, fields)
         const details = await detailsForPublish({
           post: basis,
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
+          // A date the room wrote for a promise that is now off is the room's to write again.
+          promisedBefore: promisedFor,
         })
         const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
-        setPlan({details, slug, basis, url: site && slug ? liveUrl(site, slug, handle.documentType) : null})
+        setPlan({
+          details,
+          slug,
+          basis,
+          revision: saved._rev,
+          url: site && slug ? liveUrl(site, slug, handle.documentType) : null,
+        })
         onProblem(null)
+        // Taken off the schedule, the next step is to go back on it: the panel opens on the time.
+        setView(next === 'schedule-again' ? 'time' : 'ask')
+        setTime(toLocalDateTime(next === 'schedule-again' && promisedFor ? promisedFor : defaultPromisedTime()))
         setPhase('confirming')
       } catch {
         onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, saved, isFirstPublish, promisedFor, next, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
     setPlan(null)
   }, [])
 
-  const confirming = phase === 'confirming' && plan
+  const confirming = phase === 'confirming'
   const measure = useCallback(() => {
     setAnchor(confirming ? (button.current?.getBoundingClientRect() ?? null) : null)
   }, [confirming])
   useEffect(measure, [measure])
   useViewportChanges(measure)
 
-  // The Writer asked to publish a moment ago, so Enter should finish the thought. Focus moves once
-  // the popover has been placed: it's hidden, and can't take focus, until then.
-  const open = !!confirming && !!anchor
+  // The Writer asked a moment ago, so Enter should finish the thought. Focus moves once the
+  // popover has been placed (it's hidden, and can't take focus, until then), and again when the
+  // panel gives way to the time.
+  const open = confirming && !!anchor
   useEffect(() => {
     if (!open) return undefined
-    const frame = requestAnimationFrame(() => confirmButton.current?.focus())
+    const frame = requestAnimationFrame(() => (view === 'time' ? timeInput : firstAnswer).current?.focus())
     return () => cancelAnimationFrame(frame)
-  }, [open])
+  }, [open, view])
 
   useEffect(() => {
     if (!confirming) return undefined
@@ -354,27 +408,40 @@ export function PublishButton({
     return () => window.removeEventListener('pointerdown', close)
   }, [confirming, cancel])
 
-  async function publish({details, url, basis}: PublishPlan) {
+  /** The open copy as it is saved now, or null (with the reason said) if the plan no longer fits it. */
+  async function stillAsPlanned({basis}: PublishPlan): Promise<SavedCopy | null | undefined> {
+    // The plan's slug and date were settled when the room asked. If someone has changed either
+    // since, in Details or from elsewhere, writing the plan now would undo their change.
+    const document = await client.getDocument<SavedCopy>(openId)
+    const now = readPublishable(document, kind.fields)
+    if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
+      onProblem(`This ${kind.singular}’s details changed while you were deciding. Try again to use them.`)
+      return null
+    }
+    return document
+  }
+
+  async function publish(planned: PublishPlan) {
     setPhase('publishing')
     try {
       const {fields} = kind
-      // The plan's slug and date were settled when the room asked. If someone has changed either
-      // since, in Details or from elsewhere, writing the plan now would undo their change.
-      const saved = await client.getDocument<SavedDraft>(`drafts.${handle.documentId}`)
-      const now = readPublishable(saved, fields)
-      if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
-        onProblem(`This ${kind.singular}’s details changed while you were deciding. Publish again to use them.`)
-        return
-      }
+      const document = await stillAsPlanned(planned)
+      if (document === null) return
       // The date is when the Writer said yes, not when the room asked.
+      const {details, url} = planned
       const patch = detailsPatch(
         details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details,
         fields,
       )
-      const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
-      await apply([...edit, publishDocument(handle)])
+      if (releaseId) {
+        // Taken off the schedule and published after all: its copy is what goes live.
+        await publishHeld(scheduleClient(client), {documentId: handle.documentId, releaseId, set: patch})
+      } else {
+        const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
+        await apply([...edit, publishDocument(handle)])
+      }
       onProblem(null)
-      const image = fields.image ? (saved?.[fields.image] as {asset?: unknown} | undefined) : undefined
+      const image = fields.image ? (document?.[fields.image] as {asset?: unknown} | undefined) : undefined
       onNotice({
         text: isFirstPublish ? 'Published' : 'Changes published',
         done: true,
@@ -385,35 +452,136 @@ export function PublishButton({
             : {label: addImageLabel(kind.imageTitle), onClick: () => openDetails(fields.image)},
       })
     } catch {
-      onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)
+      onProblem(couldnt('published'))
     } finally {
       setPhase('idle')
       setPlan(null)
     }
   }
 
-  if (status.label === 'Published' && phase === 'idle') return null
+  /** Promises the Post for `at`: a Draft for the first time, or one that was taken off the schedule, again. */
+  async function schedule(planned: PublishPlan, at: string) {
+    setPhase('scheduling')
+    try {
+      const {fields} = kind
+      const document = await stillAsPlanned(planned)
+      if (document === null) return
+      if (!document || document._rev !== planned.revision) {
+        // What was checked is what gets promised. Anything newer is checked first.
+        onProblem(`This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`)
+        return
+      }
+      // Nothing of the room's runs when the time comes, so the date is written now: the promised
+      // time, when readers first see it.
+      const details = await detailsForPublish({
+        post: planned.basis,
+        isFirstPublish,
+        isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
+        now: at,
+        promisedBefore: promisedFor,
+      })
+      const set = detailsPatch(details, fields)
+      const tidy = scheduleClient(client)
+      if (releaseId) {
+        await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at})
+      } else {
+        const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at})
+        onPromised({releaseId: made.releaseId, promise: {at, held: false}})
+      }
+      onProblem(null)
+      onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
+    } catch {
+      onProblem(couldnt('scheduled'))
+    } finally {
+      setPhase('idle')
+      setPlan(null)
+    }
+  }
 
-  const working = phase === 'checking' || phase === 'preparing' || phase === 'publishing'
-  const label = isFirstPublish ? 'Publish' : 'Publish changes'
+  /** "Change the time" on a Scheduled Post. Its words are locked and already checked; only the promise moves. */
+  async function reschedule(at: string, was: string) {
+    if (!releaseId) return
+    setPhase('scheduling')
+    try {
+      const {fields} = kind
+      const document = await client.getDocument<SavedCopy>(openId)
+      const details = await detailsForPublish({
+        post: readPublishable(document, fields),
+        isFirstPublish: false,
+        isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
+        now: at,
+        promisedBefore: was,
+      })
+      const set = detailsPatch(details, fields)
+      await changeTime(scheduleClient(client), {documentId: handle.documentId, releaseId, set, at, was})
+      onProblem(null)
+      onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
+    } catch (error) {
+      onProblem(
+        error instanceof OffTheSchedule
+          ? `The time couldn’t be changed, and this ${kind.singular} is off the schedule for now. Schedule it again when you’re ready.`
+          : `The time couldn’t be changed just now. It is still scheduled for ${describePromisedTime(was)}.`,
+      )
+    } finally {
+      setPhase('idle')
+    }
+  }
 
+  async function takeOff() {
+    setPhase('scheduling')
+    try {
+      await onTakeOff()
+    } finally {
+      setPhase('idle')
+    }
+  }
+
+  if (next === null && phase === 'idle') return null
+
+  const working = phase === 'checking' || phase === 'preparing' || phase === 'publishing' || phase === 'scheduling'
+  const scheduled = next === 'scheduled'
+  const label = scheduled
+    ? 'Scheduled'
+    : next === 'schedule-again'
+      ? 'Schedule again'
+      : isFirstPublish
+        ? 'Publish'
+        : 'Publish changes'
+  const busy = phase === 'publishing' ? 'Publishing…' : phase === 'scheduling' ? 'Scheduling…' : 'Checking…'
+
+  const chosen = fromLocalDateTime(time)
+  const ahead = isAhead(chosen)
+  const confirmTime = () => {
+    if (!chosen || !ahead) return
+    if (scheduled && promisedFor) void reschedule(chosen, promisedFor)
+    else if (plan) void schedule(plan, chosen)
+  }
+
+  const Pill = scheduled ? ScheduledPill : PublishPill
   return (
     <>
-      <PublishPill
+      <Pill
         ref={button}
         type="button"
         disabled={working}
         aria-haspopup="dialog"
-        aria-expanded={!!confirming}
+        aria-expanded={confirming}
         onClick={() => {
           if (confirming) return cancel()
+          if (scheduled) {
+            // Nothing to check: a Scheduled Post's words are locked, and were checked to get there.
+            setView('promised')
+            setTime(toLocalDateTime(promisedFor))
+            setPhase('confirming')
+            return
+          }
           setTimedOut(false)
-          setDraft(null)
+          setSaved(null)
           setPhase('checking')
         }}
       >
-        {phase === 'publishing' ? 'Publishing…' : working ? 'Checking…' : label}
-      </PublishPill>
+        {working && !(scheduled && phase !== 'scheduling') ? busy : label}
+      </Pill>
       {confirming && anchor && (
         <Floating
           anchor={anchor}
@@ -429,24 +597,83 @@ export function PublishButton({
           }}
         >
           <Confirm ref={panel} role="dialog" aria-labelledby="calm-publish-title">
-            <ConfirmTitle id="calm-publish-title">
-              {isFirstPublish ? `Publish this ${kind.singular}?` : 'Publish these changes?'}
-            </ConfirmTitle>
-            <ConfirmText>
-              {isFirstPublish
-                ? 'It goes live straight away'
-                : 'They replace what readers see now'}
-              {plan.url ? ', at' : plan.slug ? ', under the slug' : '.'}
-            </ConfirmText>
-            {(plan.url || plan.slug) && (
-              <Where>{plan.url ? `${plan.url.host}${plan.url.pathname}` : plan.slug}</Where>
+            {view === 'ask' && plan && (
+              <>
+                <ConfirmTitle id="calm-publish-title">
+                  {isFirstPublish ? `Publish this ${kind.singular}?` : 'Publish these changes?'}
+                </ConfirmTitle>
+                <ConfirmText>
+                  {isFirstPublish ? 'It goes live straight away' : 'They replace what readers see now'}
+                  {plan.url ? ', at' : plan.slug ? ', under the slug' : '.'}
+                </ConfirmText>
+                {(plan.url || plan.slug) && (
+                  <Where>{plan.url ? `${plan.url.host}${plan.url.pathname}` : plan.slug}</Where>
+                )}
+                <ConfirmActions>
+                  <QuietButton onClick={cancel}>Not yet</QuietButton>
+                  <PublishPill ref={firstAnswer} type="button" onClick={() => void publish(plan)}>
+                    {isFirstPublish ? 'Publish now' : 'Publish changes'}
+                  </PublishPill>
+                </ConfirmActions>
+                {/* Only where it can work: a Studio without scheduling never sees the line. */}
+                {canSchedule && (
+                  <Another>
+                    <QuietButton onClick={() => setView('time')}>Choose a time</QuietButton>
+                  </Another>
+                )}
+              </>
             )}
-            <ConfirmActions>
-              <QuietButton onClick={cancel}>Not yet</QuietButton>
-              <PublishPill ref={confirmButton} type="button" onClick={() => void publish(plan)}>
-                {isFirstPublish ? 'Publish now' : 'Publish changes'}
-              </PublishPill>
-            </ConfirmActions>
+            {view === 'time' && (
+              <>
+                <ConfirmTitle id="calm-publish-title">
+                  {scheduled ? 'Change the time?' : isFirstPublish ? `Schedule this ${kind.singular}?` : 'Schedule these changes?'}
+                </ConfirmTitle>
+                <ConfirmText>{isFirstPublish ? 'It goes live at' : 'They go live at'}</ConfirmText>
+                <TimeInput
+                  ref={timeInput}
+                  type="datetime-local"
+                  aria-label="When it goes live"
+                  aria-describedby="calm-publish-clock"
+                  value={time}
+                  min={toLocalDateTime(new Date().toISOString())}
+                  onChange={(event) => setTime(event.currentTarget.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      confirmTime()
+                    }
+                  }}
+                />
+                {/* Whose clock, said once where the promise is made; or why it can't be made yet. */}
+                <Clock id="calm-publish-clock">{ahead ? clockName() : 'Choose a time that is still ahead.'}</Clock>
+                <ConfirmActions>
+                  <QuietButton onClick={cancel}>Not yet</QuietButton>
+                  <PublishPill type="button" disabled={!ahead} onClick={confirmTime}>
+                    Schedule
+                  </PublishPill>
+                </ConfirmActions>
+                {next === 'schedule-again' && plan && (
+                  <Another>
+                    <QuietButton onClick={() => void publish(plan)}>Publish now</QuietButton>
+                  </Another>
+                )}
+              </>
+            )}
+            {view === 'promised' && promisedFor && (
+              <>
+                <ConfirmTitle id="calm-publish-title">Scheduled</ConfirmTitle>
+                <ConfirmText>
+                  {isFirstPublish ? 'This goes live' : 'These changes go live'} {describePromisedTime(promisedFor)}.
+                </ConfirmText>
+                {/* Neither is the next thing to do, so neither is clay. Esc leaves it as it is. */}
+                <ConfirmActions>
+                  <QuietButton ref={firstAnswer} onClick={() => void takeOff()}>
+                    Edit it
+                  </QuietButton>
+                  {canSchedule && <QuietButton onClick={() => setView('time')}>Change the time</QuietButton>}
+                </ConfirmActions>
+              </>
+            )}
           </Confirm>
         </Floating>
       )}
@@ -581,6 +808,38 @@ const PublishPill = styled.button`
   }
 `
 
+/** A Scheduled Post has nothing waiting to be done, so its button is quiet: it says the state, and opens it. */
+const ScheduledPill = styled.button`
+  min-height: 2.25rem;
+  padding: var(--calm-space-sm) var(--calm-space-md);
+  border: 0;
+  border-radius: var(--calm-radius-pill);
+  background: transparent;
+  color: var(--calm-color-ink-muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &:hover,
+  &[aria-expanded='true'] {
+    background: var(--calm-color-surface);
+    color: var(--calm-color-ink);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`
+
 const NoticeLink = styled.a`
   margin-inline-start: var(--calm-space-sm);
   border-radius: var(--calm-radius);
@@ -630,4 +889,43 @@ const ConfirmActions = styled.div`
   justify-content: flex-end;
   gap: var(--calm-space-xs);
   margin-top: var(--calm-space-lg);
+`
+
+/** A second way to answer, set apart under the first two so the panel still asks one thing. */
+const Another = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--calm-space-xs);
+`
+
+/** As a text field reads in Details: on the surface, with only a line beneath that turns clay. */
+const TimeInput = styled.input`
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: var(--calm-space-xs);
+  padding: var(--calm-space-sm) 0;
+  border: 0;
+  border-bottom: 1px solid var(--calm-color-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--calm-color-ink);
+  color-scheme: inherit;
+  font: inherit;
+  font-weight: var(--calm-weight-ui-strong);
+  transition: border-color var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &:focus {
+    outline: none;
+    border-bottom-color: var(--calm-color-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+`
+
+const Clock = styled.p`
+  margin: var(--calm-space-xs) 0 0;
+  color: var(--calm-color-ink-muted);
+  font-size: var(--calm-type-ui-size-small);
 `

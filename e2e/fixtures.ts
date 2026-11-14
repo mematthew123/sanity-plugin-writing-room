@@ -75,6 +75,7 @@ export const test = base.extend<{
     // The room may still have an edit on its way; closed, it can't save the draft back after it's gone.
     if (made.length > 0) await page.close()
     for (const id of made) {
+      await removeSchedules(content, id)
       await content.transaction().delete(`drafts.${id}`).delete(id).commit()
     }
   },
@@ -87,6 +88,21 @@ export const test = base.extend<{
     await provide(await makePost({type: 'fieldNote', fields: {summary: 'A summary.'}}))
   },
 })
+
+/** The releases a Post has a copy in. A Post the room has scheduled is in one of its own. */
+export async function releasesOf(content: SanityClient, id: string): Promise<string[]> {
+  const copies = await content.fetch<string[]>('*[sanity::versionOf($id)]._id', {id})
+  return copies.flatMap((copy) => /^versions\.([^.]+)\./.exec(copy)?.[1] ?? [])
+}
+
+/** Takes a test's Post off any schedule and removes the release made for it, copy and all. */
+async function removeSchedules(content: SanityClient, id: string) {
+  for (const releaseId of await releasesOf(content, id)) {
+    await content.releases.unschedule({releaseId}).catch(() => undefined)
+    await content.releases.archive({releaseId}).catch(() => undefined)
+    await content.releases.delete({releaseId}).catch(() => undefined)
+  }
+}
 
 /** The draft as the server has it, once it matches. Details and the Prose save through different stores. */
 export async function expectDraft(
