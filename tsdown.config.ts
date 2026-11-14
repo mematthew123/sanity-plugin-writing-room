@@ -1,8 +1,9 @@
 import {createHash} from 'node:crypto'
 import {readFile} from 'node:fs/promises'
 import {relative, resolve} from 'node:path'
-import {Features, transform} from 'lightningcss'
+import {transform} from 'lightningcss'
 import {defineConfig, type UserConfig} from 'tsdown'
+import {cssModules, include} from './css-modules.config.ts'
 
 type Plugin = Extract<NonNullable<UserConfig['plugins']>, {name: string}>
 
@@ -21,13 +22,17 @@ function cssModulesInJs(): Plugin {
       const {code, exports = {}} = transform({
         filename: file,
         code: await readFile(id),
-        // Classes and keyframes are renamed, as in `sanity dev`; grid areas and containers keep their names.
-        // `customIdents` stays on: it is what renames an `animation` to match its `@keyframes`.
-        cssModules: {pattern: 'calm-[hash]-[local]', grid: false, container: false},
-        // Flattened, as styled-components did, so the room asks no more of a browser than before.
-        include: Features.Nesting,
+        // Shared with `sanity dev`, so both compile a module the same way.
+        cssModules,
+        include,
         minify: true,
       })
+      for (const [local, {composes}] of Object.entries(exports)) {
+        // Only this file's rules are put on the page, so another file's would be missing.
+        if (composes.some((composed) => composed.type === 'dependency')) {
+          this.error(`${file}: .${local} composes from another file, which this build doesn't carry.`)
+        }
+      }
       const classes = Object.fromEntries(
         Object.entries(exports).map(([local, {name, composes}]) => [
           local,
