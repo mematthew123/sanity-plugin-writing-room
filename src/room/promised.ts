@@ -39,6 +39,14 @@ export function describeRelease(release: ReleaseLike): InRelease {
   return {title: release.metadata?.title?.trim() || 'an untitled release', ...(scheduledFor && {scheduledFor})}
 }
 
+/**
+ * Which of two promises is a Post's, should the Studio have left it two: the one that is actually
+ * scheduled, then the nearest time. Negative when `a` is.
+ */
+function byStanding(a: Promised, b: Promised): number {
+  return Number(a.held) - Number(b.held) || a.at.localeCompare(b.at)
+}
+
 /** The release a copy belongs to, from its id; null for a draft or a published document. */
 export function releaseOfCopy(copyId: string): string | null {
   return /^versions\.([^.]+)\./.exec(copyId)?.[1] ?? null
@@ -57,7 +65,7 @@ export function findPromise(
     const promise = mine.has(release.name) ? promiseOf(release) : null
     return promise ? [{release, promise}] : []
   })
-  found.sort((a, b) => Number(a.promise.held) - Number(b.promise.held) || a.promise.at.localeCompare(b.promise.at))
+  found.sort((a, b) => byStanding(a.promise, b.promise))
   return found[0] ?? null
 }
 
@@ -87,8 +95,8 @@ export function promisedPosts(
     if (!releaseId || !promise) continue
     const documentId = copy._id.slice(`versions.${releaseId}.`.length)
     const known = posts.get(documentId)
-    // As in `findPromise`: should a Post have two, the one that is really scheduled is its promise.
-    if (known && !(known.promise.held && !promise.held)) continue
+    // As in `findPromise`, so the Post that is listed is the one that opens.
+    if (known && byStanding(known.promise, promise) <= 0) continue
     posts.set(documentId, {documentId, documentType: copy._type, releaseId, promise, editedAt: copy._updatedAt})
   }
   return [...posts.values()].sort((a, b) => (b.editedAt ?? '').localeCompare(a.editedAt ?? ''))

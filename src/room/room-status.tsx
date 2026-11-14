@@ -483,7 +483,14 @@ export function PublishButton({
       const set = detailsPatch(details, fields)
       const tidy = scheduleClient(client)
       if (releaseId) {
-        await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at})
+        // The lookup took a moment, and this copy can still be written: look once more, and let
+        // the write itself refuse a copy that has moved on.
+        const latest = await client.getDocument<SavedCopy>(openId)
+        if (!latest || latest._rev !== planned.revision) {
+          onProblem(`This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`)
+          return
+        }
+        await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at, revision: planned.revision})
       } else {
         const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at})
         onPromised({releaseId: made.releaseId, promise: {at, held: false}})

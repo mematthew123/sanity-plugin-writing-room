@@ -133,6 +133,20 @@ describe('promisedPosts', () => {
   })
 })
 
+describe('promisedPosts and findPromise', () => {
+  const MONDAY = '2026-11-16T09:00:00Z'
+  const later = {...onePost('scheduled', {publishAt: MONDAY}), name: 'rLater'}
+  const sooner = {...onePost('scheduled', {publishAt: FRIDAY}), name: 'rSooner'}
+
+  it('agree on the nearest time when a Post is scheduled twice, whichever copy comes first', () => {
+    for (const ids of [['versions.rLater.a', 'versions.rSooner.a'], ['versions.rSooner.a', 'versions.rLater.a']]) {
+      const copies = ids.map((_id) => ({_id, _type: 'post'}))
+      expect(promisedPosts([later, sooner], copies)).toMatchObject([{documentId: 'a', releaseId: 'rSooner'}])
+      expect(findPromise([later, sooner], ids)?.release.name).toBe('rSooner')
+    }
+  })
+})
+
 describe('sameWords', () => {
   const body = [{_type: 'block', _key: 'a', children: [{_type: 'span', _key: 'b', text: 'Hello', marks: []}]}]
   const draft = {_id: 'drafts.p', _type: 'post', _rev: 'r1', _updatedAt: '2026-11-09T10:00:00Z', title: 'Hello', body}

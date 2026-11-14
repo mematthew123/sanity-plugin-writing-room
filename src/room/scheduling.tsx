@@ -11,7 +11,12 @@ import {isAhead} from '../lib/promised-time'
 export function scheduleClient(client: SanityClient): ScheduleClient {
   return {
     read: (id) => client.getDocument(id),
-    setFields: (id, fields) => client.patch(id).set(fields).commit(),
+    setFields: (id, fields, {ifRevision, unset = []} = {}) => {
+      let patch = client.patch(id).set(fields)
+      if (unset.length > 0) patch = patch.unset(unset)
+      if (ifRevision) patch = patch.ifRevisionId(ifRevision)
+      return patch.commit()
+    },
     createCopy: ({document, publishedId, releaseId}) =>
       client.createVersion({
         document: document as {_id: string; _type: string},
@@ -35,6 +40,8 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
     },
   }
 }
+
+const MAX_TIMER_MS = 2 ** 31 - 1
 
 /** Which copy of a Post the room has open, and what is promised for it. */
 export interface PostCopy {
@@ -104,7 +111,18 @@ export function PostCopyProvider({
 
   // Only what is settled on the server is tidied: never a promise the room is still making.
   const settled = found ? found.release.name : null
-  const expired = !!found?.promise.held && !isAhead(found.promise.at)
+  const heldUntil = found?.promise.held ? found.promise.at : null
+  const expired = !!heldUntil && !isAhead(heldUntil)
+  // The time can go by while the room is open: look again when it does, so the fold-back runs.
+  const [looked, lookAgain] = useState(0)
+  useEffect(() => {
+    if (!heldUntil) return undefined
+    const wait = new Date(heldUntil).getTime() - Date.now()
+    if (!(wait >= 0)) return undefined
+    // A timer can't wait longer than this, so a far-off time is waited for in turns.
+    const timer = setTimeout(() => lookAgain((count) => count + 1), Math.min(wait + 1, MAX_TIMER_MS))
+    return () => clearTimeout(timer)
+  }, [heldUntil, looked])
   useEffect(() => {
     if (!settled) {
       setOtherChanges(false)

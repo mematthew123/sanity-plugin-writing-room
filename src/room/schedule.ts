@@ -8,8 +8,11 @@ type Doc = Record<string, unknown>
  */
 export interface ScheduleClient {
   read(id: string): Promise<Doc | undefined>
-  /** Sets fields on a copy that isn't locked. */
-  setFields(id: string, fields: Doc): Promise<unknown>
+  /**
+   * Sets fields on a copy that isn't locked, and removes those named in `unset`. With `ifRevision`
+   * it fails, changing nothing, unless the copy is still at that revision.
+   */
+  setFields(id: string, fields: Doc, options?: {ifRevision?: string; unset?: string[]}): Promise<unknown>
   /** Writes `document` as a copy: in `releaseId`, or as the draft without one. */
   createCopy(args: {document: Doc; publishedId: string; releaseId?: string}): Promise<unknown>
   /** Removes a copy: the one in `releaseId`, or the draft without one. */
@@ -94,9 +97,13 @@ export async function schedulePost(
     throw error
   }
 
-  // The copy took `set`, so a draft that matches it has to have it too.
+  // The copy took `set`, so a draft that matches it has to have it too. Only the draft that was
+  // copied, though: one that has changed since keeps its own slug and date, and so stays.
   const tidied = await (async () => {
-    if (Object.keys(set).length > 0) await client.setFields(draftId(documentId), set)
+    if (Object.keys(set).length > 0) {
+      const ifRevision = typeof draft._rev === 'string' ? draft._rev : undefined
+      await client.setFields(draftId(documentId), set, {ifRevision})
+    }
     return tidyDraft(client, {documentId, releaseId})
   })().catch(() => 'left' as const)
   return {releaseId, draft: tidied}
@@ -107,30 +114,46 @@ export async function takeOffSchedule(client: ScheduleClient, {releaseId}: {rele
   await client.unschedule({releaseId})
 }
 
-/** Puts a Post that was taken off the schedule back on it, for the same time or a new one. */
+/**
+ * Puts a Post that was taken off the schedule back on it, for the same time or a new one. With
+ * `revision`, only the copy that was checked gets `set`: if it has changed since, this fails.
+ */
 export async function scheduleAgain(
   client: ScheduleClient,
-  {documentId, releaseId, set, at}: {documentId: string; releaseId: string; set: Doc; at: string},
+  {documentId, releaseId, set, at, revision}: {documentId: string; releaseId: string; set: Doc; at: string; revision?: string},
 ): Promise<void> {
-  if (Object.keys(set).length > 0) await client.setFields(copyId(documentId, releaseId), set)
+  if (Object.keys(set).length > 0) {
+    await client.setFields(copyId(documentId, releaseId), set, {ifRevision: revision})
+  }
   await client.setReleaseTime({releaseId, at})
   await client.schedule({releaseId, at})
 }
 
 /**
  * "Change the time" on a Scheduled Post. The platform locks the time with the words, so it comes
- * off the schedule and goes back on. If the new time doesn't take, the old promise is restored; if
- * even that fails, the Post is left off the schedule and `held` says so.
+ * off the schedule and goes back on. If the new time doesn't take, the old promise is restored,
+ * with the fields `set` changed as they were; if even that fails, the Post is left off the schedule
+ * and `OffTheSchedule` says so.
  */
 export async function changeTime(
   client: ScheduleClient,
   {documentId, releaseId, set, at, was}: {documentId: string; releaseId: string; set: Doc; at: string; was: string},
 ): Promise<void> {
+  const id = copyId(documentId, releaseId)
+  const changed = Object.keys(set)
+  const before = changed.length > 0 ? await client.read(id) : undefined
   await client.unschedule({releaseId})
   try {
     await scheduleAgain(client, {documentId, releaseId, set, at})
   } catch (error) {
     try {
+      if (changed.length > 0) {
+        // Without the copy as it was there is nothing to put back, so it isn't promised again.
+        if (!before) throw error
+        const had = changed.filter((key) => before[key] !== undefined)
+        const restore = Object.fromEntries(had.map((key) => [key, before[key]]))
+        await client.setFields(id, restore, {unset: changed.filter((key) => !had.includes(key))})
+      }
       await client.setReleaseTime({releaseId, at: was})
       await client.schedule({releaseId, at: was})
     } catch {
