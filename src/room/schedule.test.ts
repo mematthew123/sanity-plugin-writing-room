@@ -28,7 +28,7 @@ const ID = 'post-1'
 const R = 'rOnePost1'
 
 /** A dataset small enough to read: documents by id, releases by id, and the steps taken, in order. */
-function dataset({failOn = [] as string[]} = {}) {
+function dataset({failOn = [] as string[], between = undefined as (() => void | Promise<void>) | undefined} = {}) {
   const documents = new Map<string, Doc>()
   const releases = new Map<string, Release>()
   const steps: string[] = []
@@ -67,8 +67,16 @@ function dataset({failOn = [] as string[]} = {}) {
       put(idOf(publishedId, releaseId), document)
     },
     discardCopy: async ({publishedId, releaseId}) => {
-      step(releaseId ? 'discardCopy' : 'discardDraft')
+      step('discardCopy')
       documents.delete(idOf(publishedId, releaseId))
+    },
+    discardDraft: async ({publishedId, ifRevision}) => {
+      step('discardDraft')
+      const draft = documents.get(draftId(publishedId))
+      if (!draft) throw new Error('no draft')
+      await between?.()
+      if (documents.get(draftId(publishedId))?._rev !== ifRevision) throw new Error('revision mismatch')
+      documents.delete(draftId(publishedId))
     },
     createRelease: async ({releaseId, at}) => {
       step('createRelease')
@@ -101,7 +109,17 @@ function dataset({failOn = [] as string[]} = {}) {
       releases.delete(releaseId)
     },
   }
-  return {client, documents, releases, steps, put}
+  return {
+    client,
+    documents,
+    releases,
+    steps,
+    put,
+    /** Something another Writer does at the last moment: after the room has read, before the server acts. */
+    meanwhile: (act: () => void | Promise<void>) => {
+      between = act
+    },
+  }
 }
 
 const post = {_type: 'post', title: 'Hello', body: [{_type: 'block', _key: 'a'}]}
@@ -192,6 +210,16 @@ describe('schedulePost', () => {
     expect(documents.get(draftId(ID))).not.toHaveProperty('publishedAt')
   })
 
+  it('keeps a draft saved in the moment between the room’s look and its removal', async () => {
+    const {client, documents, put, draft, meanwhile} = withDraft()
+    meanwhile(() => void put(draftId(ID), {...post, title: 'Saved at the last moment'}))
+
+    const result = await schedulePost(client, {documentId: ID, draft, set: {}, at: FRIDAY, releaseId: R})
+
+    expect(result.draft).toBe('differs')
+    expect(documents.get(draftId(ID))).toMatchObject({title: 'Saved at the last moment'})
+  })
+
   it('stays Scheduled when the draft can’t be tidied just now', async () => {
     const {client, releases, draft} = withDraft({failOn: ['discardDraft']})
     const result = await schedulePost(client, {documentId: ID, draft, set: {}, at: FRIDAY, releaseId: R})
@@ -213,6 +241,14 @@ describe('tidyDraft', () => {
     put(draftId(ID), {...post, publishedAt: FRIDAY, title: 'Edited on Tuesday'})
     expect(await tidyDraft(client, {documentId: ID, releaseId: R})).toBe('differs')
     expect(documents.has(draftId(ID))).toBe(true)
+  })
+
+  it('leaves a matching draft that is saved again before it can be removed', async () => {
+    const {client, documents, put, meanwhile} = await scheduled()
+    put(draftId(ID), {...post, publishedAt: FRIDAY})
+    meanwhile(() => void put(draftId(ID), {...post, publishedAt: FRIDAY, title: 'Saved at the last moment'}))
+    expect(await tidyDraft(client, {documentId: ID, releaseId: R})).toBe('differs')
+    expect(documents.get(draftId(ID))).toMatchObject({title: 'Saved at the last moment'})
   })
 
   it('has nothing to do when there is no draft', async () => {
@@ -306,6 +342,26 @@ describe('changeTime', () => {
     const set = {slug: {_type: 'slug', current: 'hello'}}
     await expect(changeTime(client, {documentId: ID, releaseId: R, set, at: MONDAY, was: FRIDAY})).rejects.toThrow()
     expect(documents.get(copyId(ID, R))).not.toHaveProperty('slug')
+  })
+
+  it('leaves a date someone else set while it was off the schedule, and the Post off it', async () => {
+    const data = await scheduled()
+    const {client, documents, releases} = data
+    // The new time doesn't take, and by then a colleague has given the Post a date of their own.
+    const schedule = client.schedule
+    client.schedule = async (args) => {
+      if (args.at === MONDAY) {
+        await client.setFields(copyId(ID, R), {publishedAt: '2026-12-01T00:00:00.000Z'})
+        throw new Error('schedule failed')
+      }
+      return schedule(args)
+    }
+
+    const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {publishedAt: MONDAY}, at: MONDAY, was: FRIDAY})
+
+    await expect(attempt).rejects.toBeInstanceOf(OffTheSchedule)
+    expect(documents.get(copyId(ID, R))).toMatchObject({publishedAt: '2026-12-01T00:00:00.000Z'})
+    expect(releases.get(R)?.state).toBe('active')
   })
 
   it('says so when the Post has ended up off the schedule', async () => {

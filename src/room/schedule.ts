@@ -1,4 +1,4 @@
-import {sameWords} from './promised'
+import {isSame, sameWords} from './promised'
 
 type Doc = Record<string, unknown>
 
@@ -17,6 +17,11 @@ export interface ScheduleClient {
   createCopy(args: {document: Doc; publishedId: string; releaseId?: string}): Promise<unknown>
   /** Removes a copy: the one in `releaseId`, or the draft without one. */
   discardCopy(args: {publishedId: string; releaseId?: string}): Promise<unknown>
+  /**
+   * Removes the draft, only if it is still at `ifRevision`: otherwise it fails and the draft stays.
+   * A draft can be written to at any moment, so the room never removes one it hasn't just read.
+   */
+  discardDraft(args: {publishedId: string; ifRevision: string}): Promise<unknown>
   createRelease(args: {releaseId: string; title: string; at: string}): Promise<unknown>
   setReleaseTime(args: {releaseId: string; at: string}): Promise<unknown>
   schedule(args: {releaseId: string; at: string}): Promise<unknown>
@@ -59,9 +64,26 @@ export async function tidyDraft(
 ): Promise<'none' | 'removed' | 'differs'> {
   const [draft, copy] = await Promise.all([client.read(draftId(documentId)), client.read(copyId(documentId, releaseId))])
   if (!draft) return 'none'
-  if (!sameWords(draft, copy)) return 'differs'
-  await client.discardCopy({publishedId: documentId})
-  return 'removed'
+  if (!sameWords(draft, copy) || typeof draft._rev !== 'string') return 'differs'
+  return discardDraftAt(client, documentId, draft._rev)
+}
+
+/** Removes the draft if it is still at `revision`. If it has moved on, it holds something newer, and stays. */
+async function discardDraftAt(
+  client: ScheduleClient,
+  documentId: string,
+  revision: string,
+): Promise<'removed' | 'differs' | 'none'> {
+  try {
+    await client.discardDraft({publishedId: documentId, ifRevision: revision})
+    return 'removed'
+  } catch (error) {
+    // Only the server knows why it refused, so ask what is there now.
+    const now = await client.read(draftId(documentId))
+    if (!now) return 'none'
+    if (now._rev !== revision) return 'differs'
+    throw error
+  }
 }
 
 /**
@@ -97,15 +119,12 @@ export async function schedulePost(
     throw error
   }
 
-  // The draft goes only if it is still the one that was copied. A newer revision holds something
-  // the copy doesn't, whatever it is, and nothing is written to it on the way.
-  const tidied = await (async () => {
-    const current = await client.read(draftId(documentId))
-    if (!current) return 'none' as const
-    if (current._rev !== draft._rev) return 'differs' as const
-    await client.discardCopy({publishedId: documentId})
-    return 'removed' as const
-  })().catch(() => 'left' as const)
+  // The draft goes only if it is still the one that was copied, and the server is the judge of
+  // that: a newer revision holds something the copy doesn't, and nothing is written to it on the way.
+  const tidied =
+    typeof draft._rev === 'string'
+      ? await discardDraftAt(client, documentId, draft._rev).catch(() => 'left' as const)
+      : ('left' as const)
   return {releaseId, draft: tidied}
 }
 
@@ -172,7 +191,20 @@ export async function changeTime(
     await scheduleAgain(client, {documentId, releaseId, set, at})
   } catch (error) {
     try {
-      if (Object.keys(previous).length > 0) await client.setFields(copyId(documentId, releaseId), previous)
+      // Off the schedule, anyone can edit the copy. Only what this change wrote is taken back, and
+      // only if the copy hasn't moved since it was read: a field someone else has since set is
+      // theirs, and then the Post stays off the schedule for a person to look at.
+      const now = (await client.read(copyId(documentId, releaseId))) ?? {}
+      const undo: Doc = {}
+      for (const field of Object.keys(set)) {
+        if (isSame(now[field], previous[field])) continue
+        if (!isSame(now[field], set[field])) throw new Error(`${field} was changed by someone else`, {cause: error})
+        undo[field] = previous[field]
+      }
+      if (Object.keys(undo).length > 0) {
+        const ifRevision = typeof now._rev === 'string' ? now._rev : undefined
+        await client.setFields(copyId(documentId, releaseId), undo, {ifRevision})
+      }
       await client.setReleaseTime({releaseId, at: was})
       await client.schedule({releaseId, at: was})
     } catch {

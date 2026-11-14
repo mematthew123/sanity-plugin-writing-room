@@ -106,7 +106,8 @@ export function promisedPosts(
   return [...posts.values()].sort((a, b) => (b.editedAt ?? '').localeCompare(a.editedAt ?? ''))
 }
 
-function isSame(a: unknown, b: unknown): boolean {
+/** Whether two values from a document say the same thing, however deep they go. */
+export function isSame(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
   if (Array.isArray(a) !== Array.isArray(b)) return false

@@ -27,6 +27,14 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
         ...(releaseId && {releaseId}),
       }),
     discardCopy: ({publishedId, releaseId}) => client.discardVersion({publishedId, ...(releaseId && {releaseId})}),
+    // The discard action takes no revision, so the draft goes in a transaction with a patch that
+    // does: if the draft has moved on, the patch fails and takes the delete with it.
+    discardDraft: ({publishedId, ifRevision}) =>
+      client
+        .transaction()
+        .patch(draftId(publishedId), (patch) => patch.ifRevisionId(ifRevision).unset([NO_SUCH_FIELD]))
+        .delete(draftId(publishedId))
+        .commit(),
     createRelease: ({releaseId, title, at}) =>
       client.releases.create({
         releaseId,
@@ -45,6 +53,9 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
 }
 
 const MAX_TIMER_MS = 2 ** 31 - 1
+
+/** A patch has to do something to carry a revision condition. Unsetting what was never set does nothing. */
+const NO_SUCH_FIELD = 'writingRoomNoSuchField'
 
 /** Which copy of a Post the room has open, and what is promised for it. */
 export interface PostCopy {
