@@ -3,9 +3,9 @@ import {isSelectionCollapsed} from '@portabletext/editor/selectors'
 import {useAnnotationPopover, useToolbarSchema} from '@portabletext/toolbar'
 import {LaunchIcon} from '@sanity/icons/Launch'
 import {useCallback, useEffect, useLayoutEffect, useState} from 'react'
-import styled from 'styled-components'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {displayHref, normalizeHref} from './link'
+import styles from './LinkPopover.module.css'
 
 /** Long enough that typing through a link never shows the popover. */
 const REST_MS = 400
@@ -76,9 +76,10 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
         }
       }}
     >
-      <Surface $round>
+      <FloatingSurface className={styles.surface} round>
         {editing ? (
-          <Input
+          <input
+            className={styles.input}
             autoFocus
             aria-label="Link address"
             value={draft}
@@ -92,15 +93,16 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
             onBlur={() => setDraft(null)}
           />
         ) : (
-          <Row>
-            <Address href={href} target="_blank" rel="noopener noreferrer" title={href}>
+          <div className={styles.row}>
+            <a className={styles.address} href={href} target="_blank" rel="noopener noreferrer" title={href}>
               {displayHref(href) || 'No address'}
               <LaunchIcon aria-hidden />
-            </Address>
-            <Action type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setDraft(href)}>
+            </a>
+            <button className={styles.action} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setDraft(href)}>
               Edit
-            </Action>
-            <Action
+            </button>
+            <button
+              className={styles.action}
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
@@ -109,77 +111,10 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
               }}
             >
               Remove
-            </Action>
-          </Row>
+            </button>
+          </div>
         )}
-      </Surface>
+      </FloatingSurface>
     </Floating>
   )
 }
-
-const Surface = styled(FloatingSurface)`
-  max-width: min(28rem, calc(100vw - 2rem));
-`
-
-const Row = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 2px;
-`
-
-const Address = styled.a`
-  display: inline-flex;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  min-width: 0;
-  padding: 0 var(--calm-space-sm) 0 var(--calm-space-md);
-  overflow: hidden;
-  color: var(--calm-color-accent);
-  text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  &:hover {
-    text-decoration: underline;
-  }
-
-  svg {
-    flex-shrink: 0;
-    font-size: 1rem;
-  }
-`
-
-const Action = styled.button`
-  flex-shrink: 0;
-  height: 2rem;
-  padding: 0 var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
-  color: var(--calm-color-ink-muted);
-  font: inherit;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--calm-color-paper);
-    color: var(--calm-color-ink);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
-  }
-`
-
-const Input = styled.input`
-  width: min(22rem, 70vw);
-  height: 2rem;
-  padding: 0 var(--calm-space-md);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-paper);
-  color: var(--calm-color-ink);
-  font: inherit;
-  outline: none;
-`

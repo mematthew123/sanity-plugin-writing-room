@@ -1,8 +1,10 @@
-import {type ReactNode, useLayoutEffect, useRef, useState} from 'react'
+import {type ComponentProps, type ReactNode, useLayoutEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
-import styled from 'styled-components'
+import {cx} from '../../lib/cx'
+import styles from './floating.module.css'
 
 const GAP = 8
+/** Also the gap `.surface` leaves in floating.module.css. */
 const EDGE = 12
 
 /** Flips to the other side when there's no room, and always stays inside the window. */
@@ -39,30 +41,19 @@ export function Floating({
   }, [anchor, placement, align])
 
   return createPortal(
-    <Root
+    <div
       ref={ref}
+      className={styles.root}
       data-calm-floating=""
       data-scheme={scheme}
       style={position ? {top: position.top, left: position.left} : {visibility: 'hidden'}}
       {...props}
     >
       {children}
-    </Root>,
+    </div>,
     document.body,
   )
 }
-
-const Root = styled.div`
-  position: fixed;
-  z-index: 1000;
-  top: 0;
-  left: 0;
-  box-sizing: border-box;
-  color: var(--calm-color-ink);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-  font-weight: var(--calm-weight-ui);
-`
 
 export function useViewportChanges(onChange: () => void) {
   useLayoutEffect(() => {
@@ -76,29 +67,6 @@ export function useViewportChanges(onChange: () => void) {
 }
 
 /** Never bigger than the window, so `Floating`'s clamp always fits it. */
-export const FloatingSurface = styled.div<{$round?: boolean}>`
-  box-sizing: border-box;
-  max-width: calc(100vw - ${EDGE * 2}px);
-  max-height: calc(100dvh - ${EDGE * 2}px);
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: var(--calm-space-xs);
-  border-radius: ${({$round}) => ($round ? 'var(--calm-radius-pill)' : 'var(--calm-radius-large)')};
-  background: var(--calm-color-surface);
-  box-shadow: var(--calm-color-floating-shadow);
-
-  [data-scheme='dark'] & {
-    box-shadow: inset 0 0 0 1px var(--calm-color-rule);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: calm-float-in var(--calm-motion-gentle) var(--calm-motion-easing);
-  }
-
-  @keyframes calm-float-in {
-    from {
-      opacity: 0;
-      transform: translateY(2px);
-    }
-  }
-`
+export function FloatingSurface({round, className, ...props}: {round?: boolean} & ComponentProps<'div'>) {
+  return <div {...props} className={cx(styles.surface, className)} data-round={round || undefined} />
+}

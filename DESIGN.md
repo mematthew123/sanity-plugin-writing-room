@@ -408,11 +408,20 @@ For any styling value, work down this list and stop at the first that applies:
 
 1. **A CSS custom property** — `var(--calm-color-ink)`, `var(--calm-font-prose)`, `var(--calm-radius-large)`, `var(--calm-motion-recede)`. Colour properties re-resolve per scheme, so the component works in light and dusk with no extra work.
 2. **The TypeScript export** — `import {palette, fonts} from './tokens'` — only where CSS variables can't reach: the Studio theme (`buildTheme` needs literal colours) and the accent maths.
-3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the two breakpoints, which are named constants.
+3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the two breakpoints (below).
 
 Naming in CSS is `--calm-{group}-{token}` in kebab-case: `--calm-color-ink-muted`, `--calm-type-heading`, `--calm-space-lg`, `--calm-weight-title`.
 
 **The room's styles never leave the room.** The tokens are rendered as a `<style>` scoped to the room's own elements (`[data-calm-surface]`, and `[data-calm-floating]` for panels portaled to the body), never to `:root`. A Studio that installs the plugin must look exactly as it did everywhere outside the room, and needs no CSS loader.
+
+**The room's styles are plain CSS, and the room carries them itself.** Each component has a CSS Module beside it (`Lobby.tsx`, `Lobby.module.css`), and four rules follow:
+
+- **Write CSS, not a styling library.** A rule is selectors and declarations over the tokens above: no values computed in JavaScript, no theme object, no `@sanity/ui` primitives. The room doesn't use styled-components, which the Studio is leaving (see ADR-0005).
+- **State is an attribute, not a class or a prop.** A control that is active, selected or receded says so in the markup and the CSS selects on it: an ARIA state where one exists (`aria-pressed`, `aria-selected`, `aria-checked`), otherwise a `data-` attribute (`data-selected`, `data-receded`, `data-text-size`).
+- **Nothing for the Studio to import.** The build compiles each module into the room's JavaScript, which puts the rules on the page itself, as the tokens and fonts already are. Installing the plugin is one import; there is never a stylesheet to add beside it. `pnpm smoke` checks the styles survive a Studio's own build.
+- **A component that builds on another imports it first.** `FloatingSurface`, `BlockFrame`, `Column` and `Controls` take a `className`. Rules reach the page in the order their modules are imported, so keep the `styles` import last and the later rule wins.
+
+A CSS file can't read a constant, so the two breakpoints are written out where they're used: `40rem`, a phone or a window about that narrow, and `64rem`, too narrow for anything to sit in the margin beside the column. Use those two and no others.
 
 ## Do's and Don'ts
 

@@ -1,6 +1,6 @@
 import {Component, type ReactNode} from 'react'
-import styled from 'styled-components'
 import {Column} from './primitives'
+import styles from './SetupProblem.module.css'
 
 /** Thrown when the room's `@sanity/sdk-react` isn't the copy the Studio provides. */
 export function isSdkContextError(error: unknown): boolean {
@@ -26,7 +26,7 @@ export class SetupProblemBoundary extends Component<{children: ReactNode}, {erro
 function SdkContextProblem() {
   return (
     <Column as="main" role="alert">
-      <Heading>The Writing Room can’t start in this Studio yet</Heading>
+      <h1 className={styles.heading}>The Writing Room can’t start in this Studio yet</h1>
       <p>
         The room and the Studio are using different copies of Sanity’s App SDK, so the room can’t
         reach your content.
@@ -46,12 +46,3 @@ function SdkContextProblem() {
     </Column>
   )
 }
-
-const Heading = styled.h1`
-  margin: 0 0 var(--calm-space-lg);
-  font-family: var(--calm-font-prose);
-  font-size: calc(var(--calm-prose-size-medium) * 1.4);
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-  text-wrap: balance;
-`

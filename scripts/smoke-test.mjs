@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Installs the packed plugin into a fresh Studio and checks it installs, dedupes, type-checks and
- * builds (also inside Next.js with `--embedded`).
+ * builds with its styles (also inside Next.js with `--embedded`).
  *
  * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded]
  * `--loose` ignores the plugin's peer range, to test whether it could be widened.
@@ -32,7 +32,7 @@ const FORM_EXPORTS = [
   'isObjectInputProps',
   'isStringInputProps',
 ]
-const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
+const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react']
 
 function run(command, args, cwd) {
   console.log(`\n$ ${command} ${args.join(' ')}`)
@@ -175,6 +175,7 @@ if (missing.length) {
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
 expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
+expectRoomStyles(join(studioDir, 'dist'), 'the Studio bundle')
 
 // 7. The same Studio embedded in a Next.js app.
 if (embedded) {
@@ -215,30 +216,48 @@ export default function StudioPage() {
   })
   // Browser bundle only: .next/server has its own copy.
   expectOneSdk(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
+  expectRoomStyles(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
 }
 
 console.log(
   `\n✓ sanity@${sanityVersion}: installed, deduped, type-checked and built${embedded ? ', standalone and embedded in Next.js' : ''}.`,
 )
 
+/** Every browser script in a built app. */
+function scripts(dir, found = []) {
+  for (const entry of readdirSync(dir, {withFileTypes: true})) {
+    const child = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name !== 'cache') scripts(child, found)
+    } else if (entry.name.endsWith('.js')) {
+      found.push(readFileSync(child, 'utf8'))
+    }
+  }
+  return found
+}
+
 /** Each copy of @sanity/sdk-react carries this error message, so two copies means it appears twice. */
 function expectOneSdk(dir, label) {
   const MESSAGE = 'wrapped in a ResourceProvider or a SanityApp component'
-  let count = 0
-  const walk = (path) => {
-    for (const entry of readdirSync(path, {withFileTypes: true})) {
-      const child = join(path, entry.name)
-      if (entry.isDirectory()) {
-        if (entry.name !== 'cache') walk(child)
-      } else if (entry.name.endsWith('.js')) {
-        count += readFileSync(child, 'utf8').split(MESSAGE).length - 1
-      }
-    }
-  }
-  walk(dir)
+  const count = scripts(dir).reduce((sum, script) => sum + script.split(MESSAGE).length - 1, 0)
   console.log(`App SDK copies in ${label}: ${count}`)
   if (count !== 1) {
     console.error(`\n✗ Expected one copy of @sanity/sdk-react in ${label}, found ${count}.`)
+    process.exit(1)
+  }
+}
+
+/**
+ * The room's CSS travels inside its JavaScript, with the call that puts it on the page. A bundler
+ * that dropped either as unused would leave the room unstyled, and the build would still pass.
+ */
+function expectRoomStyles(dir, label) {
+  const all = scripts(dir)
+  const rules = all.some((script) => /\.calm-[\w-]+\{/.test(script))
+  const added = all.some((script) => script.includes('calmStyles'))
+  console.log(`The room's styles in ${label}: ${rules && added ? 'present' : 'missing'}`)
+  if (!rules || !added) {
+    console.error(`\n✗ ${label} lost the room's CSS${rules ? "'s way onto the page" : ''}.`)
     process.exit(1)
   }
 }

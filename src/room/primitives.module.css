@@ -1,0 +1,203 @@
+/* The room's one scroller. Its scrollbar's space is always kept, so nothing moves sideways when a short page follows a long one. */
+.surface {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background: var(--calm-color-paper);
+  color: var(--calm-color-ink);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+  font-weight: var(--calm-weight-ui);
+  -webkit-font-smoothing: antialiased;
+
+  &::selection,
+  & *::selection {
+    background: var(--calm-color-selection);
+  }
+}
+
+.column {
+  box-sizing: content-box;
+  max-width: var(--calm-measure);
+  margin-inline: auto;
+  padding: var(--calm-space-xxl) var(--calm-space-lg) var(--calm-space-xxl);
+
+  @media (max-width: 40rem) {
+    padding-block: var(--calm-space-lg) var(--calm-space-xl);
+  }
+}
+
+/* Shown only where there's room for it; elsewhere it isn't there at all. */
+.wideOnly {
+  display: contents;
+
+  @media (max-width: 40rem) {
+    display: none;
+  }
+}
+
+.controlsBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--calm-space-md);
+  padding: var(--calm-space-md) var(--calm-space-lg) var(--calm-space-lg);
+  /* Paper behind the controls, fading out below them, so Prose never scrolls through them. */
+  background: linear-gradient(to bottom, var(--calm-color-paper) 60%, transparent);
+  pointer-events: none;
+
+  & > * {
+    pointer-events: auto;
+  }
+
+  @media (max-width: 40rem) {
+    gap: var(--calm-space-sm);
+    padding-inline: var(--calm-space-sm);
+  }
+
+  [data-recedes] {
+    transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
+  }
+
+  &[data-receded='true'] [data-recedes] {
+    opacity: 0.08;
+  }
+
+  &:focus-within [data-recedes] {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-recedes] {
+      transition: none;
+    }
+  }
+}
+
+.controlsGroup {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--calm-space-xs);
+
+  /* The end group gives way first: its status text shortens before anything wraps. */
+  &:last-child {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+}
+
+.quietButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--calm-space-xs);
+  min-height: 2.25rem;
+  padding: var(--calm-space-sm) 0.75rem;
+  border: 0;
+  border-radius: var(--calm-radius-pill);
+  background: transparent;
+  color: var(--calm-color-ink-muted);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--calm-motion-gentle) var(--calm-motion-easing),
+    color var(--calm-motion-gentle) var(--calm-motion-easing),
+    transform var(--calm-motion-press) var(--calm-motion-easing);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--calm-color-surface);
+    color: var(--calm-color-ink);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 2px;
+  }
+
+  svg {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.recedes {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--calm-space-xs);
+}
+
+.sectionLabel {
+  margin: 0 0 var(--calm-space-sm);
+  color: var(--calm-color-ink-muted);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size-small);
+  font-weight: var(--calm-weight-ui-strong);
+}
+
+.placeholder {
+  border-radius: var(--calm-radius-large);
+  background: var(--calm-color-surface);
+  opacity: 0.6;
+}
+
+/* A checkbox drawn as a switch. */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.375rem;
+  margin: 0;
+  border-radius: var(--calm-radius-pill);
+  background: var(--calm-color-ink-faint);
+  appearance: none;
+  cursor: pointer;
+  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: calc(1.375rem - 4px);
+    height: calc(1.375rem - 4px);
+    border-radius: 50%;
+    background: var(--calm-color-paper);
+    transition: transform var(--calm-motion-gentle) var(--calm-motion-easing);
+  }
+
+  &:checked {
+    background: var(--calm-color-accent);
+  }
+
+  &:checked::before {
+    transform: translateX(0.875rem);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &::before {
+      transition: none;
+    }
+  }
+}

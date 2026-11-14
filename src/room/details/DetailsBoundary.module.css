@@ -1,0 +1,14 @@
+.card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--calm-space-sm);
+  margin-top: var(--calm-space-xl);
+  padding: var(--calm-space-md) var(--calm-space-lg);
+  border-radius: var(--calm-radius-large);
+  background: var(--calm-color-surface);
+  color: var(--calm-color-ink-muted);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+}

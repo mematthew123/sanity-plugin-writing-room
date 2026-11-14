@@ -16,7 +16,6 @@ import {
   useSyncState,
   useValidationStatus,
 } from 'sanity'
-import styled, {keyframes} from 'styled-components'
 import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
@@ -29,8 +28,9 @@ import {useWritingKind} from './kinds'
 import {useRoomView} from './navigation'
 import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
-import {NARROW, QuietButton} from './primitives'
+import {QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
+import styles from './room-status.module.css'
 
 export interface RoomNotice {
   text: string
@@ -91,11 +91,11 @@ export function SaveState() {
     return undefined
   }, [isSynced])
 
-  if (!online) return <Caution>Offline</Caution>
+  if (!online) return <span className={styles.caution}>Offline</span>
   return (
-    <Quiet role="status" aria-live="polite">
+    <span className={styles.quiet} role="status" aria-live="polite">
       {shown === 'saving' ? 'Saving…' : shown === 'saved' ? 'Saved' : ''}
-    </Quiet>
+    </span>
   )
 }
 
@@ -118,40 +118,40 @@ export function RoomMessage({
 
   if (problem) {
     return (
-      <Message role="alert" $caution>
+      <p className={styles.message} role="alert" data-caution="">
         {problem}
         <QuietButton icon={CloseIcon} aria-label="Dismiss" onClick={onDismissProblem} />
-      </Message>
+      </p>
     )
   }
   if (!online) {
     return (
-      <Message role="status" $caution>
+      <p className={styles.message} role="status" data-caution="">
         {isSynced
           ? 'Offline — changes will sync when you’re back'
           : 'Offline — your words are safe here and will sync when you’re back'}
-      </Message>
+      </p>
     )
   }
   if (notice) {
     return (
-      <Message role="status">
+      <p className={styles.message} role="status">
         {notice.done && <CheckmarkCircleIcon aria-hidden />}
         <strong>{notice.text}</strong>
         {notice.link && (
-          <NoticeLink href={notice.link.href} target="_blank" rel="noopener noreferrer">
+          <a className={styles.noticeLink} href={notice.link.href} target="_blank" rel="noopener noreferrer">
             {notice.link.label}
-          </NoticeLink>
+          </a>
         )}
         {notice.action && <QuietButton onClick={notice.action.onClick}>{notice.action.label}</QuietButton>}
-      </Message>
+      </p>
     )
   }
   return null
 }
 
 export function StatusLabel({status}: {status: PostStatus}) {
-  return <Quiet>{status.label}</Quiet>
+  return <span className={styles.quiet}>{status.label}</span>
 }
 
 /** Never recedes: writing alongside someone without knowing is unsettling. */
@@ -167,7 +167,7 @@ export function Presence({handle}: {handle: DocumentHandle}) {
     if (sanityUserId !== me?.id) others.set(sanityUserId, profile.displayName)
   }
   const sentence = presenceSentence([...others.values()])
-  return sentence ? <Quiet role="status">{sentence}</Quiet> : null
+  return sentence ? <span className={styles.quiet} role="status">{sentence}</span> : null
 }
 
 /** Long enough for a save, a read of the saved draft, and a validation of it. */
@@ -399,7 +399,8 @@ export function PublishButton({
 
   return (
     <>
-      <PublishPill
+      <button
+        className={styles.publishPill}
         ref={button}
         type="button"
         disabled={working}
@@ -413,7 +414,7 @@ export function PublishButton({
         }}
       >
         {phase === 'publishing' ? 'Publishing…' : working ? 'Checking…' : label}
-      </PublishPill>
+      </button>
       {confirming && anchor && (
         <Floating
           anchor={anchor}
@@ -428,26 +429,26 @@ export function PublishButton({
             }
           }}
         >
-          <Confirm ref={panel} role="dialog" aria-labelledby="calm-publish-title">
-            <ConfirmTitle id="calm-publish-title">
+          <FloatingSurface className={styles.confirm} ref={panel} role="dialog" aria-labelledby="calm-publish-title">
+            <h2 className={styles.confirmTitle} id="calm-publish-title">
               {isFirstPublish ? `Publish this ${kind.singular}?` : 'Publish these changes?'}
-            </ConfirmTitle>
-            <ConfirmText>
+            </h2>
+            <p className={styles.confirmText}>
               {isFirstPublish
                 ? 'It goes live straight away'
                 : 'They replace what readers see now'}
               {plan.url ? ', at' : plan.slug ? ', under the slug' : '.'}
-            </ConfirmText>
+            </p>
             {(plan.url || plan.slug) && (
-              <Where>{plan.url ? `${plan.url.host}${plan.url.pathname}` : plan.slug}</Where>
+              <p className={styles.where}>{plan.url ? `${plan.url.host}${plan.url.pathname}` : plan.slug}</p>
             )}
-            <ConfirmActions>
+            <div className={styles.confirmActions}>
               <QuietButton onClick={cancel}>Not yet</QuietButton>
-              <PublishPill ref={confirmButton} type="button" onClick={() => void publish(plan)}>
+              <button className={styles.publishPill} ref={confirmButton} type="button" onClick={() => void publish(plan)}>
                 {isFirstPublish ? 'Publish now' : 'Publish changes'}
-              </PublishPill>
-            </ConfirmActions>
-          </Confirm>
+              </button>
+            </div>
+          </FloatingSurface>
         </Floating>
       )}
     </>
@@ -466,168 +467,3 @@ function liveUrl(
     return null
   }
 }
-
-const Quiet = styled.span`
-  min-width: 0;
-  margin-inline: var(--calm-space-sm);
-  overflow: hidden;
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  &:empty {
-    display: none;
-  }
-`
-
-const Caution = styled.span`
-  flex-shrink: 0;
-  margin-inline: var(--calm-space-sm);
-  color: var(--calm-color-caution);
-  font-size: var(--calm-type-ui-size-small);
-  white-space: nowrap;
-`
-
-const messageIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-`
-
-const Message = styled.p<{$caution?: boolean}>`
-  display: flex;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  box-sizing: border-box;
-  max-width: 100%;
-  min-height: 2.5rem;
-  margin: 0;
-  padding: var(--calm-space-xs) var(--calm-space-md);
-  border-radius: var(--calm-radius-large);
-  background: var(--calm-color-surface);
-  box-shadow: var(--calm-color-floating-shadow);
-  color: ${({$caution}) => ($caution ? 'var(--calm-color-caution)' : 'var(--calm-color-ink)')};
-  font-size: var(--calm-type-ui-size);
-  text-wrap: pretty;
-
-  [data-scheme='dark'] & {
-    box-shadow: inset 0 0 0 1px var(--calm-color-rule);
-  }
-
-  strong {
-    font-weight: var(--calm-weight-ui-strong);
-    white-space: nowrap;
-  }
-
-  ${NARROW} {
-    flex-wrap: wrap;
-  }
-
-  & > svg {
-    flex-shrink: 0;
-    margin-inline-start: calc(var(--calm-space-xs) * -1);
-    color: var(--calm-color-accent);
-    font-size: 1.5rem;
-  }
-
-  button {
-    flex-shrink: 0;
-    min-height: 1.75rem;
-    margin-inline-end: calc(var(--calm-space-sm) * -1);
-    padding: var(--calm-space-xs) var(--calm-space-sm);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    animation: ${messageIn} var(--calm-motion-gentle) var(--calm-motion-easing);
-  }
-`
-
-const PublishPill = styled.button`
-  min-height: 2.25rem;
-  padding: var(--calm-space-sm) var(--calm-space-md);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-accent);
-  color: var(--calm-color-on-accent);
-  font: inherit;
-  font-weight: var(--calm-weight-ui-strong);
-  cursor: pointer;
-  transition: opacity var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  &:hover {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.7;
-  }
-
-  /* While the room asks "Publish this?", the answer is the one clay thing; the question steps back. */
-  &[aria-expanded='true'] {
-    background: var(--calm-color-surface);
-    color: var(--calm-color-ink);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const NoticeLink = styled.a`
-  margin-inline-start: var(--calm-space-sm);
-  border-radius: var(--calm-radius);
-  /* Ink, not clay: the tick beside it is the notice's one accent. */
-  color: var(--calm-color-ink);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
-  white-space: nowrap;
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-`
-
-const Confirm = styled(FloatingSurface)`
-  width: min(21rem, calc(100vw - 24px));
-  padding: var(--calm-space-lg);
-`
-
-const ConfirmTitle = styled.h2`
-  margin: 0 0 var(--calm-space-sm);
-  font-family: var(--calm-font-prose);
-  font-size: 1.375rem;
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-  text-wrap: balance;
-`
-
-const ConfirmText = styled.p`
-  margin: 0;
-  color: var(--calm-color-ink-muted);
-`
-
-/** The address, or the slug: the one fact worth a second look before saying yes. */
-const Where = styled.p`
-  margin: var(--calm-space-xs) 0 0;
-  color: var(--calm-color-ink);
-  font-weight: var(--calm-weight-ui-strong);
-  overflow-wrap: anywhere;
-`
-
-const ConfirmActions = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--calm-space-xs);
-  margin-top: var(--calm-space-lg);
-`

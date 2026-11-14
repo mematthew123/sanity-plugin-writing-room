@@ -29,7 +29,6 @@ The plugin runs inside Sanity Studio. It doesn't care what your website is built
 |---|---|---|
 | Sanity Studio | `sanity` 6.22 or newer (v6) | The version the room is written and tested against. Older 6.x releases are being checked (see [Compatibility](#compatibility)). |
 | React | 19.3.1 or newer | Required by `@portabletext/editor` 8. |
-| `styled-components` | 6.1.18 or newer | The room's styling, as in the Studio itself. |
 | Node.js | 22.12 or newer | Required by Sanity Studio v6 to run `sanity dev` and `sanity build`. |
 | Studio auto-updates | **Off** | See [Why auto-updates off?](#install). |
 
@@ -251,7 +250,7 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 
 ## Troubleshooting
 
-**"The Writing Room can't start in this Studio yet."** The room and the Studio are using different copies of Sanity's App SDK. On a deployed Studio, turn off auto-updates ([Install](#install), step 3) and deploy again. In `sanity dev`, run `npm ls @sanity/sdk-react`: it should appear at a single version. If you've linked the plugin (`npm link`, `file:`, a workspace) instead of installing it, add `sanity`, `react`, `react-dom`, `styled-components`, `@sanity/sdk-react` and `@portabletext/editor` to Vite's `resolve.dedupe` in `sanity.cli.ts`.
+**"The Writing Room can't start in this Studio yet."** The room and the Studio are using different copies of Sanity's App SDK. On a deployed Studio, turn off auto-updates ([Install](#install), step 3) and deploy again. In `sanity dev`, run `npm ls @sanity/sdk-react`: it should appear at a single version. If you've linked the plugin (`npm link`, `file:`, a workspace) instead of installing it, add `sanity`, `react`, `react-dom`, `@sanity/sdk-react` and `@portabletext/editor` to Vite's `resolve.dedupe` in `sanity.cli.ts`.
 
 **Yarn, or two copies of the SDK.** npm (7+) and pnpm install the plugin's peer dependencies for you, and share `@sanity/sdk-react` and `@portabletext/editor` with Sanity when your `sanity` version is in range. Yarn doesn't install peers: add `@sanity/sdk-react@^3.12.0` and `@portabletext/editor@^8.2.12` yourself. To check, run `npm ls @sanity/sdk-react @portabletext/editor`: each should appear at a single version.
 
@@ -262,9 +261,9 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 `npm run smoke` (in this package) packs the plugin, installs it with npm into a brand-new Studio and checks that:
 
 1. it installs with no peer-dependency conflicts,
-2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor`, `react` and `styled-components`, and of every `@portabletext/*` package,
+2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor` and `react`, and of every `@portabletext/*` package,
 3. a `sanity.config.ts` using the plugin and its theme type-checks against the published types,
-4. `sanity build` bundles the Studio with exactly one copy of the App SDK,
+4. `sanity build` bundles the Studio with exactly one copy of the App SDK, and with the room's styles,
 5. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
 
 ```sh

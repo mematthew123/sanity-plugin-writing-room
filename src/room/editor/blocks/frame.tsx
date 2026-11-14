@@ -1,48 +1,24 @@
-import styled from 'styled-components'
+import {type ComponentProps, type ReactNode} from 'react'
+import {cx} from '../../../lib/cx'
 import {Isolate} from '../isolate'
+import styles from './frame.module.css'
 
-export const BlockFrame = styled.div<{$selected?: boolean}>`
-  position: relative;
-  margin-block: var(--calm-type-prose-gap);
-  border-radius: var(--calm-radius-large);
-  outline: 2px solid ${({$selected}) => ($selected ? 'var(--calm-color-accent)' : 'transparent')};
-  outline-offset: 4px;
-  transition: outline-color var(--calm-motion-gentle) var(--calm-motion-easing);
+export function BlockFrame({
+  selected,
+  className,
+  ...props
+}: {selected?: boolean} & ComponentProps<'div'>) {
+  return <div {...props} className={cx(styles.frame, className)} data-selected={selected || undefined} />
+}
 
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
+export function FieldInput(props: ComponentProps<'input'>) {
+  return <input {...props} className={styles.input} />
+}
 
-export const FieldInput = styled.input`
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  padding: var(--calm-space-xs) 0;
-  border: 0;
-  background: transparent;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-  outline: none;
+export function Controls({children, className}: {children: ReactNode; className?: string}) {
+  return <Isolate className={cx(styles.controls, className)}>{children}</Isolate>
+}
 
-  &::placeholder {
-    color: var(--calm-color-ink-muted);
-    opacity: 0.85;
-  }
-
-  &:focus {
-    color: var(--calm-color-ink);
-  }
-`
-
-export const Controls = styled(Isolate)`
-  margin-top: var(--calm-space-sm);
-`
-
-export const Caution = styled.p`
-  margin: var(--calm-space-xs) 0 0;
-  color: var(--calm-color-caution);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size-small);
-`
+export function Caution(props: ComponentProps<'p'>) {
+  return <p {...props} className={styles.caution} />
+}
