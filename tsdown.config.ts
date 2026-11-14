@@ -21,8 +21,9 @@ function cssModulesInJs(): Plugin {
       const {code, exports = {}} = transform({
         filename: file,
         code: await readFile(id),
-        // Only classes and keyframes are renamed, as in `sanity dev`: counters and grid areas keep their names.
-        cssModules: {pattern: 'calm-[hash]-[local]', grid: false, customIdents: false, container: false},
+        // Classes and keyframes are renamed, as in `sanity dev`; grid areas and containers keep their names.
+        // `customIdents` stays on: it is what renames an `animation` to match its `@keyframes`.
+        cssModules: {pattern: 'calm-[hash]-[local]', grid: false, container: false},
         // Flattened, as styled-components did, so the room asks no more of a browser than before.
         include: Features.Nesting,
         minify: true,

@@ -260,4 +260,19 @@ function expectRoomStyles(dir, label) {
     console.error(`\n✗ ${label} lost the room's CSS${rules ? "'s way onto the page" : ''}.`)
     process.exit(1)
   }
+  // The build renames each `@keyframes`; an animation it left under its old name would never run.
+  const css = all.join('\n')
+  const keyframes = new Set(Array.from(css.matchAll(/@keyframes (calm-[\w-]+)/g), (match) => match[1]))
+  const stray = new Set()
+  for (const [, declarations] of css.matchAll(/\.calm-[\w-]+[^{}]*\{([^{}]*)\}/g)) {
+    for (const [, value] of declarations.matchAll(/(?:^|;)animation(?:-name)?:([^;]+)/g)) {
+      const names = value.split(/[\s,()]+/)
+      if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
+    }
+  }
+  console.log(`The room's animations in ${label}: ${stray.size ? 'missing their keyframes' : 'matched'}`)
+  if (stray.size) {
+    console.error(`\n✗ ${label} has animations with no @keyframes: ${[...stray].join(' | ')}`)
+    process.exit(1)
+  }
 }
