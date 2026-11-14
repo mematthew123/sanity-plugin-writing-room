@@ -45,6 +45,16 @@ export function releaseOfCopy(copyId: string): string | null {
 }
 
 /**
+ * Which of two promises is a Post's, should the Studio have left it two: the one that is actually
+ * scheduled, then the nearer time, then the release's id so the answer never depends on order.
+ */
+function comesBefore(a: Promised, aRelease: string, b: Promised, bRelease: string): boolean {
+  if (a.held !== b.held) return !a.held
+  const [aTime, bTime] = [new Date(a.at).getTime(), new Date(b.at).getTime()]
+  return aTime !== bTime ? aTime < bTime : aRelease < bRelease
+}
+
+/**
  * The Post's one-Post release among the releases it has copies in. A Post has at most one; if the
  * Studio has somehow left two, the one that is actually scheduled wins, then the nearest time.
  */
@@ -53,12 +63,14 @@ export function findPromise(
   copyIds: readonly string[],
 ): {release: ReleaseLike; promise: Promised} | null {
   const mine = new Set(copyIds.map(releaseOfCopy))
-  const found = releases.flatMap((release) => {
+  let found: {release: ReleaseLike; promise: Promised} | null = null
+  for (const release of releases) {
     const promise = mine.has(release.name) ? promiseOf(release) : null
-    return promise ? [{release, promise}] : []
-  })
-  found.sort((a, b) => Number(a.promise.held) - Number(b.promise.held) || a.promise.at.localeCompare(b.promise.at))
-  return found[0] ?? null
+    if (promise && (!found || comesBefore(promise, release.name, found.promise, found.release.name))) {
+      found = {release, promise}
+    }
+  }
+  return found
 }
 
 /** A Post with a promise: Scheduled, or taken off the schedule and waiting to go back on. */
@@ -87,8 +99,8 @@ export function promisedPosts(
     if (!releaseId || !promise) continue
     const documentId = copy._id.slice(`versions.${releaseId}.`.length)
     const known = posts.get(documentId)
-    // As in `findPromise`: should a Post have two, the one that is really scheduled is its promise.
-    if (known && !(known.promise.held && !promise.held)) continue
+    // The same choice `findPromise` makes, so the Lobby shows the copy the room will open.
+    if (known && !comesBefore(promise, releaseId, known.promise, known.releaseId)) continue
     posts.set(documentId, {documentId, documentType: copy._type, releaseId, promise, editedAt: copy._updatedAt})
   }
   return [...posts.values()].sort((a, b) => (b.editedAt ?? '').localeCompare(a.editedAt ?? ''))

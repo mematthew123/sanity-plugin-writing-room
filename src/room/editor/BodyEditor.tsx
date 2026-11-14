@@ -157,16 +157,21 @@ export function BodyEditor({
         aria-label="Body"
         renderPlaceholder={() => <Placeholder>Start writing…</Placeholder>}
       />
-      <SelectionBubble scheme={scheme} editorFocused={focused} />
-      <LinkPopover scheme={scheme} editorFocused={focused} />
-      <InsertMenu
-        scheme={scheme}
-        editorFocused={focused}
-        images={images}
-        choosingSource={choosing === 'sources'}
-        // Backing out of the list never closes a source that has since opened.
-        onChooseSource={(source) => setChoosing((current) => (current === 'sources' ? source : current))}
-      />
+      {/* Never a control that would change words that can't change. */}
+      {!readOnly && (
+        <>
+          <SelectionBubble scheme={scheme} editorFocused={focused} />
+          <LinkPopover scheme={scheme} editorFocused={focused} />
+          <InsertMenu
+            scheme={scheme}
+            editorFocused={focused}
+            images={images}
+            choosingSource={choosing === 'sources'}
+            // Backing out of the list never closes a source that has since opened.
+            onChooseSource={(source) => setChoosing((current) => (current === 'sources' ? source : current))}
+          />
+        </>
+      )}
       {choosing && choosing !== 'sources' && (
         <ImageSourceDialog
           source={choosing}

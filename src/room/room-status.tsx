@@ -32,7 +32,7 @@ import {type PostStatus} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
-import {changeTime, OffTheSchedule, publishHeld, scheduleAgain, schedulePost} from './schedule'
+import {ChangedSinceChecked, changeTime, OffTheSchedule, publishHeld, scheduleAgain, schedulePost} from './schedule'
 import {type JustPromised, type PostCopy, scheduleClient} from './scheduling'
 import {fromLocalDateTime, toLocalDateTime} from './details/values'
 
@@ -483,15 +483,20 @@ export function PublishButton({
       const set = detailsPatch(details, fields)
       const tidy = scheduleClient(client)
       if (releaseId) {
-        await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at})
+        // Off the schedule its copy can still be edited, so it goes back on only as it was checked.
+        await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at, checked: planned.revision})
       } else {
         const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at})
         onPromised({releaseId: made.releaseId, promise: {at, held: false}})
       }
       onProblem(null)
       onNotice({text: `Scheduled for ${describePromisedTime(at)}`, done: true})
-    } catch {
-      onProblem(couldnt('scheduled'))
+    } catch (error) {
+      onProblem(
+        error instanceof ChangedSinceChecked
+          ? `This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`
+          : couldnt('scheduled'),
+      )
     } finally {
       setPhase('idle')
       setPlan(null)

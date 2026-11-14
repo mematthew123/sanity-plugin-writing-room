@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {
+  ChangedSinceChecked,
   changeTime,
   copyId,
   draftId,
@@ -51,12 +52,15 @@ function dataset({failOn = [] as string[]} = {}) {
 
   const client: ScheduleClient = {
     read: async (id) => documents.get(id),
-    setFields: async (id, fields) => {
+    setFields: async (id, fields, options) => {
       step('setFields')
       locked(id)
       const current = documents.get(id)
       if (!current) throw new Error(`${id} not found`)
-      put(id, {...current, ...fields})
+      if (options?.ifRevision && current._rev !== options.ifRevision) throw new Error('revision mismatch')
+      const next: Doc = {...current, ...fields}
+      for (const [field, value] of Object.entries(fields)) if (value === undefined) delete next[field]
+      put(id, next)
     },
     createCopy: async ({document, publishedId, releaseId}) => {
       step('createCopy')
@@ -175,6 +179,19 @@ describe('schedulePost', () => {
     expect(documents.get(copyId(ID, R))).toMatchObject({title: 'Hello'})
   })
 
+  it('never writes to the draft, so a slug someone set meanwhile is theirs to keep', async () => {
+    const {client, documents, put, draft, steps} = withDraft()
+    put(draftId(ID), {...post, slug: {_type: 'slug', current: 'their-own-slug'}})
+
+    const set = {slug: {_type: 'slug', current: 'hello'}, publishedAt: FRIDAY}
+    const result = await schedulePost(client, {documentId: ID, draft, set, at: FRIDAY, releaseId: R})
+
+    expect(result.draft).toBe('differs')
+    expect(steps).not.toContain('setFields')
+    expect(documents.get(draftId(ID))).toMatchObject({slug: {current: 'their-own-slug'}})
+    expect(documents.get(draftId(ID))).not.toHaveProperty('publishedAt')
+  })
+
   it('stays Scheduled when the draft can’t be tidied just now', async () => {
     const {client, releases, draft} = withDraft({failOn: ['discardDraft']})
     const result = await schedulePost(client, {documentId: ID, draft, set: {}, at: FRIDAY, releaseId: R})
@@ -223,6 +240,29 @@ describe('takeOffSchedule, then scheduleAgain', () => {
     expect(documents.get(copyId(ID, R))).toMatchObject({title: 'Hello, fixed'})
   })
 
+  it('goes back on only as it was checked', async () => {
+    const {client, documents, releases} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    const checked = documents.get(copyId(ID, R))!._rev as string
+    // Someone clears the title after the check, before the Writer says yes.
+    await client.setFields(copyId(ID, R), {title: ''})
+
+    for (const set of [{}, {publishedAt: MONDAY}]) {
+      const attempt = scheduleAgain(client, {documentId: ID, releaseId: R, set, at: MONDAY, checked})
+      await expect(attempt).rejects.toBeInstanceOf(ChangedSinceChecked)
+    }
+    expect(releases.get(R)).toMatchObject({state: 'active', at: FRIDAY})
+    expect(documents.get(copyId(ID, R))).toMatchObject({title: '', publishedAt: FRIDAY})
+  })
+
+  it('goes back on when it is still the revision that was checked', async () => {
+    const {client, documents, releases} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    const checked = documents.get(copyId(ID, R))!._rev as string
+    await scheduleAgain(client, {documentId: ID, releaseId: R, set: {publishedAt: MONDAY}, at: MONDAY, checked})
+    expect(releases.get(R)).toMatchObject({state: 'scheduled', publishAt: MONDAY})
+  })
+
   it('can go back on for another time, taking the date with it', async () => {
     const {client, documents, releases} = await scheduled()
     await takeOffSchedule(client, {releaseId: R})
@@ -251,6 +291,21 @@ describe('changeTime', () => {
     const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {}, at: MONDAY, was: FRIDAY})
     await expect(attempt).rejects.not.toBeInstanceOf(OffTheSchedule)
     expect(releases.get(R)).toMatchObject({state: 'scheduled', at: FRIDAY, publishAt: FRIDAY})
+  })
+
+  it('puts the old date back with the old promise', async () => {
+    const {client, documents, releases} = await scheduled({failOn: ['schedule']})
+    const attempt = changeTime(client, {documentId: ID, releaseId: R, set: {publishedAt: MONDAY}, at: MONDAY, was: FRIDAY})
+    await expect(attempt).rejects.toThrow()
+    expect(releases.get(R)).toMatchObject({state: 'scheduled', publishAt: FRIDAY})
+    expect(documents.get(copyId(ID, R))).toMatchObject({publishedAt: FRIDAY})
+  })
+
+  it('takes away a field the failed change added', async () => {
+    const {client, documents} = await scheduled({failOn: ['schedule']})
+    const set = {slug: {_type: 'slug', current: 'hello'}}
+    await expect(changeTime(client, {documentId: ID, releaseId: R, set, at: MONDAY, was: FRIDAY})).rejects.toThrow()
+    expect(documents.get(copyId(ID, R))).not.toHaveProperty('slug')
   })
 
   it('says so when the Post has ended up off the schedule', async () => {

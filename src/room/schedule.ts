@@ -8,8 +8,11 @@ type Doc = Record<string, unknown>
  */
 export interface ScheduleClient {
   read(id: string): Promise<Doc | undefined>
-  /** Sets fields on a copy that isn't locked. */
-  setFields(id: string, fields: Doc): Promise<unknown>
+  /**
+   * Sets fields on a copy that isn't locked; a field given as `undefined` is removed. With
+   * `ifRevision`, only if the copy is still at that revision: otherwise it fails and nothing is written.
+   */
+  setFields(id: string, fields: Doc, options?: {ifRevision?: string}): Promise<unknown>
   /** Writes `document` as a copy: in `releaseId`, or as the draft without one. */
   createCopy(args: {document: Doc; publishedId: string; releaseId?: string}): Promise<unknown>
   /** Removes a copy: the one in `releaseId`, or the draft without one. */
@@ -94,12 +97,24 @@ export async function schedulePost(
     throw error
   }
 
-  // The copy took `set`, so a draft that matches it has to have it too.
+  // The draft goes only if it is still the one that was copied. A newer revision holds something
+  // the copy doesn't, whatever it is, and nothing is written to it on the way.
   const tidied = await (async () => {
-    if (Object.keys(set).length > 0) await client.setFields(draftId(documentId), set)
-    return tidyDraft(client, {documentId, releaseId})
+    const current = await client.read(draftId(documentId))
+    if (!current) return 'none' as const
+    if (current._rev !== draft._rev) return 'differs' as const
+    await client.discardCopy({publishedId: documentId})
+    return 'removed' as const
   })().catch(() => 'left' as const)
   return {releaseId, draft: tidied}
+}
+
+/** The copy has changed since it was checked, so what would be promised isn't what was checked. */
+export class ChangedSinceChecked extends Error {
+  constructor(cause?: unknown) {
+    super('The copy changed after it was checked', {cause})
+    this.name = 'ChangedSinceChecked'
+  }
 }
 
 /** "Edit it": off the schedule, so the copy can change. The release remembers its time. */
@@ -107,12 +122,35 @@ export async function takeOffSchedule(client: ScheduleClient, {releaseId}: {rele
   await client.unschedule({releaseId})
 }
 
-/** Puts a Post that was taken off the schedule back on it, for the same time or a new one. */
+/**
+ * Puts a Post that was taken off the schedule back on it, for the same time or a new one.
+ *
+ * `checked` is the revision of the copy that passed the publish check. The copy can be edited
+ * until the moment it is scheduled, so it goes back on only if it is still that revision; if not,
+ * `ChangedSinceChecked` is thrown and nothing is promised.
+ */
 export async function scheduleAgain(
   client: ScheduleClient,
-  {documentId, releaseId, set, at}: {documentId: string; releaseId: string; set: Doc; at: string},
+  {
+    documentId,
+    releaseId,
+    set,
+    at,
+    checked,
+  }: {documentId: string; releaseId: string; set: Doc; at: string; checked?: string},
 ): Promise<void> {
-  if (Object.keys(set).length > 0) await client.setFields(copyId(documentId, releaseId), set)
+  const id = copyId(documentId, releaseId)
+  if (Object.keys(set).length > 0) {
+    try {
+      await client.setFields(id, set, checked ? {ifRevision: checked} : undefined)
+    } catch (error) {
+      // Only the server knows whether it refused because of the revision, so ask it.
+      if (checked && (await client.read(id))?._rev !== checked) throw new ChangedSinceChecked(error)
+      throw error
+    }
+  } else if (checked && (await client.read(id))?._rev !== checked) {
+    throw new ChangedSinceChecked()
+  }
   await client.setReleaseTime({releaseId, at})
   await client.schedule({releaseId, at})
 }
@@ -120,17 +158,21 @@ export async function scheduleAgain(
 /**
  * "Change the time" on a Scheduled Post. The platform locks the time with the words, so it comes
  * off the schedule and goes back on. If the new time doesn't take, the old promise is restored; if
- * even that fails, the Post is left off the schedule and `held` says so.
+ * even that fails, the Post is left off the schedule and `OffTheSchedule` says so.
  */
 export async function changeTime(
   client: ScheduleClient,
   {documentId, releaseId, set, at, was}: {documentId: string; releaseId: string; set: Doc; at: string; was: string},
 ): Promise<void> {
+  // What `set` is about to replace, so the old promise can be restored whole: its time and its date.
+  const before = (await client.read(copyId(documentId, releaseId))) ?? {}
+  const previous = Object.fromEntries(Object.keys(set).map((field) => [field, before[field]]))
   await client.unschedule({releaseId})
   try {
     await scheduleAgain(client, {documentId, releaseId, set, at})
   } catch (error) {
     try {
+      if (Object.keys(previous).length > 0) await client.setFields(copyId(documentId, releaseId), previous)
       await client.setReleaseTime({releaseId, at: was})
       await client.schedule({releaseId, at: was})
     } catch {

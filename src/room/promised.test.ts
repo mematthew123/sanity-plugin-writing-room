@@ -124,6 +124,19 @@ describe('promisedPosts', () => {
     expect(promisedPosts([one], [{_id: 'versions.rOne.a.b.c', _type: 'post'}])[0]?.documentId).toBe('a.b.c')
   })
 
+  it('picks the same promise as the room does, whatever order the copies come in', () => {
+    const monday = {...onePost('scheduled', {publishAt: '2026-11-16T09:00:00Z'}), name: 'rMonday'}
+    const friday = {...onePost('scheduled', {publishAt: FRIDAY}), name: 'rFriday'}
+    const copies = [
+      {_id: 'versions.rMonday.a', _type: 'post'},
+      {_id: 'versions.rFriday.a', _type: 'post'},
+    ]
+    for (const order of [copies, [...copies].reverse()]) {
+      expect(promisedPosts([monday, friday], order)).toMatchObject([{documentId: 'a', releaseId: 'rFriday'}])
+      expect(findPromise([monday, friday], order.map((copy) => copy._id))?.release.name).toBe('rFriday')
+    }
+  })
+
   it('lists a Post once, by the promise that is really scheduled', () => {
     const copies = [
       {_id: 'versions.rTwo.a', _type: 'post'},

@@ -11,7 +11,15 @@ import {isAhead} from '../lib/promised-time'
 export function scheduleClient(client: SanityClient): ScheduleClient {
   return {
     read: (id) => client.getDocument(id),
-    setFields: (id, fields) => client.patch(id).set(fields).commit(),
+    setFields: (id, fields, options) => {
+      const set = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined))
+      const unset = Object.keys(fields).filter((field) => fields[field] === undefined)
+      let patch = client.patch(id)
+      if (options?.ifRevision) patch = patch.ifRevisionId(options.ifRevision)
+      if (Object.keys(set).length > 0) patch = patch.set(set)
+      if (unset.length > 0) patch = patch.unset(unset)
+      return patch.commit()
+    },
     createCopy: ({document, publishedId, releaseId}) =>
       client.createVersion({
         document: document as {_id: string; _type: string},
@@ -35,6 +43,8 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
     },
   }
 }
+
+const MAX_TIMER_MS = 2 ** 31 - 1
 
 /** Which copy of a Post the room has open, and what is promised for it. */
 export interface PostCopy {
@@ -104,6 +114,18 @@ export function PostCopyProvider({
 
   // Only what is settled on the server is tidied: never a promise the room is still making.
   const settled = found ? found.release.name : null
+  // A held promise runs out at its time whether or not anything else changes, so the room looks again then.
+  const [, lookAgain] = useState(0)
+  const heldUntil = found?.promise.held ? found.promise.at : undefined
+  useEffect(() => {
+    if (!heldUntil) return undefined
+    const wait = new Date(heldUntil).getTime() - Date.now()
+    if (!(wait > 0)) return undefined
+    // Further off than a timer can count: the room will have been reopened long before.
+    if (wait > MAX_TIMER_MS) return undefined
+    const timer = setTimeout(() => lookAgain((count) => count + 1), wait + 1000)
+    return () => clearTimeout(timer)
+  }, [heldUntil])
   const expired = !!found?.promise.held && !isAhead(found.promise.at)
   useEffect(() => {
     if (!settled) {
