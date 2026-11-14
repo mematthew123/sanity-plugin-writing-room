@@ -81,6 +81,30 @@ test('says why typing does nothing in a Scheduled Post, and offers to edit it', 
   }).toPass({timeout: 20_000})
 })
 
+test('changes the time of a Scheduled Post, and its date with it', async ({page, post, content}) => {
+  await page.getByRole('button', {name: 'Schedule', exact: true}).click()
+  await page.getByRole('button', {name: 'Scheduled', exact: true}).click()
+  await page.getByRole('button', {name: 'Change the time'}).click()
+
+  const later = new Date(Date.now() + 5 * 24 * 3600 * 1000)
+  later.setHours(14, 30, 0, 0)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  await page
+    .getByLabel('When it goes live')
+    .fill(`${later.getFullYear()}-${pad(later.getMonth() + 1)}-${pad(later.getDate())}T14:30`)
+  await page.getByRole('button', {name: 'Schedule', exact: true}).click()
+  await expect(page.getByText(/^Scheduled for .* at (14:30|2:30 pm)$/)).toBeVisible()
+
+  await expect(async () => {
+    const [releaseId] = await releasesOf(content, post.id)
+    const release = await content.releases.get({releaseId: releaseId!}) as Release | undefined
+    expect(release?.state).toBe('scheduled')
+    expect(new Date(release!.publishAt!).getTime()).toBe(later.getTime())
+    const copy = await content.getDocument<{publishedAt?: string}>(`versions.${releaseId}.${post.id}`)
+    expect(new Date(copy!.publishedAt!).getTime()).toBe(later.getTime())
+  }).toPass({timeout: 20_000})
+})
+
 test('says "Not yet" to a time and nothing is scheduled', async ({page, post, content}) => {
   await page.getByRole('button', {name: 'Not yet'}).click()
   await expect(page.getByRole('button', {name: 'Schedule', exact: true})).toHaveCount(0)
