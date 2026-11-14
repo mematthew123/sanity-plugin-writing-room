@@ -6,10 +6,12 @@ import {
   useApplyDocumentActions,
   useCreateDocument,
   useDocument,
+  useActiveReleases,
   useDocumentProjection,
   useDocuments,
+  useQuery,
 } from '@sanity/sdk-react'
-import {Suspense, useEffect, useMemo, useRef, useState} from 'react'
+import {createContext, Suspense, useContext, useEffect, useMemo, useRef, useState} from 'react'
 import {useColorSchemeValue, useCurrentUser, useDataset, useProjectId} from 'sanity'
 import {StateLink, useRouter} from 'sanity/router'
 import styled from 'styled-components'
@@ -21,6 +23,7 @@ import {forgetLastOpened, readLastOpened} from './last-opened'
 import {useLeaveToStudio} from './navigation'
 import {describePostStatus, type DocumentEditStatus, type PostStatus, timeAgo} from './post-status'
 import {Column, NARROW, Placeholder, QuietButton, SectionLabel} from './primitives'
+import {type PromisedPost, promisedPosts, type ReleaseLike} from './promised'
 import {roomState} from './room-route'
 import {countWords} from './word-count'
 
@@ -334,7 +337,22 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
   })
   const [problem, setProblem] = useState<string | null>(null)
 
-  if (data.length === 0 && !remembered) {
+  // A Scheduled Post is a copy in a release of its own, and may have no draft: it is found there.
+  const releases = useActiveReleases() as unknown as ReleaseLike[]
+  const {data: copies} = useQuery<Array<{_id: string; _type: string; _updatedAt?: string}>>({
+    query: '*[_type in $types && _id in path("versions.**")]{_id, _type, _updatedAt}',
+    params: {types},
+    perspective: 'raw',
+  })
+  const promised = useMemo(() => promisedPosts(releases, copies ?? []), [releases, copies])
+  const promises = useMemo(() => new Map(promised.map((post) => [post.documentId, post])), [promised])
+  const documents = useMemo<DocumentHandle[]>(() => {
+    const listed = new Set(data.map((handle) => handle.documentId))
+    const onlyPromised = promised.filter((post) => !listed.has(post.documentId))
+    return [...onlyPromised.map(({documentId, documentType}) => ({documentId, documentType})), ...data]
+  }, [data, promised])
+
+  if (documents.length === 0 && !remembered) {
     const names = listOfKinds.format(kinds.map((kind) => kind.singular))
     return (
       <>
@@ -351,11 +369,11 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
     )
   }
 
-  const first: DocumentHandle = remembered ?? data[0]!
-  const others = data.filter((handle) => handle.documentId !== first.documentId).slice(0, RECENT)
+  const first: DocumentHandle = remembered ?? documents[0]!
+  const others = documents.filter((handle) => handle.documentId !== first.documentId).slice(0, RECENT)
 
   return (
-    <>
+    <Promises.Provider value={promises}>
       <Header>
         <Greeting />
         <StartNew kinds={kinds} onProblem={setProblem} />
@@ -390,9 +408,12 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
         </Recent>
       )}
       <BrowseLink />
-    </>
+    </Promises.Provider>
   )
 }
+
+/** The Posts on the desk that have a promised time, by id. */
+const Promises = createContext<ReadonlyMap<string, PromisedPost>>(new Map())
 
 function DeskPlaceholder() {
   return (
@@ -438,19 +459,16 @@ interface Glimpse {
 /** A document's title and its words as plain text, wherever its type keeps them. */
 function useGlimpse(handle: DocumentHandle, kinds: WritingKind[], ref?: React.RefObject<HTMLElement | null>) {
   const kind = kinds.find((option) => option.type === handle.documentType)
+  const promised = useContext(Promises).get(handle.documentId)
   const {data} = useDocumentProjection<Glimpse>({
     ...handle,
+    // Its words are in its Scheduled copy, which is all there may be of it.
+    ...(promised && {perspective: {releaseName: promised.releaseId}}),
     // With a ref the SDK waits until the row is on screen; without one it loads straight away.
     ...(ref && {ref}),
     projection: `{"title": ${kind?.fields.title ?? 'title'}, "text": pt::text(${kind?.fields.body ?? 'body'})}`,
   })
-  return {data, kind, status: describePostStatus(data?._status)}
-}
-
-const STATUS: Record<PostStatus['label'], string> = {
-  Draft: 'Draft',
-  Published: 'Published',
-  'Published · unpublished changes': 'Unpublished changes',
+  return {data, kind, promised, status: describePostStatus(data?._status, {promise: promised?.promise})}
 }
 
 /** "Draft", with a dot while there's something readers haven't seen. */
@@ -458,8 +476,8 @@ function Status({status}: {status: PostStatus}) {
   return (
     <span>
       <StatusText>
-        {status.label !== 'Published' && <Dot aria-hidden />}
-        {STATUS[status.label]}
+        {status.unseen && <Dot aria-hidden />}
+        {status.short}
       </StatusText>
     </span>
   )
@@ -633,9 +651,10 @@ const Rows = styled.ul`
 function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
-  const {data, kind, status} = useGlimpse(handle, kinds, ref)
-  // Only a never-published document with no title and no words can be an abandoned start.
-  const maybeEmpty = status.label === 'Draft' && !data?.title?.trim() && !data?.text?.trim()
+  const {data, kind, promised, status} = useGlimpse(handle, kinds, ref)
+  // Only a never-published document with no title and no words can be an abandoned start, and
+  // never one with a promised time.
+  const maybeEmpty = !status.isPublished && !promised && !data?.title?.trim() && !data?.text?.trim()
 
   return (
     <RowRoot ref={ref}>
