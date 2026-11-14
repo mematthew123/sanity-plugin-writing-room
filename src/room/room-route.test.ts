@@ -1,6 +1,6 @@
 import {route} from 'sanity/router'
 import {describe, expect, it} from 'vitest'
-import {detailsState, openedDocument, openedView, ROOM_ROUTES, roomState} from './room-route'
+import {detailsState, openedDocument, openedRelease, openedView, ROOM_ROUTES, roomState} from './room-route'
 
 const router = route.create(
   '/',
@@ -50,6 +50,28 @@ describe('room routes', () => {
   it('opens on the Prose unless Details was asked for', () => {
     expect(openedView(router.decode('/abc') ?? {})).toEqual({details: false})
     expect(openedView(router.decode('/abc?view=history&field=slug') ?? {})).toEqual({details: false})
+  })
+
+  it('carries the Release whose copy to open, in the query', () => {
+    const url = router.encode(roomState('abc', 'caseStudy', TYPES, 'rSummer'))
+    expect(url).toBe('/caseStudy/abc?release=rSummer')
+    const state = router.decode(url) ?? {}
+    expect(openedDocument(state, TYPES)).toEqual({documentId: 'abc', documentType: 'caseStudy'})
+    expect(openedRelease(state)).toBe('rSummer')
+    expect(openedView(state)).toEqual({details: false})
+  })
+
+  it('stays in the Release when Details opens', () => {
+    const url = router.encode(detailsState(roomState('abc', 'post', TYPES, 'rSummer'), 'slug'))
+    expect(url).toBe('/abc?release=rSummer&view=details&field=slug')
+    const state = router.decode(url) ?? {}
+    expect(openedRelease(state)).toBe('rSummer')
+    expect(openedView(state)).toEqual({details: true, field: 'slug'})
+  })
+
+  it('opens the Writer’s own copy when no Release was asked for', () => {
+    expect(openedRelease(router.decode('/abc') ?? {})).toBeUndefined()
+    expect(openedRelease(router.decode('/abc?view=details') ?? {})).toBeUndefined()
   })
 
   it('shows the Lobby when no document is open', () => {

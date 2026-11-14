@@ -2,8 +2,8 @@ import {type DocumentHandle, useActiveReleases, useQuery} from '@sanity/sdk-reac
 import {createContext, type ReactNode, useContext, useEffect, useMemo, useState} from 'react'
 import {type SanityClient, useClient, useSchema, useSource} from 'sanity'
 import {API_VERSION} from '../lib/api-version'
-import {type Promised} from './post-status'
-import {findPromise, type ReleaseLike} from './promised'
+import {type InRelease, type Promised} from './post-status'
+import {describeRelease, findPromise, isOnePostRelease, type ReleaseLike} from './promised'
 import {copyId, draftId, foldBack, type ScheduleClient, tidyDraft} from './schedule'
 import {isAhead, waitUntil} from '../lib/promised-time'
 
@@ -56,9 +56,13 @@ const NO_SUCH_FIELD = 'writingRoomNoSuchField'
 export interface PostCopy {
   documentId: string
   documentType: string
-  /** The Post's own release, while it is Scheduled or taken off the schedule. */
+  /** The Post's own release while it has a promise, or the Release it was opened in. */
   releaseId: string | null
   promise: Promised | null
+  /** Set when the open copy is one in a Release. */
+  release: InRelease | null
+  /** The title of a Release that was asked for but has no copy of the Post; '' if it has none. Null if none was asked for. */
+  notIn: string | null
   openId: string
   /** For the App SDK. */
   handle: DocumentHandle
@@ -84,12 +88,15 @@ export interface JustPromised {
 export function PostCopyProvider({
   documentId,
   documentType,
+  inRelease,
   justPromised,
   onCaughtUp,
   children,
 }: {
   documentId: string
   documentType: string
+  /** The Release the Writer chose in Structure before opening the room, if they did. */
+  inRelease?: string
   justPromised: JustPromised | null
   onCaughtUp: () => void
   children: (copy: PostCopy) => ReactNode
@@ -101,9 +108,18 @@ export function PostCopyProvider({
     params: {id: documentId},
     perspective: 'raw',
   })
-  const found = useMemo(() => findPromise(releases, copyIds ?? []), [releases, copyIds])
-  const releaseId = found?.release.name ?? justPromised?.releaseId ?? null
-  const promise = found?.promise ?? justPromised?.promise ?? null
+  // A Release of many is opened only when asked for, and only if the Post already has a copy in
+  // it: the room writes into Releases, and never adds to one (ADR-0003). A one-Post release isn't
+  // asked for; the room finds that itself.
+  const asked = inRelease ? releases.find((release) => release.name === inRelease) : undefined
+  const theirs = asked && !isOnePostRelease(asked) ? asked : undefined
+  const within = theirs && (copyIds ?? []).includes(copyId(documentId, theirs.name)) ? theirs : null
+  const release = useMemo(() => (within ? describeRelease(within) : null), [within])
+  const notIn = inRelease && !within && !(asked && isOnePostRelease(asked)) ? (theirs?.metadata?.title?.trim() ?? '') : null
+
+  const found = useMemo(() => (within ? null : findPromise(releases, copyIds ?? [])), [within, releases, copyIds])
+  const releaseId = within?.name ?? found?.release.name ?? justPromised?.releaseId ?? null
+  const promise = within ? null : (found?.promise ?? justPromised?.promise ?? null)
   const hasDraft = (copyIds ?? []).includes(draftId(documentId))
   const [otherChanges, setOtherChanges] = useState(false)
 
@@ -156,13 +172,15 @@ export function PostCopyProvider({
       documentType,
       releaseId,
       promise,
+      release,
+      notIn,
       openId: releaseId ? copyId(documentId, releaseId) : draftId(documentId),
       handle: releaseId
         ? {documentId, documentType, perspective: {releaseName: releaseId}}
         : {documentId, documentType},
       otherChanges,
     }),
-    [documentId, documentType, releaseId, promise, otherChanges],
+    [documentId, documentType, releaseId, promise, release, notIn, otherChanges],
   )
 
   return <Copy.Provider value={copy}>{children(copy)}</Copy.Provider>

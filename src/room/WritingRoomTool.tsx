@@ -7,7 +7,7 @@ import {Lobby} from './Lobby'
 import {Surface} from './primitives'
 import {Room} from './Room'
 import {SetupProblemBoundary} from './SetupProblem'
-import {openedDocument} from './room-route'
+import {openedDocument, openedRelease} from './room-route'
 
 /** The surface and its portaled popovers. */
 const ROOM_ELEMENTS = ['[data-calm-surface]', '[data-calm-floating]']
@@ -57,7 +57,12 @@ export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
         <SetupProblemBoundary>
           <Suspense fallback={null}>
             {opened ? (
-              <Room key={opened.documentId} documentId={opened.documentId} documentType={opened.documentType} />
+              <Room
+                key={opened.documentId}
+                documentId={opened.documentId}
+                documentType={opened.documentType}
+                release={openedRelease(state)}
+              />
             ) : (
               <Lobby />
             )}

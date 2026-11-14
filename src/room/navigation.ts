@@ -3,7 +3,7 @@ import {useCallback, useMemo} from 'react'
 import {useWorkspace} from 'sanity'
 import {useRouter} from 'sanity/router'
 import {useHasDetails, useWritingTypes} from './kinds'
-import {detailsState, openedView, roomState} from './room-route'
+import {detailsState, openedRelease, openedView, roomState} from './room-route'
 
 function useStudioPath() {
   const {basePath} = useWorkspace()
@@ -53,7 +53,12 @@ export function useRoomView(handle: DocumentHandle) {
   const opened = openedView(state)
   const inDetails = opened.details && hasDetails
   const field = opened.field
-  const room = useMemo(() => roomState(documentId, documentType, types), [documentId, documentType, types])
+  // Both views are of the same copy: one opened in a Release stays in it.
+  const release = openedRelease(state)
+  const room = useMemo(
+    () => roomState(documentId, documentType, types, release),
+    [documentId, documentType, types, release],
+  )
 
   /**
    * With a field, Details opens with that field focused. A type with nothing for Details to show

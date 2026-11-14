@@ -39,7 +39,7 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
         ),
         canHandleIntent: (intent, params) => intent === WRITE_INTENT && isWritingType(params.type),
         getIntentState: (_intent, params) =>
-          isWritingType(params.type) ? roomState(params.id, params.type, types) : {},
+          isWritingType(params.type) ? roomState(params.id, params.type, types, params.release) : {},
       },
     ],
     studio: {

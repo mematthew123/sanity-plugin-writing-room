@@ -53,7 +53,16 @@ import {TitleField} from './TitleField'
 import {useEscape} from './use-escape'
 import {useRecede} from './use-recede'
 
-export function Room({documentId, documentType}: {documentId: string; documentType: string}) {
+export function Room({
+  documentId,
+  documentType,
+  release,
+}: {
+  documentId: string
+  documentType: string
+  /** The Release whose copy to open, when the Writer came from Structure with one chosen. */
+  release?: string
+}) {
   const [problem, setProblem] = useState<string | null>(null)
   // Out here so "Scheduled for…" outlasts the room starting over on the Scheduled copy.
   const [notice, setNotice] = useState<RoomNotice | null>(null)
@@ -72,6 +81,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
       <PostCopyProvider
         documentId={documentId}
         documentType={documentType}
+        inRelease={release}
         justPromised={justPromised}
         onCaughtUp={caughtUp}
       >
@@ -151,7 +161,7 @@ function LoadedRoom({
     ...handle,
     projection: fields.slug ? `{_id, "slug": ${fields.slug}.current}` : '{_id}',
   })
-  const status = describePostStatus(data?._status, {promise: copy.promise})
+  const status = describePostStatus(data?._status, {promise: copy.promise, release: copy.release})
   const {isPublished, locked} = status
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
@@ -162,8 +172,10 @@ function LoadedRoom({
 
   // "Edit it"
   const {releaseId} = copy
+  const inRelease = copy.release
   const takeOff = useCallback(async () => {
-    if (!releaseId) return
+    // Only the Post's own schedule is the room's to change. A Release is the Studio's.
+    if (!releaseId || inRelease) return
     try {
       await takeOffSchedule(scheduleClient(client), {releaseId})
       setNotice(null)
@@ -171,7 +183,7 @@ function LoadedRoom({
     } catch {
       onProblem(`This ${singular} couldn’t be taken off the schedule just now. Try again in a moment.`)
     }
-  }, [client, releaseId, singular, setNotice, onProblem])
+  }, [client, releaseId, inRelease, singular, setNotice, onProblem])
 
   // A page that silently ignores keys reads as broken.
   const promisedFor = locked ? status.promisedFor : undefined
@@ -196,13 +208,45 @@ function LoadedRoom({
       action: {label: 'Open in Structure', onClick: openInStructure},
     })
   }, [otherChanges, singular, setNotice, openInStructure])
+
+  // A scheduled Release locks every copy in it, and unscheduling it is the Studio's. The room says
+  // so on the way in, and again if the Writer tries to type.
+  const releaseTitle = inRelease?.title
+  const releaseLockedFor = inRelease?.scheduledFor
+  useEffect(() => {
+    if (!releaseTitle || !releaseLockedFor) return undefined
+    const say = () =>
+      setNotice({
+        text: `${releaseTitle.replace(/^./, (first) => first.toUpperCase())} is scheduled for ${describePromisedTime(releaseLockedFor)}, so this ${singular} can’t change.`,
+        action: {label: 'Open in Structure', onClick: openInStructure},
+      })
+    say()
+    const onKey = (event: KeyboardEvent) => {
+      if (isTypingAtProse(event)) say()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [releaseTitle, releaseLockedFor, singular, setNotice, openInStructure])
+
+  // Asked for a Release the Post has no copy in: the room never adds to one, so it says which copy this is.
+  const {notIn} = copy
+  useEffect(() => {
+    if (notIn === null) return
+    setNotice({
+      text: `This ${singular} isn’t in ${notIn || 'that release'}, so this is its own copy.`,
+      action: {label: 'Open in Structure', onClick: openInStructure},
+    })
+  }, [notIn, singular, setNotice, openInStructure])
   const projectId = useProjectId()
   const dataset = useDataset()
 
-  // So the Lobby can offer to continue this one.
+  // So the Lobby can offer to continue this one. Not a Release's copy: the Lobby only ever opens
+  // the Writer's own, and a Release is found again through Structure.
+  const isReleaseCopy = !!copy.release
   useEffect(() => {
+    if (isReleaseCopy) return
     rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
-  }, [projectId, dataset, handle.documentId, handle.documentType])
+  }, [isReleaseCopy, projectId, dataset, handle.documentId, handle.documentType])
 
   const view = useRoomView(handle)
   const {hasDetails, inDetails} = view
@@ -238,9 +282,14 @@ function LoadedRoom({
                 <Presence handle={handle} />
                 <SaveState />
                 <Recedes>
-                  <WideOnly>
+                  {/* On a phone the button's label says the status. A Release's copy has no button, so it keeps its words. */}
+                  {copy.release ? (
                     <StatusLabel status={status} />
-                  </WideOnly>
+                  ) : (
+                    <WideOnly>
+                      <StatusLabel status={status} />
+                    </WideOnly>
+                  )}
                   <RoomSettingsMenu
                     scheme={scheme}
                     more={
