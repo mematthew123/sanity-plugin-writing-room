@@ -1,5 +1,15 @@
 # sanity-plugin-writing-room
 
+## 0.4.0
+
+### Minor Changes
+
+- [#16](https://github.com/mematthew123/sanity-plugin-writing-room/pull/16) [`be9e0b2`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/be9e0b20ae91b6b2ac1c927a544ef67d395f7a94) Thanks [@mematthew123](https://github.com/mematthew123)! - Choose an image that already exists. The Insert Menu now has two image rows, "Upload an image" and "Choose an image". The second offers the image sources your Studio has set up (its own uploads, Media Library, any a plugin adds) and opens the one you pick in its own dialog. The room follows your Studio's `form.image` settings and the body image type's `options.sources`, and no longer uploads a pasted or dropped image in a Studio that has turned uploads off.
+
+### Patch Changes
+
+- [#16](https://github.com/mematthew123/sanity-plugin-writing-room/pull/16) [`be9e0b2`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/be9e0b20ae91b6b2ac1c927a544ef67d395f7a94) Thanks [@mematthew123](https://github.com/mematthew123)! - Numbered lists in the room count 1, 2, 3 again. They were showing 1, 1, 2.
+
 ## 0.3.0
 
 ### Minor Changes
