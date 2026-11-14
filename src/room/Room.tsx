@@ -191,7 +191,7 @@ function LoadedRoom({
                 page={page}
                 inDetails={inDetails}
                 focusField={view.field}
-                onUploadFailed={onProblem}
+                onProblem={onProblem}
               />
             </Page>
           </Main>
@@ -241,7 +241,7 @@ function Pages({
   page,
   inDetails,
   focusField,
-  onUploadFailed,
+  onProblem,
 }: {
   handle: DocumentHandle
   fields: WritingFields
@@ -249,7 +249,7 @@ function Pages({
   page: RefObject<HTMLElement | null>
   inDetails: boolean
   focusField: string | undefined
-  onUploadFailed: (problem: string | null) => void
+  onProblem: (problem: string | null) => void
 }) {
   const editor = useEditor()
   const openInStructure = useOpenInStructure(handle)
@@ -262,7 +262,7 @@ function Pages({
     <>
       {/* Inert as soon as it starts to go, so nothing typed lands in an editor that can't be seen. */}
       <Swap hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
-        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onUploadFailed={onUploadFailed} />
+        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onProblem={onProblem} />
       </Swap>
       {shown === 'details' && (
         <Swap inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">

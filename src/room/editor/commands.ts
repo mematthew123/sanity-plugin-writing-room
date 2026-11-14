@@ -6,10 +6,13 @@ import {ImageIcon} from '@sanity/icons/Image'
 import {OlistIcon} from '@sanity/icons/Olist'
 import {PlayIcon} from '@sanity/icons/Play'
 import {UlistIcon} from '@sanity/icons/Ulist'
+import {UploadIcon} from '@sanity/icons/Upload'
 import {type BodyAllows} from './allows'
+import {type BodyImages} from './image-sources'
 
 export type InsertCommandId =
-  | 'image'
+  | 'uploadImage'
+  | 'chooseImage'
   | 'embed'
   | 'codeBlock'
   | 'sectionBreak'
@@ -22,12 +25,25 @@ export interface InsertCommand {
   label: string
   icon: ComponentType
   keywords: string[]
-  allowed: (allows: BodyAllows) => boolean
+  allowed: (allows: BodyAllows, images: Pick<BodyImages, 'upload' | 'sources'>) => boolean
 }
 
 /** In display order. */
 export const INSERT_COMMANDS: InsertCommand[] = [
-  {id: 'image', label: 'Image', icon: ImageIcon, keywords: ['picture', 'photo'], allowed: (a) => a.block('image')},
+  {
+    id: 'uploadImage',
+    label: 'Upload an image',
+    icon: UploadIcon,
+    keywords: ['picture', 'photo'],
+    allowed: (a, images) => a.block('image') && images.upload,
+  },
+  {
+    id: 'chooseImage',
+    label: 'Choose an image',
+    icon: ImageIcon,
+    keywords: ['picture', 'photo', 'existing', 'library'],
+    allowed: (a, images) => a.block('image') && images.sources.length > 0,
+  },
   {
     id: 'embed',
     label: 'Embed',
@@ -54,9 +70,13 @@ export const INSERT_COMMANDS: InsertCommand[] = [
   {id: 'numberList', label: 'Numbered list', icon: OlistIcon, keywords: ['list', 'ordered'], allowed: (a) => a.list('number')},
 ]
 
-export function matchCommands(keyword: string, allows: BodyAllows): InsertCommand[] {
+export function matchCommands(
+  keyword: string,
+  allows: BodyAllows,
+  images: Pick<BodyImages, 'upload' | 'sources'>,
+): InsertCommand[] {
   const query = keyword.trim().toLowerCase()
-  const available = INSERT_COMMANDS.filter((command) => command.allowed(allows))
+  const available = INSERT_COMMANDS.filter((command) => command.allowed(allows, images))
   if (!query) return available
   return available.filter(
     (command) =>
@@ -66,12 +86,15 @@ export function matchCommands(keyword: string, allows: BodyAllows): InsertComman
 }
 
 export const PICK_IMAGE_EVENT = 'custom.pick image'
+export const CHOOSE_IMAGE_EVENT = 'custom.choose image'
 
-/** Images need a file first, so they raise {@link PICK_IMAGE_EVENT} instead. */
+/** Images need a file or a choice first, so they raise an event of their own instead. */
 export function commandEvents(id: InsertCommandId, allows: BodyAllows) {
   switch (id) {
-    case 'image':
+    case 'uploadImage':
       return [{type: PICK_IMAGE_EVENT} as const]
+    case 'chooseImage':
+      return [{type: CHOOSE_IMAGE_EVENT} as const]
     case 'embed':
       return [
         {type: 'insert.block', block: {_type: allows.roomBlock('embed')!}, placement: 'auto', select: 'start'} as const,

@@ -4,14 +4,26 @@ import {getFocusTextBlock, isSelectionCollapsed} from '@portabletext/editor/sele
 import {getTextBlockText, isEmptyTextBlock} from '@portabletext/editor/utils'
 import {defineTypeaheadPicker, useTypeaheadPicker} from '@portabletext/plugin-typeahead-picker'
 import {AddIcon} from '@sanity/icons/Add'
-import {type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useState} from 'react'
+import {ImageIcon} from '@sanity/icons/Image'
+import {
+  type ComponentType,
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import {type AssetSource, useTranslation} from 'sanity'
 import styled from 'styled-components'
 import {type BodyAllows, useBodyAllows} from './allows'
 import {commandEvents, type InsertCommand, type InsertCommandId, matchCommands} from './commands'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
+import {type BodyImages} from './image-sources'
 
 /** Built per body type, since the picker's matcher only sees what was typed. */
-const slashPicker = (allows: BodyAllows) =>
+const slashPicker = (allows: BodyAllows, images: BodyImages) =>
   defineTypeaheadPicker<InsertCommand & {key: string}>({
     trigger: /^\//,
     keyword: /\w*/,
@@ -19,7 +31,7 @@ const slashPicker = (allows: BodyAllows) =>
       const focus = getFocusTextBlock(snapshot)
       return !!focus && !focus.node.listItem && getTextBlockText(focus.node) === '/'
     },
-    getMatches: ({keyword}) => matchCommands(keyword, allows).map((command) => ({...command, key: command.id})),
+    getMatches: ({keyword}) => matchCommands(keyword, allows, images).map((command) => ({...command, key: command.id})),
     onSelect: [
       ({event}) => [
         raise({type: 'delete', at: event.patternSelection}),
@@ -42,13 +54,44 @@ function useOnEmptyLine() {
   })
 }
 
-export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocused: boolean}) {
+interface MenuItem {
+  id: string
+  label: string
+  icon: ComponentType
+}
+
+export function InsertMenu({
+  scheme,
+  editorFocused,
+  images,
+  choosingSource,
+  onChooseSource,
+}: {
+  scheme: string
+  editorFocused: boolean
+  images: BodyImages
+  /** The Writer asked to choose an image and there are several image sources to choose it from. */
+  choosingSource: boolean
+  /** `null` when the Writer backs out. */
+  onChooseSource: (source: AssetSource | null) => void
+}) {
   const editor = useEditor()
   const onEmptyLine = useOnEmptyLine()
   const selection = useEditorSelector(editor, (snapshot) => snapshot.context.selection)
   const allows = useBodyAllows()
-  const commands = useMemo(() => matchCommands('', allows), [allows])
-  const picker = useTypeaheadPicker(useMemo(() => slashPicker(allows), [allows]))
+  const commands = useMemo(() => matchCommands('', allows, images), [allows, images])
+  const picker = useTypeaheadPicker(useMemo(() => slashPicker(allows, images), [allows, images]))
+  // Each source by the name it gives itself in the Studio's own Select menu.
+  const {t} = useTranslation()
+  const sources = useMemo(
+    () =>
+      images.sources.map((source, index): MenuItem => ({
+        id: `source-${index}`,
+        label: (source.i18nKey && t(source.i18nKey)) || source.title || source.name,
+        icon: source.icon ?? ImageIcon,
+      })),
+    [images.sources, t],
+  )
   const [lineRect, setLineRect] = useState<DOMRect | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -56,15 +99,20 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
   const showPlus = editorFocused && onEmptyLine && commands.length > 0 && picker.snapshot.matches('idle')
 
   const measure = useCallback(() => {
-    const block = showPlus || menuOpen ? editor.dom.getStartBlockElement(editor.getSnapshot()) : null
+    const block =
+      showPlus || menuOpen || choosingSource ? editor.dom.getStartBlockElement(editor.getSnapshot()) : null
     setLineRect(block ? block.getBoundingClientRect() : null)
-  }, [editor, showPlus, menuOpen])
+  }, [editor, showPlus, menuOpen, choosingSource])
   useLayoutEffect(measure, [measure, selection])
   useViewportChanges(measure)
 
   useEffect(() => {
     if (!onEmptyLine) setMenuOpen(false)
   }, [onEmptyLine])
+
+  useEffect(() => {
+    if (choosingSource) setActiveIndex(0)
+  }, [choosingSource])
 
   const runCommand = useCallback(
     (id: InsertCommandId) => {
@@ -87,6 +135,40 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
           onHover={(index) => picker.send({type: 'navigate to', index})}
           onChoose={() => picker.send({type: 'select'})}
           empty={picker.snapshot.matches({active: 'no matches'})}
+        />
+      </Floating>
+    )
+  }
+
+  // The same panel, in the same place, now listing where an image can be chosen from.
+  if (choosingSource) {
+    if (!lineRect) return null
+    return (
+      <Floating
+        anchor={lineRect}
+        placement="below"
+        align="start"
+        scheme={scheme}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            event.stopPropagation()
+            onChooseSource(null)
+            editor.send({type: 'focus'})
+          }
+        }}
+      >
+        <Menu
+          label="Choose an image from"
+          commands={sources}
+          activeIndex={activeIndex}
+          onHover={setActiveIndex}
+          onChoose={(index) => onChooseSource(images.sources[index ?? activeIndex] ?? null)}
+          onLeave={() => onChooseSource(null)}
+          keyboard={{
+            next: () => setActiveIndex((i) => (i + 1) % sources.length),
+            previous: () => setActiveIndex((i) => (i - 1 + sources.length) % sources.length),
+          }}
         />
       </Floating>
     )
@@ -148,21 +230,36 @@ export function InsertMenu({scheme, editorFocused}: {scheme: string; editorFocus
 }
 
 function Menu({
+  label = 'Insert',
   commands,
   activeIndex,
   onHover,
   onChoose,
+  onLeave,
   keyboard,
   empty = false,
 }: {
-  commands: ReadonlyArray<InsertCommand>
+  label?: string
+  commands: ReadonlyArray<MenuItem>
   activeIndex: number
   onHover: (index: number) => void
   onChoose: (index?: number) => void
+  /** Focus went somewhere else. */
+  onLeave?: () => void
   keyboard?: {next: () => void; previous: () => void}
   empty?: boolean
 }) {
   const activeId = commands[activeIndex]?.id
+  const list = useRef<HTMLUListElement>(null)
+  const takesFocus = !!keyboard
+
+  // `autoFocus` alone is the browser's to honour, and it only does so once per page.
+  // A frame later, because the panel is hidden until it has found its place, and nothing hidden takes focus.
+  useEffect(() => {
+    if (!takesFocus) return undefined
+    const frame = requestAnimationFrame(() => list.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [takesFocus])
 
   // Focus stays on the list (aria-activedescendant), so the browser won't scroll the active option into view.
   useLayoutEffect(() => {
@@ -175,8 +272,10 @@ function Menu({
         <NoMatches>Nothing matches that</NoMatches>
       ) : (
         <List
+          ref={list}
           role="listbox"
-          aria-label="Insert"
+          aria-label={label}
+          onBlur={onLeave}
           aria-activedescendant={`calm-insert-${activeId}`}
           tabIndex={keyboard ? 0 : -1}
            
