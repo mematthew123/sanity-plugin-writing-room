@@ -12,7 +12,8 @@ export interface ScheduleClient {
   setFields(id: string, fields: Doc, options?: {ifRevision?: string}): Promise<Doc | undefined>
   /** Without a `releaseId`, the copy is the draft. */
   createCopy(args: {document: Doc; publishedId: string; releaseId?: string}): Promise<unknown>
-  discardCopy(args: {publishedId: string; releaseId?: string}): Promise<unknown>
+  /** With `ifRevision`, fails and leaves the copy unless it is still at that revision. */
+  discardCopy(args: {publishedId: string; releaseId?: string; ifRevision?: string}): Promise<unknown>
   /** Fails, and leaves the draft, unless it is still at `ifRevision`. */
   discardDraft(args: {publishedId: string; ifRevision: string}): Promise<unknown>
   createRelease(args: {releaseId: string; title: string; at: string}): Promise<unknown>
@@ -45,14 +46,25 @@ function content(document: Doc): Doc {
 
 const quietly = (attempt: () => Promise<unknown>) => attempt().catch(() => undefined)
 
+/**
+ * Scheduling writes its details (`roomWrites`: the slug, the date) to the copy only. A draft that
+ * differs just by not having them yet is the one the copy was made from.
+ */
+function saysTheSame(draft: Doc, copy: Doc | undefined, roomWrites: readonly string[]): boolean {
+  if (!copy) return false
+  const filled = {...draft}
+  for (const field of roomWrites) if (filled[field] === undefined && copy[field] !== undefined) filled[field] = copy[field]
+  return sameWords(filled, copy)
+}
+
 /** Removes a draft that says what the Scheduled copy says. One that `differs` is someone's words, and stays. */
 export async function tidyDraft(
   client: ScheduleClient,
-  {documentId, releaseId}: {documentId: string; releaseId: string},
+  {documentId, releaseId, roomWrites = []}: {documentId: string; releaseId: string; roomWrites?: readonly string[]},
 ): Promise<'none' | 'removed' | 'differs'> {
   const [draft, copy] = await Promise.all([client.read(draftId(documentId)), client.read(copyId(documentId, releaseId))])
   if (!draft) return 'none'
-  if (!sameWords(draft, copy) || typeof draft._rev !== 'string') return 'differs'
+  if (!saysTheSame(draft, copy, roomWrites) || typeof draft._rev !== 'string') return 'differs'
   return discardDraftAt(client, documentId, draft._rev)
 }
 
@@ -253,19 +265,52 @@ export async function publishHeld(
 
 /**
  * Turns a Post taken off the schedule back into an ordinary draft and removes its release. `kept`
- * means a draft with other words was already there, so nothing was touched.
+ * means a draft with other words was already there, so nothing was touched. `moved` means the copy
+ * was saved again while this was folding it: it is as it was, to be folded as it is now.
+ *
+ * `stamped` names what the copy holds only because of the promise (the date written for it), which
+ * the draft must not carry on.
  */
 export async function foldBack(
   client: ScheduleClient,
-  {documentId, releaseId}: {documentId: string; releaseId: string},
-): Promise<'folded' | 'kept' | 'gone'> {
-  const [draft, copy] = await Promise.all([client.read(draftId(documentId)), client.read(copyId(documentId, releaseId))])
+  {
+    documentId,
+    releaseId,
+    roomWrites = [],
+    stamped,
+  }: {documentId: string; releaseId: string; roomWrites?: readonly string[]; stamped?: (copy: Doc) => string[]},
+): Promise<'folded' | 'kept' | 'gone' | 'moved'> {
+  const id = copyId(documentId, releaseId)
+  const [draft, copy] = await Promise.all([client.read(draftId(documentId)), client.read(id)])
   if (!copy) return 'gone'
-  if (draft && !sameWords(draft, copy)) return 'kept'
+  if (draft && !saysTheSame(draft, copy, roomWrites)) return 'kept'
+
+  const promised = stamped?.(copy) ?? []
   if (!draft) {
-    await client.createCopy({document: {...content(copy), _id: draftId(documentId)}, publishedId: documentId})
+    const document: Doc = {...content(copy), _id: draftId(documentId)}
+    for (const field of promised) delete document[field]
+    await client.createCopy({document, publishedId: documentId})
+  } else if (promised.some((field) => draft[field] !== undefined)) {
+    await client.setFields(
+      draftId(documentId),
+      Object.fromEntries(promised.map((field) => [field, undefined])),
+      typeof draft._rev === 'string' ? {ifRevision: draft._rev} : undefined,
+    )
   }
-  await client.discardCopy({publishedId: documentId, releaseId})
+
+  // Only the revision that was copied: a newer one holds words the draft doesn't.
+  const revision = typeof copy._rev === 'string' ? copy._rev : undefined
+  try {
+    await client.discardCopy({publishedId: documentId, releaseId, ...(revision && {ifRevision: revision})})
+  } catch (error) {
+    const now = await client.read(id)
+    if (now && now._rev === revision) throw error
+    if (now) {
+      // The draft just written is already out of date, and would read as someone else's words.
+      if (!draft) await quietly(() => client.discardCopy({publishedId: documentId}))
+      return 'moved'
+    }
+  }
   await quietly(() => client.removeRelease({releaseId}))
   return 'folded'
 }

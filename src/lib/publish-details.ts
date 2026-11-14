@@ -14,7 +14,7 @@ export interface PublishDetails {
   publishedAt?: string
 }
 
-const sameMoment = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime()
+export const sameMoment = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime()
 
 /**
  * Settles a unique slug on the first publish and stamps a missing published date with `now`: this

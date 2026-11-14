@@ -90,6 +90,13 @@ export function RoomSyncProvider({
 
 const useRoomSynced = () => useContext(RoomSynced)
 
+/** For what sits outside the room and has to wait for it to be saved. */
+export function ReportSynced({onChange}: {onChange: (synced: boolean) => void}) {
+  const isSynced = useRoomSynced()
+  useEffect(() => onChange(isSynced), [isSynced, onChange])
+  return null
+}
+
 /** Offline, it stays until the connection returns. */
 export function SaveState() {
   const isSynced = useRoomSynced()
@@ -292,6 +299,8 @@ export function PublishButton({
   const timeInput = useRef<HTMLInputElement>(null)
   const isFirstPublish = !status.isPublished
   const promisedFor = status.promisedFor
+  // A held promise whose time went by still wrote its date, so that date still moves.
+  const promisedBefore = copy.promise?.at
   // Unless the Studio has since turned scheduling off.
   const next = status.next === 'schedule-again' && !canSchedule ? (isFirstPublish ? 'publish' : 'publish-changes') : status.next
   const couldnt = (what: string) => `This ${kind.singular} couldn’t be ${what} just now. Try again in a moment.`
@@ -361,7 +370,7 @@ export function PublishButton({
           post: basis,
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
-          promisedBefore: promisedFor,
+          promisedBefore,
         })
         const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
         setPlan({
@@ -380,7 +389,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, settled, saved, isFirstPublish, promisedFor, next, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, saved, isFirstPublish, promisedFor, promisedBefore, next, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
@@ -479,7 +488,7 @@ export function PublishButton({
         isFirstPublish,
         isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
         now: at,
-        promisedBefore: promisedFor,
+        promisedBefore,
       })
       const set = detailsPatch(details, fields)
       const tidy = scheduleClient(client)

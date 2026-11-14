@@ -28,12 +28,14 @@ const MONDAY = '2026-11-16T09:00:00.000Z'
 const ID = 'post-1'
 const R = 'rOnePost1'
 
+/** Never repeated, even across the datasets `scheduled` copies between. */
+let revision = 0
+
 /** Documents and releases by id, and the steps taken, in order. */
 function dataset({failOn = [] as string[], between = undefined as (() => void | Promise<void>) | undefined} = {}) {
   const documents = new Map<string, Doc>()
   const releases = new Map<string, Release>()
   const steps: string[] = []
-  let revision = 0
   const failing = [...failOn]
 
   const step = (name: string) => {
@@ -68,8 +70,12 @@ function dataset({failOn = [] as string[], between = undefined as (() => void | 
       step('createCopy')
       put(idOf(publishedId, releaseId), document)
     },
-    discardCopy: async ({publishedId, releaseId}) => {
+    discardCopy: async ({publishedId, releaseId, ifRevision}) => {
       step('discardCopy')
+      if (ifRevision) {
+        await between?.()
+        if (documents.get(idOf(publishedId, releaseId))?._rev !== ifRevision) throw new Error('revision mismatch')
+      }
       documents.delete(idOf(publishedId, releaseId))
     },
     discardDraft: async ({publishedId, ifRevision}) => {
@@ -257,6 +263,23 @@ describe('tidyDraft', () => {
     const {client, steps} = await scheduled()
     expect(await tidyDraft(client, {documentId: ID, releaseId: R})).toBe('none')
     expect(steps).toEqual([])
+  })
+
+  it('removes the draft the copy was made from, which never had the date written for the schedule', async () => {
+    const {client, documents, put} = await scheduled()
+    put(draftId(ID), post)
+    expect(await tidyDraft(client, {documentId: ID, releaseId: R})).toBe('differs')
+    expect(await tidyDraft(client, {documentId: ID, releaseId: R, roomWrites: ['slug', 'publishedAt']})).toBe('removed')
+    expect(documents.has(draftId(ID))).toBe(false)
+  })
+
+  it('leaves a draft with a date of its own, or other words, whatever the room writes', async () => {
+    const {client, documents, put} = await scheduled()
+    put(draftId(ID), {...post, publishedAt: MONDAY})
+    expect(await tidyDraft(client, {documentId: ID, releaseId: R, roomWrites: ['publishedAt']})).toBe('differs')
+    put(draftId(ID), {...post, title: 'Edited on Tuesday'})
+    expect(await tidyDraft(client, {documentId: ID, releaseId: R, roomWrites: ['publishedAt']})).toBe('differs')
+    expect(documents.has(draftId(ID))).toBe(true)
   })
 })
 
@@ -537,6 +560,53 @@ describe('foldBack', () => {
     expect(documents.has(copyId(ID, R))).toBe(true)
     expect(documents.get(draftId(ID))).toMatchObject({title: 'Someone else’s edit'})
     expect(releases.has(R)).toBe(true)
+  })
+
+  it('doesn’t carry on the date written for the promise', async () => {
+    const {client, documents} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+
+    expect(await foldBack(client, {documentId: ID, releaseId: R, stamped: () => ['publishedAt']})).toBe('folded')
+
+    expect(documents.get(draftId(ID))).toMatchObject(post)
+    expect(documents.get(draftId(ID))).not.toHaveProperty('publishedAt')
+  })
+
+  it('takes that date off a matching draft that was already there', async () => {
+    const {client, documents, put} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    put(draftId(ID), {...post, publishedAt: FRIDAY})
+
+    expect(await foldBack(client, {documentId: ID, releaseId: R, stamped: () => ['publishedAt']})).toBe('folded')
+
+    expect([...documents.keys()]).toEqual([draftId(ID)])
+    expect(documents.get(draftId(ID))).not.toHaveProperty('publishedAt')
+  })
+
+  it('folds onto the draft the copy was made from', async () => {
+    const {client, documents, put} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    put(draftId(ID), post)
+
+    expect(await foldBack(client, {documentId: ID, releaseId: R, roomWrites: ['publishedAt']})).toBe('folded')
+
+    expect([...documents.keys()]).toEqual([draftId(ID)])
+  })
+
+  it('leaves the copy, and no draft, when words are saved to it while it is being folded', async () => {
+    const {client, documents, releases, meanwhile} = await scheduled()
+    await takeOffSchedule(client, {releaseId: R})
+    meanwhile(() => void client.setFields(copyId(ID, R), {title: 'Typed as the time went by'}))
+
+    expect(await foldBack(client, {documentId: ID, releaseId: R})).toBe('moved')
+
+    expect(documents.get(copyId(ID, R))).toMatchObject({title: 'Typed as the time went by'})
+    expect(documents.has(draftId(ID))).toBe(false)
+    expect(releases.has(R)).toBe(true)
+
+    meanwhile(() => undefined)
+    expect(await foldBack(client, {documentId: ID, releaseId: R})).toBe('folded')
+    expect(documents.get(draftId(ID))).toMatchObject({title: 'Typed as the time went by'})
   })
 
   it('keeps the words if the copy can’t be removed after the draft is written', async () => {

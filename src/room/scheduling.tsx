@@ -6,6 +6,8 @@ import {type Promised} from './post-status'
 import {findPromise, type ReleaseLike} from './promised'
 import {copyId, draftId, foldBack, type ScheduleClient, tidyDraft} from './schedule'
 import {isAhead, waitUntil} from '../lib/promised-time'
+import {sameMoment} from '../lib/publish-details'
+import {useWritingKind} from './kinds'
 
 export function scheduleClient(client: SanityClient): ScheduleClient {
   return {
@@ -25,14 +27,11 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
         publishedId,
         ...(releaseId && {releaseId}),
       }),
-    discardCopy: ({publishedId, releaseId}) => client.discardVersion({publishedId, ...(releaseId && {releaseId})}),
-    // The discard action takes no revision. A patch does, and when it fails the delete fails with it.
-    discardDraft: ({publishedId, ifRevision}) =>
-      client
-        .transaction()
-        .patch(draftId(publishedId), (patch) => patch.ifRevisionId(ifRevision).unset([NO_SUCH_FIELD]))
-        .delete(draftId(publishedId))
-        .commit(),
+    discardCopy: ({publishedId, releaseId, ifRevision}) =>
+      ifRevision && releaseId
+        ? deleteAt(client, copyId(publishedId, releaseId), ifRevision)
+        : client.discardVersion({publishedId, ...(releaseId && {releaseId})}),
+    discardDraft: ({publishedId, ifRevision}) => deleteAt(client, draftId(publishedId), ifRevision),
     createRelease: ({releaseId, title, at}) =>
       client.releases.create({
         releaseId,
@@ -53,6 +52,14 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
 /** A patch has to do something to carry a revision condition. */
 const NO_SUCH_FIELD = 'writingRoomNoSuchField'
 
+/** The discard actions take no revision. A patch does, and when it fails the delete fails with it. */
+const deleteAt = (client: SanityClient, id: string, revision: string) =>
+  client
+    .transaction()
+    .patch(id, (patch) => patch.ifRevisionId(revision).unset([NO_SUCH_FIELD]))
+    .delete(id)
+    .commit()
+
 export interface PostCopy {
   documentId: string
   documentType: string
@@ -64,6 +71,8 @@ export interface PostCopy {
   handle: DocumentHandle
   /** A draft with other words sits beside the Scheduled copy. */
   otherChanges: boolean
+  /** Its time went by and it is being turned back into a draft: nothing can be typed until it is. */
+  folding: boolean
 }
 
 const Copy = createContext<PostCopy | null>(null)
@@ -85,6 +94,7 @@ export function PostCopyProvider({
   documentId,
   documentType,
   making,
+  synced,
   justPromised,
   onCaughtUp,
   children,
@@ -93,6 +103,8 @@ export function PostCopyProvider({
   documentType: string
   /** The release of a schedule still being made, or one that failed and is being taken away. */
   making: string | null
+  /** Everything typed in the room has been saved. */
+  synced: boolean
   justPromised: JustPromised | null
   onCaughtUp: () => void
   children: (copy: PostCopy) => ReactNode
@@ -129,30 +141,68 @@ export function PostCopyProvider({
     return () => clearTimeout(timer)
   }, [heldUntil, looks])
   const expired = !!found?.promise.held && !isAhead(found.promise.at)
+
+  const {fields} = useWritingKind(documentType)
+  const roomWrites = useMemo(
+    () => [fields.slug, fields.publishedAt].filter((field): field is string => !!field),
+    [fields.slug, fields.publishedAt],
+  )
+  const dateField = fields.publishedAt
+  const promisedAt = found?.promise.at
+
+  // Folding back takes away the copy the Writer may be typing in. So it waits until the room is
+  // saved, holds the page still, and folds only once it is both. `leftAsIs` is a fold given up on.
+  const [held, setHeld] = useState<string | null>(null)
+  const [leftAsIs, setLeftAsIs] = useState<string | null>(null)
+  const toFold = expired && !!settled && leftAsIs !== settled
+  useEffect(() => {
+    if (toFold && synced) setHeld(settled)
+  }, [toFold, synced, settled])
+  const folding = toFold && held === settled
+  const still = folding && synced
+
   useEffect(() => {
     if (!settled) {
       setOtherChanges(false)
       return undefined
     }
+    if (expired && !still) return undefined
     let stale = false
     const tidy = scheduleClient(client)
-    const target = {documentId, releaseId: settled}
-    const work = expired
-      ? foldBack(tidy, target).then((result) => result === 'kept')
-      : hasDraft
-        ? tidyDraft(tidy, target).then((result) => result === 'differs')
-        : Promise.resolve(false)
-    work.then(
-      (differs) => {
-        if (!stale) setOtherChanges(differs)
-      },
-      // The next visit tries again.
-      () => undefined,
-    )
+    const target = {documentId, releaseId: settled, roomWrites}
+    if (expired) {
+      // The date the room wrote for the promise is no date once the promise is gone.
+      const stamped = (copy: Record<string, unknown>) => {
+        const date = dateField ? copy[dateField] : undefined
+        return dateField && promisedAt && typeof date === 'string' && sameMoment(date, promisedAt) ? [dateField] : []
+      }
+      foldBack(tidy, {...target, stamped}).then(
+        (result) => {
+          if (stale) return
+          if (result === 'moved') lookAgain((count) => count + 1)
+          if (result === 'kept') setLeftAsIs(settled)
+          setOtherChanges(result === 'kept')
+        },
+        // The next visit tries again.
+        () => {
+          if (!stale) setLeftAsIs(settled)
+        },
+      )
+    } else if (hasDraft) {
+      tidyDraft(tidy, target).then(
+        (result) => {
+          if (!stale) setOtherChanges(result === 'differs')
+        },
+        // The next visit tries again.
+        () => undefined,
+      )
+    } else {
+      setOtherChanges(false)
+    }
     return () => {
       stale = true
     }
-  }, [client, documentId, settled, expired, hasDraft])
+  }, [client, documentId, settled, expired, still, hasDraft, looks, roomWrites, dateField, promisedAt])
 
   const copy = useMemo<PostCopy>(
     () => ({
@@ -165,8 +215,9 @@ export function PostCopyProvider({
         ? {documentId, documentType, perspective: {releaseName: releaseId}}
         : {documentId, documentType},
       otherChanges,
+      folding,
     }),
-    [documentId, documentType, releaseId, promise, otherChanges],
+    [documentId, documentType, releaseId, promise, otherChanges, folding],
   )
 
   return <Copy.Provider value={copy}>{children(copy)}</Copy.Provider>

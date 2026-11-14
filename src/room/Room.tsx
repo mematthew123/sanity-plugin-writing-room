@@ -40,6 +40,7 @@ import {
 import {
   Presence,
   PublishButton,
+  ReportSynced,
   RoomMessage,
   type RoomNotice,
   RoomSyncProvider,
@@ -60,6 +61,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
   const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
   const caughtUp = useCallback(() => setJustPromised(null), [])
   const [making, setMaking] = useState<string | null>(null)
+  const [synced, setSynced] = useState(true)
 
   useEffect(() => {
     if (!notice) return undefined
@@ -74,6 +76,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
         documentId={documentId}
         documentType={documentType}
         making={making}
+        synced={synced}
         justPromised={justPromised}
         onCaughtUp={caughtUp}
       >
@@ -87,6 +90,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
               onProblem={setProblem}
               notice={notice}
               onNotice={setNotice}
+              onSynced={setSynced}
               onMaking={setMaking}
               onPromised={setJustPromised}
             />
@@ -137,6 +141,7 @@ function LoadedRoom({
   onProblem,
   notice,
   onNotice: setNotice,
+  onSynced,
   onMaking,
   onPromised,
 }: {
@@ -145,6 +150,7 @@ function LoadedRoom({
   onProblem: (problem: string | null) => void
   notice: RoomNotice | null
   onNotice: (notice: RoomNotice | null) => void
+  onSynced: (synced: boolean) => void
   onMaking: (releaseId: string | null) => void
   onPromised: (promised: JustPromised) => void
 }) {
@@ -157,7 +163,8 @@ function LoadedRoom({
     projection: fields.slug ? `{_id, "slug": ${fields.slug}.current}` : '{_id}',
   })
   const status = describePostStatus(data?._status, {promise: copy.promise})
-  const {isPublished, locked} = status
+  const {isPublished} = status
+  const locked = status.locked || copy.folding
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
   const [settings] = useRoomSettings()
@@ -224,6 +231,7 @@ function LoadedRoom({
   return (
     <EditorProvider initialConfig={{schemaDefinition}}>
       <RoomSyncProvider handle={handle} releaseId={copy.releaseId}>
+        <ReportSynced onChange={onSynced} />
         <Layout>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
