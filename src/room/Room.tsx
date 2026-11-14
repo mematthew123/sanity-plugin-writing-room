@@ -55,8 +55,7 @@ import {useRecede} from './use-recede'
 
 export function Room({documentId, documentType}: {documentId: string; documentType: string}) {
   const [problem, setProblem] = useState<string | null>(null)
-  // Kept out here: when a Post is scheduled the room opens its Scheduled copy, and "Scheduled for…"
-  // has to outlast the change.
+  // Out here so "Scheduled for…" outlasts the room starting over on the Scheduled copy.
   const [notice, setNotice] = useState<RoomNotice | null>(null)
   const [justPromised, setJustPromised] = useState<JustPromised | null>(null)
   const caughtUp = useCallback(() => setJustPromised(null), [])
@@ -78,7 +77,7 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
       >
         {(copy) => (
           <Suspense fallback={<LoadingRoom />}>
-            {/* Another copy is another document to the editor, so the room starts over on it. */}
+            {/* Another copy is another document to the editor. */}
             <LoadedRoom
               key={copy.openId}
               copy={copy}
@@ -119,7 +118,7 @@ const NOTICE_VISIBLE_MS = 8000
 /** Long enough to reach for a notice that offers somewhere to go. */
 const NOTICE_WITH_NEXT_STEP_MS = 16000
 
-/** Typing that could never land: a letter, or a key that edits, pressed where the Prose is. */
+/** A letter, or a key that edits, pressed where the Prose is. */
 function isTypingAtProse(event: KeyboardEvent): boolean {
   if (event.metaKey || event.ctrlKey || event.altKey) return false
   if (event.key.length !== 1 && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter') return false
@@ -161,7 +160,7 @@ function LoadedRoom({
   const canSchedule = useCanSchedule(handle.documentId, handle.documentType)
   const openInStructure = useOpenInStructure(handle)
 
-  // "Edit it": off the schedule, which makes it a Draft that remembers its time.
+  // "Edit it"
   const {releaseId} = copy
   const takeOff = useCallback(async () => {
     if (!releaseId) return
@@ -174,7 +173,7 @@ function LoadedRoom({
     }
   }, [client, releaseId, singular, setNotice, onProblem])
 
-  // A page that silently ignores keys reads as broken, so the room says why, where it speaks.
+  // A page that silently ignores keys reads as broken.
   const promisedFor = locked ? status.promisedFor : undefined
   useEffect(() => {
     if (!promisedFor) return undefined
@@ -185,12 +184,10 @@ function LoadedRoom({
         action: {label: 'Edit it', onClick: () => void takeOff()},
       })
     }
-    // Before anything in the room can take the key for itself.
     window.addEventListener('keydown', say, true)
     return () => window.removeEventListener('keydown', say, true)
   }, [promisedFor, singular, setNotice, takeOff])
 
-  // The room never picks between two people's words: it says the others are there, once.
   const {otherChanges} = copy
   useEffect(() => {
     if (!otherChanges) return
@@ -225,7 +222,7 @@ function LoadedRoom({
         <Layout>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
-            // Nothing can be typed into a Scheduled Post, so its controls stay where they can be found.
+            // Nothing can be typed into a Scheduled Post, so its controls stay.
             receded={receded && !inDetails && !locked}
             start={
               <Recedes>
@@ -401,7 +398,7 @@ function LeaveButton({
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    // Only ever a draft: a Post with a promised time is not an abandoned start.
+    // A Post with a promised time is not an abandoned start.
     if (!releaseId && !isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
       void apply(discardDocument(handle))
       router.navigate({})

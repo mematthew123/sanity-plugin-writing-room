@@ -7,7 +7,6 @@ import {findPromise, type ReleaseLike} from './promised'
 import {copyId, draftId, foldBack, type ScheduleClient, tidyDraft} from './schedule'
 import {isAhead} from '../lib/promised-time'
 
-/** The Studio's client, as the few writes scheduling is made of. */
 export function scheduleClient(client: SanityClient): ScheduleClient {
   return {
     read: (id) => client.getDocument(id),
@@ -27,8 +26,7 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
         ...(releaseId && {releaseId}),
       }),
     discardCopy: ({publishedId, releaseId}) => client.discardVersion({publishedId, ...(releaseId && {releaseId})}),
-    // The discard action takes no revision, so the draft goes in a transaction with a patch that
-    // does: if the draft has moved on, the patch fails and takes the delete with it.
+    // The discard action takes no revision. A patch does, and when it fails the delete fails with it.
     discardDraft: ({publishedId, ifRevision}) =>
       client
         .transaction()
@@ -54,21 +52,19 @@ export function scheduleClient(client: SanityClient): ScheduleClient {
 
 const MAX_TIMER_MS = 2 ** 31 - 1
 
-/** A patch has to do something to carry a revision condition. Unsetting what was never set does nothing. */
+/** A patch has to do something to carry a revision condition. */
 const NO_SUCH_FIELD = 'writingRoomNoSuchField'
 
-/** Which copy of a Post the room has open, and what is promised for it. */
 export interface PostCopy {
   documentId: string
   documentType: string
-  /** The Post's one-Post release, while it is Scheduled or taken off the schedule. */
+  /** The Post's own release, while it is Scheduled or taken off the schedule. */
   releaseId: string | null
   promise: Promised | null
-  /** The id of the copy that is open: the Scheduled copy, or the draft. */
   openId: string
-  /** For the App SDK: the same document, read and written through its release when it has one. */
+  /** For the App SDK. */
   handle: DocumentHandle
-  /** A draft with other words sits beside the Scheduled copy. They are someone's, so the room leaves them. */
+  /** A draft with other words sits beside the Scheduled copy. */
   otherChanges: boolean
 }
 
@@ -80,17 +76,13 @@ export function usePostCopy(): PostCopy {
   return copy
 }
 
-/** A promise the room has just made, held until the Studio's own list of releases catches up. */
+/** A promise the room has just made, until the list of releases catches up. */
 export interface JustPromised {
   releaseId: string
   promise: Promised
 }
 
-/**
- * Finds the Post's schedule, if it has one, and keeps the room's promise that it leaves nothing
- * behind (ADR-0004): a leftover draft that matches the Scheduled copy is removed, and a Post taken
- * off the schedule whose time has gone by is folded back into an ordinary draft.
- */
+/** Finds the Post's schedule, and tidies what a schedule leaves behind: a matching draft, or a promise whose time has gone by. */
 export function PostCopyProvider({
   documentId,
   documentType,
@@ -101,7 +93,6 @@ export function PostCopyProvider({
   documentId: string
   documentType: string
   justPromised: JustPromised | null
-  /** The Studio's list now has the promise, so the room's own note of it can go. */
   onCaughtUp: () => void
   children: (copy: PostCopy) => ReactNode
 }) {
@@ -123,16 +114,15 @@ export function PostCopyProvider({
     if (caughtUp) onCaughtUp()
   }, [caughtUp, onCaughtUp])
 
-  // Only what is settled on the server is tidied: never a promise the room is still making.
+  // Never tidy a promise the room is still making.
   const settled = found ? found.release.name : null
-  // A held promise runs out at its time whether or not anything else changes, so the room looks again then.
+  // Nothing else changes when a held promise runs out, so look again then.
   const [, lookAgain] = useState(0)
   const heldUntil = found?.promise.held ? found.promise.at : undefined
   useEffect(() => {
     if (!heldUntil) return undefined
     const wait = new Date(heldUntil).getTime() - Date.now()
     if (!(wait > 0)) return undefined
-    // Further off than a timer can count: the room will have been reopened long before.
     if (wait > MAX_TIMER_MS) return undefined
     const timer = setTimeout(() => lookAgain((count) => count + 1), wait + 1000)
     return () => clearTimeout(timer)
@@ -155,7 +145,7 @@ export function PostCopyProvider({
       (differs) => {
         if (!stale) setOtherChanges(differs)
       },
-      // Tidying is a courtesy. If it can't be done just now, the next visit tries again.
+      // The next visit tries again.
       () => undefined,
     )
     return () => {
@@ -182,9 +172,8 @@ export function PostCopyProvider({
 }
 
 /**
- * Whether "Choose a time" can work here. The Studio can turn scheduling off for the workspace, or
- * take its own "Schedule publish" away from a type or a role; the room follows both. If neither
- * can be read, scheduling is absent (ADR-0003).
+ * Follows the Studio: scheduling can be off for the workspace, or its "Schedule publish" action
+ * removed for a type or a role. If neither can be read, the room doesn't offer it.
  */
 export function useCanSchedule(documentId: string, documentType: string): boolean {
   const source = useSource()

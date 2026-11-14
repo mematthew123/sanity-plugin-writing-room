@@ -89,13 +89,12 @@ export const test = base.extend<{
   },
 })
 
-/** The releases a Post has a copy in. A Post the room has scheduled is in one of its own. */
+/** The releases a Post has a copy in. */
 export async function releasesOf(content: SanityClient, id: string): Promise<string[]> {
   const copies = await content.fetch<string[]>('*[sanity::versionOf($id)]._id', {id})
   return copies.flatMap((copy) => /^versions\.([^.]+)\./.exec(copy)?.[1] ?? [])
 }
 
-/** Takes a test's Post off any schedule and removes the release made for it, copy and all. */
 async function removeSchedules(content: SanityClient, id: string) {
   for (const releaseId of await releasesOf(content, id)) {
     await content.releases.unschedule({releaseId}).catch(() => undefined)

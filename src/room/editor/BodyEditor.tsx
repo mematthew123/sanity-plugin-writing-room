@@ -57,7 +57,6 @@ export function BodyEditor({
   handle: DocumentHandle
   path: string
   scheme: string
-  /** A Scheduled Post's words are locked: they can be read, selected and copied, not changed. */
   readOnly?: boolean
   onProblem: (message: string) => void
 }) {
@@ -157,7 +156,6 @@ export function BodyEditor({
         aria-label="Body"
         renderPlaceholder={() => <Placeholder>Start writing…</Placeholder>}
       />
-      {/* Never a control that would change words that can't change. */}
       {!readOnly && (
         <>
           <SelectionBubble scheme={scheme} editorFocused={focused} />

@@ -11,7 +11,7 @@ test.beforeEach(async ({page, post}) => {
   const room = new Room(page)
   await room.open(post)
   await page.getByRole('button', {name: 'Publish', exact: true}).click()
-  // A Studio whose plan or settings don't offer scheduling never shows the line, and that is right.
+  // A Studio that doesn't offer scheduling never shows the line.
   await expect(page.getByRole('button', {name: 'Publish now'})).toBeVisible()
   test.skip(
     (await page.getByRole('button', {name: 'Choose a time'}).count()) === 0,
@@ -40,7 +40,6 @@ test('schedules a Post for tomorrow morning, and leaves one copy of it', async (
       `versions.${releaseId}.${post.id}`,
     )
     expect(copy?.slug?.current).toMatch(/^e2e-/)
-    // The date is the promised time, when readers first see it.
     expect(new Date(copy!.publishedAt!).getTime()).toBe(new Date(release!.publishAt!).getTime())
     expect(await content.getDocument(`drafts.${post.id}`), 'the draft is tidied away').toBeFalsy()
   }).toPass({timeout: 20_000})
@@ -59,7 +58,6 @@ test('says why typing does nothing in a Scheduled Post, and offers to edit it', 
 
   await page.getByRole('status').getByRole('button', {name: 'Edit it'}).click()
 
-  // Off the schedule it is a Draft again, whose next step is to go back on.
   await expect(page.getByRole('button', {name: 'Schedule again'})).toBeVisible()
   await expect(async () => {
     const [releaseId] = await releasesOf(content, post.id)
@@ -70,7 +68,7 @@ test('says why typing does nothing in a Scheduled Post, and offers to edit it', 
 
   await room.title.fill(`${post.title}, fixed`)
   await page.getByRole('button', {name: 'Schedule again'}).click()
-  // The panel opens on the time it was promised for.
+  // The panel opens on the remembered time.
   await page.getByRole('button', {name: 'Schedule', exact: true}).click()
   await expect(page.getByRole('button', {name: 'Scheduled', exact: true})).toBeVisible()
 

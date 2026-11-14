@@ -1,11 +1,9 @@
 import {type InRelease, type Promised} from './post-status'
 
-/** As much of a release document as the room reads. */
 export interface ReleaseLike {
-  /** The release's id, as it appears in a copy's `versions.<name>.<id>`. */
+  /** As in a copy's id: `versions.<name>.<id>`. */
   name: string
   state: string
-  /** Set by the platform while the release is scheduled. */
   publishAt?: string
   metadata?: {
     title?: string
@@ -15,14 +13,10 @@ export interface ReleaseLike {
   }
 }
 
-/** A release that holds one document: how the platform schedules a single Post. */
+/** How the platform schedules a single Post. */
 export const isOnePostRelease = (release: ReleaseLike) => release.metadata?.cardinality === 'one'
 
-/**
- * What a one-Post release promises. Scheduled, it holds; taken off the schedule (the Studio's
- * "paused") it remembers its time; anything else (published, archived, never given a time) is no
- * promise.
- */
+/** Held is the Studio's "paused": off the schedule, with its time remembered. */
 export function promiseOf(release: ReleaseLike | null | undefined): Promised | null {
   if (!release || !isOnePostRelease(release)) return null
   const at = release.publishAt ?? release.metadata?.intendedPublishAt
@@ -32,32 +26,24 @@ export function promiseOf(release: ReleaseLike | null | undefined): Promised | n
   return null
 }
 
-/** A Release as the room names it. Only for one a person made: a one-Post release has no name to show. */
 export function describeRelease(release: ReleaseLike): InRelease {
   const scheduled = release.state === 'scheduled' || release.state === 'scheduling'
   const scheduledFor = scheduled ? (release.publishAt ?? release.metadata?.intendedPublishAt) : undefined
   return {title: release.metadata?.title?.trim() || 'an untitled release', ...(scheduledFor && {scheduledFor})}
 }
 
-/** The release a copy belongs to, from its id; null for a draft or a published document. */
+/** Null for a draft or a published document. */
 export function releaseOfCopy(copyId: string): string | null {
   return /^versions\.([^.]+)\./.exec(copyId)?.[1] ?? null
 }
 
-/**
- * Which of two promises is a Post's, should the Studio have left it two: the one that is actually
- * scheduled, then the nearer time, then the release's id so the answer never depends on order.
- */
+/** Should a Post have two promises: the scheduled one, then the nearer time, then by id so order never decides. */
 function comesBefore(a: Promised, aRelease: string, b: Promised, bRelease: string): boolean {
   if (a.held !== b.held) return !a.held
   const [aTime, bTime] = [new Date(a.at).getTime(), new Date(b.at).getTime()]
   return aTime !== bTime ? aTime < bTime : aRelease < bRelease
 }
 
-/**
- * The Post's one-Post release among the releases it has copies in. A Post has at most one; if the
- * Studio has somehow left two, the one that is actually scheduled wins, then the nearest time.
- */
 export function findPromise(
   releases: readonly ReleaseLike[],
   copyIds: readonly string[],
@@ -73,20 +59,15 @@ export function findPromise(
   return found
 }
 
-/** A Post with a promise: Scheduled, or taken off the schedule and waiting to go back on. */
 export interface PromisedPost {
   documentId: string
   documentType: string
   releaseId: string
   promise: Promised
-  /** When its copy was last edited. */
   editedAt?: string
 }
 
-/**
- * Every Post that has a promise, most recently edited first, from the copies that sit in releases.
- * A Scheduled Post may have no draft at all (ADR-0004), so this is the only list it is on.
- */
+/** Most recently edited first. A Scheduled Post may have no draft, so this is the only list it is on. */
 export function promisedPosts(
   releases: readonly ReleaseLike[],
   copies: ReadonlyArray<{_id: string; _type: string; _updatedAt?: string}>,
@@ -99,14 +80,12 @@ export function promisedPosts(
     if (!releaseId || !promise) continue
     const documentId = copy._id.slice(`versions.${releaseId}.`.length)
     const known = posts.get(documentId)
-    // The same choice `findPromise` makes, so the Lobby shows the copy the room will open.
     if (known && !comesBefore(promise, releaseId, known.promise, known.releaseId)) continue
     posts.set(documentId, {documentId, documentType: copy._type, releaseId, promise, editedAt: copy._updatedAt})
   }
   return [...posts.values()].sort((a, b) => (b.editedAt ?? '').localeCompare(a.editedAt ?? ''))
 }
 
-/** Whether two values from a document say the same thing, however deep they go. */
 export function isSame(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
@@ -120,10 +99,7 @@ function words(document: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(document).filter(([key, value]) => !key.startsWith('_') && value !== undefined))
 }
 
-/**
- * Whether two copies of a Post say the same thing, whatever their ids, revisions and dates. A draft
- * that says what the Scheduled copy says has nothing to lose, so the room may tidy it away.
- */
+/** Whether two copies say the same thing, whatever their ids, revisions and dates. */
 export function sameWords(
   a: Record<string, unknown> | null | undefined,
   b: Record<string, unknown> | null | undefined,

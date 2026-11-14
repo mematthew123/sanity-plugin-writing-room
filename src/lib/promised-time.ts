@@ -1,9 +1,9 @@
-/** What "now" and "here" are for the Writer. Everything defaults to their own device. */
+/** Defaults to the Writer's own device. */
 export interface Clock {
   now?: Date
-  /** An IANA zone, e.g. `Europe/Lisbon`. */
+  /** `Europe/Lisbon` */
   timeZone?: string
-  /** Whether the Writer reads the time as 9:00 pm or 21:00. */
+  /** 9:00 pm, or 21:00. */
   hour12?: boolean
 }
 
@@ -17,7 +17,7 @@ function parts(date: Date, options: Intl.DateTimeFormatOptions): Record<string, 
   return found
 }
 
-/** The calendar day a moment falls on in a zone, as a count of days, so two can be compared. */
+/** The calendar day in a zone, as a count of days. */
 function dayNumber(date: Date, timeZone: string | undefined): number {
   const {year, month, day} = parts(date, {year: 'numeric', month: 'numeric', day: 'numeric', timeZone})
   return Date.UTC(Number(year), Number(month) - 1, Number(day)) / DAY_MS
@@ -34,10 +34,7 @@ function timeOfDay(date: Date, timeZone: string | undefined, hour12: boolean): s
   return dayPeriod ? `${time} ${dayPeriod.toLowerCase()}` : time
 }
 
-/**
- * A time as the room says it, on the Writer's own clock: "tomorrow at 9:00", "Friday at 9:00"
- * within the coming week, "12 March at 9:00" beyond it. It reads on after "for" or a "·".
- */
+/** "tomorrow at 9:00", "Friday at 9:00" within the coming week, "12 March at 9:00" beyond it. */
 export function describePromisedTime(at: string, {now = new Date(), timeZone, hour12 = writersHour12()}: Clock = {}): string {
   const date = new Date(at)
   const time = timeOfDay(date, timeZone, hour12)
@@ -52,7 +49,7 @@ export function describePromisedTime(at: string, {now = new Date(), timeZone, ho
   return `${day} ${month}${sameYear ? '' : ` ${year}`} at ${time}`
 }
 
-/** Where the time input starts for a new schedule: tomorrow at nine, the Writer's time. */
+/** Tomorrow at nine, the Writer's time. */
 export function defaultPromisedTime(now: Date = new Date()): string {
   const date = new Date(now)
   date.setDate(date.getDate() + 1)
@@ -60,14 +57,13 @@ export function defaultPromisedTime(now: Date = new Date()): string {
   return date.toISOString()
 }
 
-/** A promise can only be made for a time still to come. */
 export function isAhead(at: string | undefined, now: Date = new Date()): boolean {
   if (!at) return false
   const time = new Date(at).getTime()
   return !Number.isNaN(time) && time > now.getTime()
 }
 
-/** Whose clock a time is on, said once where it's set: "Lisbon time". */
+/** "Lisbon time" */
 export function clockName(timeZone: string = Intl.DateTimeFormat().resolvedOptions().timeZone): string {
   const place = timeZone.includes('/') ? timeZone.slice(timeZone.lastIndexOf('/') + 1).replace(/_/g, ' ') : ''
   return place && place !== 'UTC' ? `${place} time` : 'UTC'

@@ -27,7 +27,7 @@ const MONDAY = '2026-11-16T09:00:00.000Z'
 const ID = 'post-1'
 const R = 'rOnePost1'
 
-/** A dataset small enough to read: documents by id, releases by id, and the steps taken, in order. */
+/** Documents and releases by id, and the steps taken, in order. */
 function dataset({failOn = [] as string[], between = undefined as (() => void | Promise<void>) | undefined} = {}) {
   const documents = new Map<string, Doc>()
   const releases = new Map<string, Release>()
@@ -115,7 +115,7 @@ function dataset({failOn = [] as string[], between = undefined as (() => void | 
     releases,
     steps,
     put,
-    /** Something another Writer does at the last moment: after the room has read, before the server acts. */
+    /** Runs after the room has read the draft, before the server acts on it. */
     meanwhile: (act: () => void | Promise<void>) => {
       between = act
     },
@@ -130,7 +130,7 @@ function withDraft(options?: Parameters<typeof dataset>[0]) {
   return {...data, draft: data.documents.get(draftId(ID))!}
 }
 
-/** A Post already Scheduled for Friday, the way the room leaves one: a copy, and no draft. */
+/** Scheduled for Friday, as the room leaves one: a copy, and no draft. */
 async function scheduled(options?: Parameters<typeof dataset>[0]) {
   const data = withDraft()
   await schedulePost(data.client, {documentId: ID, draft: data.draft, set: {publishedAt: FRIDAY}, at: FRIDAY, releaseId: R})

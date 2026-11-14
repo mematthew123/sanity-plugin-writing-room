@@ -71,7 +71,6 @@ export function RoomSyncProvider({
   children,
 }: {
   handle: DocumentHandle
-  /** The release whose copy is open, when it isn't the draft. */
   releaseId: string | null
   children: ReactNode
 }) {
@@ -194,7 +193,7 @@ interface PublishPlan {
   slug: string | undefined
   /** The slug and date the plan was made from. If they've moved by the time the Writer says yes, the plan is off. */
   basis: PublishablePost
-  /** The revision that was checked. Scheduling copies the Post, so it copies exactly this. */
+  /** The revision that was checked: scheduling promises exactly this. */
   revision: string | undefined
 }
 
@@ -230,16 +229,12 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
-/**
- * What the one panel under the button is showing. It asks once whether to publish; "Choose a time"
- * gives way, in place, to a date and time; and on a Scheduled Post it says when, and what can be done.
- */
+/** The one panel: asking whether to publish, choosing a time, or saying when a Scheduled Post goes live. */
 type PanelView = 'ask' | 'time' | 'promised'
 
 /**
- * The one thing to do next. For a Draft: waits for the latest words to sync and validate, goes to
- * any problem, then asks once before publishing, now or at a time. For a Scheduled Post there is
- * nothing to do, so the button is quiet and says so; its panel is where the promise can be changed.
+ * Waits for the latest words to sync and validate, goes to any problem, then asks once before
+ * publishing, now or at a time. On a Scheduled Post the button is quiet, and opens what can be changed.
  */
 export function PublishButton({
   copy,
@@ -254,13 +249,12 @@ export function PublishButton({
   copy: PostCopy
   status: PostStatus
   scheme: string
-  /** Whether the Studio offers scheduling here. Without it there is no "Choose a time". */
+  /** Without it there is no "Choose a time". */
   canSchedule: boolean
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
-  /** The Post has just been scheduled into a release of its own. */
   onPromised: (promised: JustPromised) => void
-  /** "Edit it": takes a Scheduled Post off the schedule. */
+  /** "Edit it" */
   onTakeOff: () => Promise<void>
 }) {
   const {handle, openId, releaseId} = copy
@@ -286,7 +280,7 @@ export function PublishButton({
   const timeInput = useRef<HTMLInputElement>(null)
   const isFirstPublish = !status.isPublished
   const promisedFor = status.promisedFor
-  // A Post that was taken off the schedule goes back on it, unless the Studio has since turned scheduling off.
+  // Unless the Studio has since turned scheduling off.
   const next = status.next === 'schedule-again' && !canSchedule ? (isFirstPublish ? 'publish' : 'publish-changes') : status.next
   const couldnt = (what: string) => `This ${kind.singular} couldn’t be ${what} just now. Try again in a moment.`
 
@@ -353,7 +347,6 @@ export function PublishButton({
           post: basis,
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
-          // A date the room wrote for a promise that is now off is the room's to write again.
           promisedBefore: promisedFor,
         })
         const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
@@ -365,7 +358,6 @@ export function PublishButton({
           url: site && slug ? liveUrl(site, slug, handle.documentType) : null,
         })
         onProblem(null)
-        // Taken off the schedule, the next step is to go back on it: the panel opens on the time.
         setView(next === 'schedule-again' ? 'time' : 'ask')
         setTime(toLocalDateTime(next === 'schedule-again' && promisedFor ? promisedFor : defaultPromisedTime()))
         setPhase('confirming')
@@ -389,8 +381,7 @@ export function PublishButton({
   useViewportChanges(measure)
 
   // The Writer asked a moment ago, so Enter should finish the thought. Focus moves once the
-  // popover has been placed (it's hidden, and can't take focus, until then), and again when the
-  // panel gives way to the time.
+  // popover has been placed: it's hidden, and can't take focus, until then.
   const open = confirming && !!anchor
   useEffect(() => {
     if (!open) return undefined
@@ -408,7 +399,7 @@ export function PublishButton({
     return () => window.removeEventListener('pointerdown', close)
   }, [confirming, cancel])
 
-  /** The open copy as it is saved now, or null (with the reason said) if the plan no longer fits it. */
+  /** Null, with the reason said, if the plan no longer fits the saved copy. */
   async function stillAsPlanned({basis}: PublishPlan): Promise<SavedCopy | null | undefined> {
     // The plan's slug and date were settled when the room asked. If someone has changed either
     // since, in Details or from elsewhere, writing the plan now would undo their change.
@@ -434,7 +425,6 @@ export function PublishButton({
         fields,
       )
       if (releaseId) {
-        // Taken off the schedule and published after all: its copy is what goes live.
         await publishHeld(scheduleClient(client), {documentId: handle.documentId, releaseId, set: patch})
       } else {
         const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
@@ -459,7 +449,6 @@ export function PublishButton({
     }
   }
 
-  /** Promises the Post for `at`: a Draft for the first time, or one that was taken off the schedule, again. */
   async function schedule(planned: PublishPlan, at: string) {
     setPhase('scheduling')
     try {
@@ -467,12 +456,10 @@ export function PublishButton({
       const document = await stillAsPlanned(planned)
       if (document === null) return
       if (!document || document._rev !== planned.revision) {
-        // What was checked is what gets promised. Anything newer is checked first.
         onProblem(`This ${kind.singular} changed while you were deciding. Try again to schedule it as it is now.`)
         return
       }
-      // Nothing of the room's runs when the time comes, so the date is written now: the promised
-      // time, when readers first see it.
+      // Nothing of the room's runs when the time comes, so the date is written now.
       const details = await detailsForPublish({
         post: planned.basis,
         isFirstPublish,
@@ -483,7 +470,6 @@ export function PublishButton({
       const set = detailsPatch(details, fields)
       const tidy = scheduleClient(client)
       if (releaseId) {
-        // Off the schedule its copy can still be edited, so it goes back on only as it was checked.
         await scheduleAgain(tidy, {documentId: handle.documentId, releaseId, set, at, checked: planned.revision})
       } else {
         const made = await schedulePost(tidy, {documentId: handle.documentId, draft: document, set, at})
@@ -503,7 +489,7 @@ export function PublishButton({
     }
   }
 
-  /** "Change the time" on a Scheduled Post. Its words are locked and already checked; only the promise moves. */
+  /** "Change the time": the words are locked and already checked, so only the promise moves. */
   async function reschedule(at: string, was: string) {
     if (!releaseId) return
     setPhase('scheduling')
@@ -574,7 +560,7 @@ export function PublishButton({
         onClick={() => {
           if (confirming) return cancel()
           if (scheduled) {
-            // Nothing to check: a Scheduled Post's words are locked, and were checked to get there.
+            // Nothing to check: its words are locked.
             setView('promised')
             setTime(toLocalDateTime(promisedFor))
             setPhase('confirming')
@@ -620,7 +606,6 @@ export function PublishButton({
                     {isFirstPublish ? 'Publish now' : 'Publish changes'}
                   </PublishPill>
                 </ConfirmActions>
-                {/* Only where it can work: a Studio without scheduling never sees the line. */}
                 {canSchedule && (
                   <Another>
                     <QuietButton onClick={() => setView('time')}>Choose a time</QuietButton>
@@ -649,7 +634,6 @@ export function PublishButton({
                     }
                   }}
                 />
-                {/* Whose clock, said once where the promise is made; or why it can't be made yet. */}
                 <Clock id="calm-publish-clock">{ahead ? clockName() : 'Choose a time that is still ahead.'}</Clock>
                 <ConfirmActions>
                   <QuietButton onClick={cancel}>Not yet</QuietButton>
@@ -670,7 +654,7 @@ export function PublishButton({
                 <ConfirmText>
                   {isFirstPublish ? 'This goes live' : 'These changes go live'} {describePromisedTime(promisedFor)}.
                 </ConfirmText>
-                {/* Neither is the next thing to do, so neither is clay. Esc leaves it as it is. */}
+                {/* Neither is the next thing to do, so neither is clay. */}
                 <ConfirmActions>
                   <QuietButton ref={firstAnswer} onClick={() => void takeOff()}>
                     Edit it
@@ -813,7 +797,7 @@ const PublishPill = styled.button`
   }
 `
 
-/** A Scheduled Post has nothing waiting to be done, so its button is quiet: it says the state, and opens it. */
+/** Nothing is waiting to be done on a Scheduled Post, so its button is quiet. */
 const ScheduledPill = styled.button`
   min-height: 2.25rem;
   padding: var(--calm-space-sm) var(--calm-space-md);
@@ -896,14 +880,14 @@ const ConfirmActions = styled.div`
   margin-top: var(--calm-space-lg);
 `
 
-/** A second way to answer, set apart under the first two so the panel still asks one thing. */
+/** Set apart under the first two answers, so the panel still asks one thing. */
 const Another = styled.div`
   display: flex;
   justify-content: flex-end;
   margin-top: var(--calm-space-xs);
 `
 
-/** As a text field reads in Details: on the surface, with only a line beneath that turns clay. */
+/** As a text field reads in Details. */
 const TimeInput = styled.input`
   box-sizing: border-box;
   width: 100%;

@@ -18,7 +18,6 @@ export function TitleField({
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
-  /** A Scheduled Post's words are locked, the title among them. */
   readOnly?: boolean
   onEnter: () => void
 }) {

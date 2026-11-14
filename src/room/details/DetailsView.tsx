@@ -28,9 +28,8 @@ export function DetailsView({
 }: {
   handle: DocumentHandle
   fields: WritingFields
-  /** The release whose copy is open, when it isn't the draft: the form reads and writes that copy. */
+  /** The release whose copy is open, when it isn't the draft. */
   releaseId?: string
-  /** A Scheduled Post's Details are locked with its Prose. */
   readOnly?: boolean
   /** A publish problem or a nudge can send the Writer to one field, named by its path. */
   focusField?: string

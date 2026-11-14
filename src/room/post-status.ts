@@ -4,41 +4,38 @@ import {type Clock, describePromisedTime, isAhead} from '../lib/promised-time'
 export interface DocumentEditStatus {
   lastEditedDraftAt?: string
   lastEditedPublishedAt?: string
-  /** The copy in the release the document was read through, if it has one. */
+  /** The copy in the release the document was read through. */
   lastEditedVersionAt?: string
 }
 
-/** The time a Post is promised to readers for, or was until the Writer took it off the schedule. */
 export interface Promised {
   at: string
-  /** Taken off the schedule to be edited. The time is remembered, and nothing goes live. */
+  /** Taken off the schedule: the time is remembered, and nothing goes live. */
   held: boolean
 }
 
-/** A Release the open copy belongs to. It goes by its own title. */
 export interface InRelease {
   title: string
-  /** Set while the Release is scheduled, which locks every copy in it. */
+  /** Set while the Release is scheduled, which locks its copies. */
   scheduledFor?: string
 }
 
-/** The one thing to do next, which is what the bar's button says. Null when there is nothing. */
+/** What the bar's button says. */
 export type NextStep = 'publish' | 'publish-changes' | 'schedule-again' | 'scheduled' | null
 
 export interface PostStatus {
-  /** In the room's bar: "Published · unpublished changes". */
+  /** "Published · unpublished changes" */
   label: string
-  /** On a Lobby row, which has less room: "Unpublished changes". */
+  /** For a Lobby row: "Unpublished changes" */
   short: string
   lastEditedAt: string | undefined
-  /** Readers have seen this Post, in some form. */
   isPublished: boolean
-  /** There is something readers haven't seen yet. */
+  /** Something here hasn't reached readers. */
   unseen: boolean
   next: NextStep
-  /** The promised time, while it is Scheduled or waiting to be scheduled again. */
+  /** While it is Scheduled, or waiting to be scheduled again. */
   promisedFor?: string
-  /** The words can't change as things stand: the platform locks whatever is scheduled. */
+  /** The platform locks whatever is scheduled. */
   locked: boolean
 }
 
@@ -62,7 +59,7 @@ export function describePostStatus(
     return {...base, label, short: label, unseen: true, next: null, locked: !!release.scheduledFor}
   }
 
-  // A held promise whose time has gone by is no promise at all: the Post is an ordinary Draft again.
+  // A held promise whose time has gone by is no promise.
   const kept = promise && (!promise.held || isAhead(promise.at, clock.now)) ? promise : null
 
   if (kept && !kept.held) {

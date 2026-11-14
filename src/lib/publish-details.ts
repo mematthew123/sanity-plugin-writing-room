@@ -17,11 +17,9 @@ export interface PublishDetails {
 const sameMoment = (a: string, b: string) => new Date(a).getTime() === new Date(b).getTime()
 
 /**
- * Settles a unique slug on the first publish and stamps a missing published date.
- *
- * `now` is when readers first see the Post: this moment for a publish, the promised time for a
- * schedule. `promisedBefore` is the time it was last scheduled for, if it was: a date that still
- * equals it is one the room wrote, so it moves to `now`. Any other date is the Writer's, and stays.
+ * Settles a unique slug on the first publish and stamps a missing published date with `now`: this
+ * moment for a publish, the promised time for a schedule. A date that equals `promisedBefore` is
+ * one the room wrote for an earlier schedule, so it moves to `now`.
  */
 export async function detailsForPublish({
   post,

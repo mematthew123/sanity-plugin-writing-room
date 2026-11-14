@@ -1,9 +1,7 @@
 import {type SanityClient} from 'sanity'
 
 /**
- * Whether another document has the slug. The Post's own copies don't count: its draft, its
- * published document, and its copy in any release, which is where a Scheduled Post keeps its slug.
- *
+ * The Post's own copies don't count, a Scheduled copy in a release among them.
  * `slugField` comes from the schema, so it's safe to interpolate into the query.
  */
 export function slugTakenByAnother(

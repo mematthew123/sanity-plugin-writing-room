@@ -337,7 +337,7 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
   })
   const [problem, setProblem] = useState<string | null>(null)
 
-  // A Scheduled Post is a copy in a release of its own, and may have no draft: it is found there.
+  // A Scheduled Post may have no draft, only its copy in a release.
   const releases = useActiveReleases() as unknown as ReleaseLike[]
   const {data: copies} = useQuery<Array<{_id: string; _type: string; _updatedAt?: string}>>({
     query: '*[_type in $types && _id in path("versions.**")]{_id, _type, _updatedAt}',
@@ -412,7 +412,6 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
   )
 }
 
-/** The Posts on the desk that have a promised time, by id. */
 const Promises = createContext<ReadonlyMap<string, PromisedPost>>(new Map())
 
 function DeskPlaceholder() {
@@ -462,7 +461,6 @@ function useGlimpse(handle: DocumentHandle, kinds: WritingKind[], ref?: React.Re
   const promised = useContext(Promises).get(handle.documentId)
   const {data} = useDocumentProjection<Glimpse>({
     ...handle,
-    // Its words are in its Scheduled copy, which is all there may be of it.
     ...(promised && {perspective: {releaseName: promised.releaseId}}),
     // With a ref the SDK waits until the row is on screen; without one it loads straight away.
     ...(ref && {ref}),
@@ -652,8 +650,7 @@ function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
   const {data, kind, promised, status} = useGlimpse(handle, kinds, ref)
-  // Only a never-published document with no title and no words can be an abandoned start, and
-  // never one with a promised time.
+  // Only a never-published document with no title, no words and no promised time can be an abandoned start.
   const maybeEmpty = !status.isPublished && !promised && !data?.title?.trim() && !data?.text?.trim()
 
   return (
