@@ -1,7 +1,7 @@
 import studio from '@sanity/eslint-config-studio'
 
 export default [
-  {ignores: ['dist', 'playwright-report', 'test-results']},
+  {ignores: ['dist', 'playwright-report', 'test-results', 'vrt/out']},
   ...studio,
   {
     // Playwright reads a fixture's dependencies from its first argument, so it has to be a pattern.
@@ -10,6 +10,6 @@ export default [
   },
   {
     files: ['scripts/**/*.mjs'],
-    languageOptions: {globals: {console: 'readonly', process: 'readonly'}},
+    languageOptions: {globals: {console: 'readonly', fetch: 'readonly', process: 'readonly', setTimeout: 'readonly', URL: 'readonly'}},
   },
 ]

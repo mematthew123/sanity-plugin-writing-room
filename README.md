@@ -329,6 +329,24 @@ pnpm shots --project dark -g details                     # one capture, one sche
 
 The publish capture shows `demo.writingroom.studio` as the place the Post goes live; a dev Studio that was already running keeps its own `SANITY_STUDIO_PREVIEW_ORIGIN`, so stop it first.
 
+### Visual regressions
+
+`pnpm vrt` compares the room on your working tree against the commit where your branch left `main`. It checks that commit out into a git worktree of its own (kept in `~/.cache/sanity-plugin-writing-room-vrt`, with its own `node_modules`), starts a dev Studio from each, and captures the room in each state `pnpm shots` photographs, in a desktop and a phone window, light and dark. Each capture is compared two ways:
+
+- **Styles**: the computed style and box of every element, keyed by its position in the DOM and never by class name. It covers the whole page, not just what fits in the window, and a renamed class or a rule that moved to another stylesheet only counts if the browser computed something different.
+- **Pixels**: a screenshot of the window.
+
+```sh
+pnpm vrt                                   # everything: 8 states, 4 windows, about 3 minutes
+pnpm vrt -g details --project phone-dark   # one state, one window
+pnpm vrt --base-ref v0.4.0                 # against another commit
+pnpm vrt --help
+```
+
+It exits 1 when anything differs, and writes `vrt/out/<run>/summary.md` (git ignores it): the differences grouped by property, with the base, candidate and diff images beside it. A capture that differs is taken again once before it counts, since a late font or image differs once and a regression differs every time.
+
+It uses the same `.env.local`, essay and `shots-` ids as the captures above. The candidate is the dev Studio at `http://localhost:3333`, yours if it is running. The base Studio listens on port 3334, and the browser is pointed there whenever a base page asks for `localhost:3333`, so the project needs no other CORS origin. The states are in `vrt/capture.vrt.ts`; add one there when the room gains a state worth guarding.
+
 `publishConfig` swaps `exports` from `src` to `dist` when the package is packed or published, so always publish with `pnpm publish`. Releases are made with Changesets; see [RELEASING.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/RELEASING.md).
 
 `pnpm dev` runs the dev Studio in `sanity.config.ts`: the starter schema, `writingRoom({types: ['post']})` and the theme, with the plugin imported straight from `src/`, so edits reload as you save. It writes real documents, so point `.env.local` at a project and dataset you don't mind testing in, with `http://localhost:3333` as a CORS origin. Set `SANITY_STUDIO_PREVIEW_ORIGIN` to try Preview against a site with a draft-mode route. The dev Studio isn't part of the package, and isn't meant to be built (`sanity build` would write over `dist/`).
