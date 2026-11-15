@@ -13,10 +13,25 @@ function wasRejected(error: unknown): boolean {
   return typeof status === 'number' && status >= 400 && status < 500
 }
 
+const ARCHIVING_POLL_MS = 250
+const ARCHIVING_TIMEOUT_MS = 10_000
+
+/** Archiving settles a moment after Sanity accepts it, and a release can't be deleted until it has. */
+async function archived(client: SanityClient, releaseId: string): Promise<void> {
+  const giveUpAt = Date.now() + ARCHIVING_TIMEOUT_MS
+  try {
+    while ((await client.releases.get({releaseId}))?.state === 'archiving' && Date.now() < giveUpAt) {
+      await new Promise((resolve) => setTimeout(resolve, ARCHIVING_POLL_MS))
+    }
+  } catch {
+  }
+}
+
 async function removeUnscheduled(client: SanityClient, documentId: string, releaseId: string) {
   try {
     await client.discardVersion({releaseId, publishedId: documentId}).catch(() => undefined)
     await client.releases.archive({releaseId})
+    await archived(client, releaseId)
     await client.releases.delete({releaseId})
   } catch {
   }
@@ -166,9 +181,10 @@ export async function unlockPost(
       () => client.releases.archive({releaseId}),
       async () => {
         const state = await stateNow()
-        return state === undefined || state === 'archived'
+        return state === undefined || state === 'archived' || state === 'archiving'
       },
     )
+    await archived(client, releaseId)
   }
   await unlessAlreadySo(
     () => client.releases.delete({releaseId}),

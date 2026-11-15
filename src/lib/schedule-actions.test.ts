@@ -1,5 +1,5 @@
 import {type SanityClient} from 'sanity'
-import {describe, expect, it} from 'vitest'
+import {afterEach, describe, expect, it, vi} from 'vitest'
 import {schedulePost, unlockPost} from './schedule-actions'
 
 const FRIDAY = '2026-11-20T09:00:00.000Z'
@@ -157,7 +157,7 @@ describe('schedulePost', () => {
     const rejected = Object.assign(new Error('no'), {statusCode: 409})
     const {client, names} = fakeClient({fail: {'releases.schedule': rejected}})
     await expect(schedulePost(client, {documentId: 'post1', publishAt: new Date(FRIDAY)})).rejects.toBe(rejected)
-    expect(names().slice(3)).toEqual(['discardVersion', 'releases.archive', 'releases.delete'])
+    expect(names().slice(3)).toEqual(['discardVersion', 'releases.archive', 'releases.get', 'releases.delete'])
   })
 
   it('touches nothing when it can’t tell whether the schedule landed', async () => {
@@ -242,7 +242,7 @@ describe('schedulePost', () => {
       const {client, calls, names} = fakeClient({version: null, fail: {createVersion: lost}})
       await expect(schedulePost(client, input)).rejects.toBe(lost)
       expect(calls[2]).toEqual(['getDocument', 'versions.rNEW.post1'])
-      expect(names().slice(3)).toEqual(['discardVersion', 'releases.archive', 'releases.delete'])
+      expect(names().slice(3)).toEqual(['discardVersion', 'releases.archive', 'releases.get', 'releases.delete'])
     })
 
     it('keeps the release when the copy landed after all: the room shows it and offers Unlock', async () => {
@@ -274,6 +274,7 @@ describe('unlockPost', () => {
       'getDocument',
       'transaction',
       'releases.archive',
+      'releases.get',
       'releases.delete',
     ])
     expect(calls[2]).toEqual(['getDocument', 'versions.rABC.post1'])
@@ -298,13 +299,39 @@ describe('unlockPost', () => {
   it('leaves the draft alone when the version is already gone', async () => {
     const {client, names} = fakeClient({release: {...scheduled, state: 'active'}, version: null})
     await unlockPost(client, args)
-    expect(names()).toEqual(['releases.get', 'getDocument', 'releases.archive', 'releases.delete'])
+    expect(names()).toEqual(['releases.get', 'getDocument', 'releases.archive', 'releases.get', 'releases.delete'])
   })
 
   it('finishes an Unlock that was cut short after archiving', async () => {
     const {client, names} = fakeClient({release: {...scheduled, state: 'archived'}})
     await unlockPost(client, args)
     expect(names()).toEqual(['releases.get', 'releases.delete'])
+  })
+
+  describe('while the release is still archiving', () => {
+    afterEach(() => vi.useRealTimers())
+    const active = {...scheduled, state: 'active'}
+    const archiving = {...scheduled, state: 'archiving'}
+
+    it('waits for it to be archived before deleting it', async () => {
+      vi.useFakeTimers()
+      const {client, names} = fakeClient({release: active, releaseLater: [archiving, {...scheduled, state: 'archived'}]})
+      const unlocking = unlockPost(client, args)
+      await vi.advanceTimersByTimeAsync(200)
+      expect(names()).not.toContain('releases.delete')
+      await vi.advanceTimersByTimeAsync(100)
+      await expect(unlocking).resolves.toEqual({scheduledFor: FRIDAY})
+      expect(names().slice(2)).toEqual(['releases.archive', 'releases.get', 'releases.get', 'releases.delete'])
+    })
+
+    it('doesn’t wait for ever', async () => {
+      vi.useFakeTimers()
+      const {client, names} = fakeClient({release: active, releaseLater: [archiving]})
+      const unlocking = unlockPost(client, args)
+      await vi.advanceTimersByTimeAsync(11_000)
+      await expect(unlocking).resolves.toEqual({scheduledFor: FRIDAY})
+      expect(names().at(-1)).toBe('releases.delete')
+    })
   })
 
   it('has nothing to do when the release is gone', async () => {
@@ -343,7 +370,7 @@ describe('unlockPost', () => {
     it('carries on when the other one has already given the draft the version', async () => {
       const {client, names} = fakeClient({release: scheduled, version, versionLater: null, fail: {transaction: rejected}})
       await expect(unlockPost(client, args)).resolves.toEqual({scheduledFor: FRIDAY})
-      expect(names().slice(-2)).toEqual(['releases.archive', 'releases.delete'])
+      expect(names().slice(-3)).toEqual(['releases.archive', 'releases.get', 'releases.delete'])
     })
 
     it('is done when the other one archived and deleted the release', async () => {
