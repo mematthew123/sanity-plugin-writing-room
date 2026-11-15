@@ -79,7 +79,6 @@
   }
 }
 
-/* The empty Lobby's only button. */
 .startButton[data-prominent] {
   background: var(--calm-color-accent);
   box-shadow: none;

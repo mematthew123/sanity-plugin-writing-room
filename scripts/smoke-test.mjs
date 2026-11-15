@@ -223,7 +223,6 @@ console.log(
   `\n✓ sanity@${sanityVersion}: installed, deduped, type-checked and built${embedded ? ', standalone and embedded in Next.js' : ''}.`,
 )
 
-/** Every browser script in a built app. */
 function scripts(dir, found = []) {
   for (const entry of readdirSync(dir, {withFileTypes: true})) {
     const child = join(dir, entry.name)

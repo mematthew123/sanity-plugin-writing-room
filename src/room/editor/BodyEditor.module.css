@@ -57,7 +57,6 @@
     text-underline-offset: 0.2em;
   }
 
-  /* Each list item is its own block, so markers and numbering are drawn here. */
   [data-list-item] {
     position: relative;
     margin-bottom: calc(var(--calm-type-prose-gap) * 0.4);

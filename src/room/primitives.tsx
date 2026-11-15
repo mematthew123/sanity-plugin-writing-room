@@ -13,7 +13,6 @@ export function Column({
   ref,
   ...props
 }: {as?: 'div' | 'main' | 'article'; ref?: Ref<HTMLElement>} & Omit<ComponentProps<'div'>, 'ref'>) {
-  // Whichever element it is, the ref is to an element.
   return <Tag {...props} ref={ref as Ref<HTMLDivElement>} className={cx(styles.column, className)} />
 }
 

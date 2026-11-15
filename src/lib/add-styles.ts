@@ -1,4 +1,4 @@
-/** Injects one CSS Module's rules, once. Called from the build's output (see tsdown.config.ts). */
+/** Injects one CSS Module's rules, once (see tsdown.config.ts). */
 export function addStyles(id: string, css: string): void {
   // Also evaluated on a server when the Studio is embedded.
   if (typeof document === 'undefined') return

@@ -24,7 +24,6 @@ function cssModulesInJs(): Plugin {
         minify: true,
       })
       for (const [local, {composes}] of Object.entries(exports)) {
-        // Only this file's rules are injected.
         if (composes.some((composed) => composed.type === 'dependency')) {
           this.error(`${file}: .${local} composes from another file, which this build doesn't carry.`)
         }
@@ -35,7 +34,6 @@ function cssModulesInJs(): Plugin {
           [name, ...composes.map((composed) => composed.name)].join(' '),
         ]),
       )
-      // Keyed by content, as the class names are.
       const css = code.toString()
       const key = createHash('sha256').update(css).digest('hex').slice(0, 8)
       return {

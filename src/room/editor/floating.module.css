@@ -17,7 +17,7 @@
   font-weight: var(--calm-weight-ui);
 }
 
-/* Twice `EDGE` in floating.tsx is kept clear, so the clamp there always fits. */
+/* 24px is twice `EDGE` in floating.tsx. */
 .surface {
   box-sizing: border-box;
   max-width: calc(100vw - 24px);

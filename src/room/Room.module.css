@@ -58,7 +58,6 @@
   flex: 1;
 }
 
-/* Clicks pass through everywhere but the message. */
 .foot {
   position: sticky;
   bottom: 0;
@@ -78,7 +77,6 @@
   }
 }
 
-/* Without a margin to sit in, it's in the `Aa` menu instead. */
 .count {
   transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
 
