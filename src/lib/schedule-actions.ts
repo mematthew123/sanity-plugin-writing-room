@@ -3,6 +3,9 @@ import {draftFromScheduledVersion, draftIdOf, versionIdOf} from './schedule'
 
 const RELEASE_TITLE = 'Scheduled publish'
 
+/** A field no document has. Unsetting it is a patch that changes nothing. */
+const CLAIM = 'writingRoomUnlock'
+
 type Stored = Record<string, unknown> & {_id: string; _rev?: string; _updatedAt?: string}
 
 function wasRejected(error: unknown): boolean {
@@ -19,24 +22,46 @@ async function removeUnscheduled(client: SanityClient, documentId: string, relea
   }
 }
 
+function same(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a) !== Array.isArray(b)) return false
+  const keys = Object.keys(a)
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every((key) => same((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
+  )
+}
+
 async function writeDetails(
   client: SanityClient,
   draftId: string,
   details: Record<string, unknown>,
-): Promise<() => Promise<void>> {
+  revision: string | undefined,
+): Promise<{revision: string | undefined; putDetailsBack: () => Promise<void>}> {
   const keys = Object.keys(details)
-  if (keys.length === 0) return async () => undefined
+  if (keys.length === 0) return {revision, putDetailsBack: async () => undefined}
   const before = await client.getDocument<Stored>(draftId)
-  await client.patch(draftId).set(details).commit()
-  return async () => {
-    const set: Record<string, unknown> = {}
-    const unset: string[] = []
-    for (const key of keys) {
-      if (before && before[key] !== undefined) set[key] = before[key]
-      else unset.push(key)
+  const write = client.patch(draftId).set(details)
+  const written = await (revision ? write.ifRevisionId(revision) : write).commit<Stored>()
+  const putDetailsBack = async () => {
+    try {
+      // Only what is still as the room wrote it: anything else is someone's newer change.
+      const now = await client.getDocument<Stored>(draftId)
+      if (!now?._rev) return
+      const set: Record<string, unknown> = {}
+      const unset: string[] = []
+      for (const key of keys) {
+        if (!same(now[key], details[key])) continue
+        if (before && before[key] !== undefined) set[key] = before[key]
+        else unset.push(key)
+      }
+      if (Object.keys(set).length + unset.length === 0) return
+      await client.patch(draftId).set(set).unset(unset).ifRevisionId(now._rev).commit()
+    } catch {
     }
-    await client.patch(draftId).set(set).unset(unset).commit().catch(() => undefined)
   }
+  return {revision: written?._rev, putDetailsBack}
 }
 
 async function mayHaveVersion(client: SanityClient, documentId: string, releaseId: string | undefined) {
@@ -50,11 +75,22 @@ async function mayHaveVersion(client: SanityClient, documentId: string, releaseI
 
 export async function schedulePost(
   client: SanityClient,
-  {documentId, publishAt, details = {}}: {documentId: string; publishAt: Date; details?: Record<string, unknown>},
+  {
+    documentId,
+    publishAt,
+    details = {},
+    revision,
+  }: {
+    documentId: string
+    publishAt: Date
+    details?: Record<string, unknown>
+    /** The draft revision that was checked. Given, nothing newer is scheduled in its place. */
+    revision?: string
+  },
 ): Promise<{releaseId: string}> {
   const draftId = draftIdOf(documentId)
   const at = publishAt.toISOString()
-  const putDetailsBack = await writeDetails(client, draftId, details)
+  const {revision: toCopy, putDetailsBack} = await writeDetails(client, draftId, details, revision)
 
   let releaseId: string | undefined
   let copied = false
@@ -62,7 +98,12 @@ export async function schedulePost(
     ;({releaseId} = await client.releases.create({
       metadata: {title: RELEASE_TITLE, releaseType: 'scheduled', cardinality: 'one', intendedPublishAt: at},
     }))
-    await client.createVersion({publishedId: documentId, baseId: draftId, releaseId})
+    await client.createVersion({
+      publishedId: documentId,
+      baseId: draftId,
+      releaseId,
+      ...(toCopy ? {ifBaseRevisionId: toCopy} : {}),
+    })
     copied = true
     await client.releases.schedule({releaseId, publishAt: at})
   } catch (error) {
@@ -110,8 +151,11 @@ export async function unlockPost(
       const draft = draftFromScheduledVersion(version, {documentId, dateField, scheduledFor})
       await unlessAlreadySo(
         () =>
+          // The patch changes nothing: it is there to turn the transaction down when another Unlock
+          // has already taken this version, or someone has changed it since it was read.
           client
             .transaction()
+            .patch(versionId, {ifRevisionID: version._rev, unset: [CLAIM]})
             .createOrReplace(draft as Stored & {_type: string})
             .delete(versionId)
             .commit(),

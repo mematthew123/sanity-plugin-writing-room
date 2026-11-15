@@ -18,6 +18,14 @@ async function releasesOf(content: SanityClient, id: string): Promise<Release[]>
   )
 }
 
+const NO_SCHEDULED_DRAFTS = 'This project doesn’t have scheduled drafts.'
+
+/** What Studio asks before it offers scheduled drafts. Anything else that goes wrong is a failure. */
+async function hasScheduledDrafts(content: SanityClient): Promise<boolean> {
+  const features = await content.request<string[]>({uri: '/features', tag: 'features'})
+  return features.includes('singleDocRelease')
+}
+
 async function sweepSchedules(content: SanityClient, id: string) {
   for (const release of await releasesOf(content, id)) {
     const releaseId = release.name
@@ -39,7 +47,7 @@ test('schedules from the ask-once panel, locks the room, and unlocks back to a d
   await page.getByRole('button', {name: 'Publish', exact: true}).click()
   const scheduleInstead = page.getByRole('button', {name: 'Schedule for later'})
   await expect(page.getByRole('button', {name: 'Publish now'})).toBeVisible()
-  test.skip(!(await scheduleInstead.isVisible()), 'This project doesn’t have scheduled drafts.')
+  test.skip(!(await scheduleInstead.isVisible()), NO_SCHEDULED_DRAFTS)
 
   try {
     await scheduleInstead.click()
@@ -106,21 +114,15 @@ test('schedules from the ask-once panel, locks the room, and unlocks back to a d
 
 test('a schedule left hanging locks the room until the Writer unlocks it', async ({page, post, content}) => {
   test.setTimeout(180_000)
-  let releaseId: string
-  try {
-    const made = await content.releases.create({
-      metadata: {
-        title: 'Scheduled publish',
-        releaseType: 'scheduled',
-        cardinality: 'one',
-        intendedPublishAt: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
-      },
-    })
-    releaseId = made.releaseId
-  } catch {
-    test.skip(true, 'This project doesn’t have scheduled drafts.')
-    return
-  }
+  test.skip(!(await hasScheduledDrafts(content)), NO_SCHEDULED_DRAFTS)
+  const {releaseId} = await content.releases.create({
+    metadata: {
+      title: 'Scheduled publish',
+      releaseType: 'scheduled',
+      cardinality: 'one',
+      intendedPublishAt: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
+    },
+  })
 
   try {
     const draft = await content.getDocument<Record<string, unknown>>(`drafts.${post.id}`)
@@ -151,7 +153,11 @@ test('a schedule left hanging locks the room until the Writer unlocks it', async
   }
 })
 
-async function goLiveOnASchedule(content: SanityClient, id: string): Promise<string> {
+async function goLiveOnASchedule(
+  content: SanityClient,
+  id: string,
+  made: (releaseId: string) => void,
+): Promise<void> {
   const {releaseId} = await content.releases.create({
     metadata: {
       title: 'Scheduled publish',
@@ -160,12 +166,12 @@ async function goLiveOnASchedule(content: SanityClient, id: string): Promise<str
       intendedPublishAt: new Date(Date.now() + 3600 * 1000).toISOString(),
     },
   })
+  made(releaseId)
   await content.createVersion({publishedId: id, baseId: `drafts.${id}`, releaseId})
   await content.releases.publish({releaseId})
   await expect(async () => {
     expect(await content.getDocument(id), 'it went live').toBeTruthy()
   }).toPass({timeout: 30_000})
-  return releaseId
 }
 
 test('reads as published once a schedule has gone live, with nothing left to publish', async ({
@@ -173,10 +179,12 @@ test('reads as published once a schedule has gone live, with nothing left to pub
   post,
   content,
 }) => {
+  test.skip(!(await hasScheduledDrafts(content)), NO_SCHEDULED_DRAFTS)
   let releaseId: string | undefined
   try {
-    releaseId = await goLiveOnASchedule(content, post.id).catch(() => undefined)
-    test.skip(!releaseId, 'This project doesn’t have scheduled drafts.')
+    await goLiveOnASchedule(content, post.id, (made) => {
+      releaseId = made
+    })
 
     await new Room(page).open(post)
 
@@ -185,6 +193,11 @@ test('reads as published once a schedule has gone live, with nothing left to pub
     await expect(page.getByRole('button', {name: 'Unlock'})).toHaveCount(0)
     expect(await content.getDocument(`drafts.${post.id}`)).toBeFalsy()
   } finally {
-    if (releaseId) await content.releases.delete({releaseId}).catch(() => undefined)
+    if (releaseId) {
+      // Published, there is only the release to delete. Cut short, its version and the release are still there.
+      await content.discardVersion({releaseId, publishedId: post.id}).catch(() => undefined)
+      await content.releases.archive({releaseId}).catch(() => undefined)
+      await content.releases.delete({releaseId}).catch(() => undefined)
+    }
   }
 })

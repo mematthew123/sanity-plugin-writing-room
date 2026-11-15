@@ -404,12 +404,24 @@ export function PublishButton({
     }
     setPhase('scheduling')
     try {
-      if ((await savedIfPlanStands(basis)) === null) return
+      const saved = await savedIfPlanStands(basis)
+      if (saved === null) return
+      // The check was of one revision. Scheduling copies the draft as it is saved, so a later
+      // revision, a collaborator's say, would go on the schedule unchecked.
+      if (!saved?._rev || saved._rev !== draft?._rev) {
+        onProblem(`This ${kind.singular} changed while you were deciding. Publish again to schedule it as it is now.`)
+        return
+      }
       const patch = detailsPatch(
         details.publishedAt ? {...details, publishedAt: at.toISOString()} : details,
         kind.fields,
       )
-      await schedulePost(client, {documentId: handle.documentId, publishAt: at, details: patch})
+      await schedulePost(client, {
+        documentId: handle.documentId,
+        publishAt: at,
+        details: patch,
+        revision: saved._rev,
+      })
       onProblem(null)
       onNotice({text: `Scheduled for ${formatGoLive(at.toISOString())}`, done: true})
     } catch {

@@ -10,12 +10,22 @@ interface Fake {
   versionLater?: Record<string, unknown> | null
   version?: Record<string, unknown> | null
   draft?: Record<string, unknown> | null
+  draftLater?: Record<string, unknown> | null
   fail?: Record<string, unknown>
 }
 
-function fakeClient({release, releaseLater, version = null, versionLater, draft = null, fail = {}}: Fake = {}) {
+function fakeClient({
+  release,
+  releaseLater,
+  version = null,
+  versionLater,
+  draft = null,
+  draftLater,
+  fail = {},
+}: Fake = {}) {
   let gets = 0
   let versionReads = 0
+  let draftReads = 0
   const calls: Array<[string, unknown?]> = []
   const run = async <T,>(name: string, args: unknown, result?: T): Promise<T> => {
     calls.push([name, args])
@@ -23,12 +33,16 @@ function fakeClient({release, releaseLater, version = null, versionLater, draft 
     return result as T
   }
   const client = {
-    patch: (id: string) => ({
-      set: (set: unknown) => ({
-        commit: () => run('patch', {id, set}),
-        unset: (unset: unknown) => ({commit: () => run('patch', {id, set, unset})}),
-      }),
-    }),
+    patch: (id: string) => {
+      const patch: Record<string, unknown> = {id}
+      const builder = {
+        set: (set: unknown) => ((patch.set = set), builder),
+        unset: (unset: unknown) => ((patch.unset = unset), builder),
+        ifRevisionId: (rev: string) => ((patch.ifRevisionId = rev), builder),
+        commit: () => run('patch', patch, {_id: id, _rev: 'rWRITTEN'}),
+      }
+      return builder
+    },
     releases: {
       create: (args: unknown) => run('releases.create', args, {releaseId: 'rNEW'}),
       schedule: (args: unknown) => run('releases.schedule', args),
@@ -44,7 +58,11 @@ function fakeClient({release, releaseLater, version = null, versionLater, draft 
     createVersion: (args: unknown) => run('createVersion', args),
     discardVersion: (args: unknown) => run('discardVersion', args),
     getDocument: (id: string) => {
-      if (id.startsWith('drafts.')) return run('getDocument', id, draft)
+      if (id.startsWith('drafts.')) {
+        const read = draftLater !== undefined && draftReads > 0 ? draftLater : draft
+        draftReads += 1
+        return run('getDocument', id, read)
+      }
       const read = versionLater !== undefined && versionReads > 0 ? versionLater : version
       versionReads += 1
       return run('getDocument', id, read)
@@ -52,6 +70,7 @@ function fakeClient({release, releaseLater, version = null, versionLater, draft 
     transaction: () => {
       const operations: unknown[] = []
       const transaction = {
+        patch: (id: string, patch: object) => (operations.push({patch: {id, ...patch}}), transaction),
         createOrReplace: (document: unknown) => (operations.push({createOrReplace: document}), transaction),
         delete: (id: string) => (operations.push({delete: id}), transaction),
         commit: () => run('transaction', operations),
@@ -96,6 +115,44 @@ describe('schedulePost', () => {
     expect(names()).toEqual(['getDocument', 'patch', 'releases.create', 'createVersion', 'releases.schedule'])
   })
 
+  it('schedules the revision that was checked, and nothing newer', async () => {
+    const {client, calls} = fakeClient()
+    await schedulePost(client, {documentId: 'post1', publishAt: new Date(FRIDAY), revision: 'rCHECKED'})
+    expect(calls[1]).toEqual([
+      'createVersion',
+      {publishedId: 'post1', baseId: 'drafts.post1', releaseId: 'rNEW', ifBaseRevisionId: 'rCHECKED'},
+    ])
+  })
+
+  it('writes the details to the checked revision only, then copies the revision that made', async () => {
+    const {client, calls} = fakeClient()
+    await schedulePost(client, {
+      documentId: 'post1',
+      publishAt: new Date(FRIDAY),
+      details: {publishedAt: FRIDAY},
+      revision: 'rCHECKED',
+    })
+    expect(calls[1]).toEqual(['patch', {id: 'drafts.post1', set: {publishedAt: FRIDAY}, ifRevisionId: 'rCHECKED'}])
+    expect(calls[3]).toEqual([
+      'createVersion',
+      {publishedId: 'post1', baseId: 'drafts.post1', releaseId: 'rNEW', ifBaseRevisionId: 'rWRITTEN'},
+    ])
+  })
+
+  it('makes nothing when the draft has moved on from the checked revision', async () => {
+    const moved = Object.assign(new Error('moved on'), {statusCode: 409})
+    const {client, names} = fakeClient({fail: {patch: moved}})
+    await expect(
+      schedulePost(client, {
+        documentId: 'post1',
+        publishAt: new Date(FRIDAY),
+        details: {publishedAt: FRIDAY},
+        revision: 'rCHECKED',
+      }),
+    ).rejects.toBe(moved)
+    expect(names()).toEqual(['getDocument', 'patch'])
+  })
+
   it('removes what it made when Sanity turns the schedule down', async () => {
     const rejected = Object.assign(new Error('no'), {statusCode: 409})
     const {client, names} = fakeClient({fail: {'releases.schedule': rejected}})
@@ -119,21 +176,55 @@ describe('schedulePost', () => {
       publishAt: new Date(FRIDAY),
       details: {publishedAt: FRIDAY, slug},
     }
-    const putBack = ['patch', {id: 'drafts.post1', set: {slug: {_type: 'slug', current: 'old'}}, unset: ['publishedAt']}]
+    const old = {_type: 'slug', current: 'old'}
+    const written = {_id: 'drafts.post1', _rev: 'rWRITTEN', publishedAt: FRIDAY, slug: {...slug}}
+    const putBack = ['patch', {id: 'drafts.post1', set: {slug: old}, unset: ['publishedAt'], ifRevisionId: 'rWRITTEN'}]
 
     for (const step of ['releases.create', 'createVersion', 'releases.schedule']) {
       it(`puts the draft’s details back when Sanity turns down ${step}`, async () => {
-        const draft = {_id: 'drafts.post1', slug: {_type: 'slug', current: 'old'}}
-        const {client, calls} = fakeClient({draft, fail: {[step]: rejected}})
+        const draft = {_id: 'drafts.post1', slug: old}
+        const {client, calls} = fakeClient({draft, draftLater: written, fail: {[step]: rejected}})
         await expect(schedulePost(client, input)).rejects.toBe(rejected)
         expect(calls.at(-1)).toEqual(putBack)
       })
     }
 
     it('takes away a date the draft never had', async () => {
-      const {client, calls} = fakeClient({draft: {_id: 'drafts.post1'}, fail: {'releases.create': rejected}})
+      const {client, calls} = fakeClient({
+        draft: {_id: 'drafts.post1'},
+        draftLater: written,
+        fail: {'releases.create': rejected},
+      })
       await expect(schedulePost(client, input)).rejects.toBe(rejected)
-      expect(calls.at(-1)).toEqual(['patch', {id: 'drafts.post1', set: {}, unset: ['publishedAt', 'slug']}])
+      expect(calls.at(-1)).toEqual([
+        'patch',
+        {id: 'drafts.post1', set: {}, unset: ['publishedAt', 'slug'], ifRevisionId: 'rWRITTEN'},
+      ])
+    })
+
+    it('leaves a detail someone else has changed since', async () => {
+      const theirs = {...written, _rev: 'rTHEIRS', slug: {_type: 'slug', current: 'their-slug'}}
+      const {client, calls} = fakeClient({
+        draft: {_id: 'drafts.post1', slug: old},
+        draftLater: theirs,
+        fail: {'releases.create': rejected},
+      })
+      await expect(schedulePost(client, input)).rejects.toBe(rejected)
+      expect(calls.at(-1)).toEqual([
+        'patch',
+        {id: 'drafts.post1', set: {}, unset: ['publishedAt'], ifRevisionId: 'rTHEIRS'},
+      ])
+    })
+
+    it('writes nothing back when every detail has been changed since', async () => {
+      const theirs = {_id: 'drafts.post1', _rev: 'rTHEIRS', publishedAt: '2026-01-01T00:00:00.000Z', slug: old}
+      const {client, names} = fakeClient({
+        draft: {_id: 'drafts.post1', slug: old},
+        draftLater: theirs,
+        fail: {'releases.create': rejected},
+      })
+      await expect(schedulePost(client, input)).rejects.toBe(rejected)
+      expect(names().filter((name) => name === 'patch')).toHaveLength(1)
     })
 
     it('leaves the details when the schedule may have landed: Unlock clears them', async () => {
@@ -189,6 +280,7 @@ describe('unlockPost', () => {
     expect(calls[3]).toEqual([
       'transaction',
       [
+        {patch: {id: 'versions.rABC.post1', ifRevisionID: 'r1', unset: ['writingRoomUnlock']}},
         {createOrReplace: {_id: 'drafts.post1', _type: 'post', title: 'Quiet mornings'}},
         {delete: 'versions.rABC.post1'},
       ],
