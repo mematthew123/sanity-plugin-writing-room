@@ -12,7 +12,7 @@
   - "All …" links that work with any Structure.
   - Prefixed block types the plugin registers itself.
   - Setup problems that explain themselves.
-- **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest. See `docs/adr/0001-details-use-the-studio-form.md`.
+- **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest.
 - **Look and feel:**
   - Fonts shipped with the plugin.
   - Tokens scoped to the room.
