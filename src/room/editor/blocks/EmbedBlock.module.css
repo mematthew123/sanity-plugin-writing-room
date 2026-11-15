@@ -1,0 +1,59 @@
+.card {
+  padding: var(--calm-space-md);
+  border-radius: var(--calm-radius-large);
+  background: var(--calm-color-surface);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--calm-space-md);
+}
+
+.provider {
+  color: var(--calm-color-ink);
+  font-weight: var(--calm-weight-ui-strong);
+}
+
+.previewToggle {
+  padding: var(--calm-space-xs) var(--calm-space-sm);
+  border: 0;
+  border-radius: var(--calm-radius-pill);
+  background: transparent;
+  color: var(--calm-color-ink-muted);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--calm-color-paper);
+    color: var(--calm-color-ink);
+  }
+}
+
+.link {
+  overflow: hidden;
+  margin-top: var(--calm-space-xs);
+  color: var(--calm-color-ink-muted);
+  font-size: var(--calm-type-ui-size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.player {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  margin-top: var(--calm-space-sm);
+  border: 0;
+  border-radius: var(--calm-radius);
+
+  &[data-audio] {
+    height: 152px;
+    aspect-ratio: auto;
+  }
+}

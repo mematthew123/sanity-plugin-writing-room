@@ -9,11 +9,11 @@ import {
   stringToPath,
   useDocumentForm,
 } from 'sanity'
-import styled from 'styled-components'
 import {type WritingFields} from '../fields'
 import {onDetailsFocusAsked, onFirstDetailAsked} from '../navigation'
 import {Placeholder} from '../primitives'
 import {DetailsDocument, InRoomDetails} from './room-form'
+import styles from './DetailsView.module.css'
 
 /**
  * Every field but the title and the body, rendered by the Studio's own form,
@@ -70,12 +70,12 @@ export function DetailsView({
     return onFirstDetailAsked(() => focusPath.current([firstField]))
   }, [firstField])
 
-  if (!formState || !ready) return <Placeholder $height="12rem" />
+  if (!formState || !ready) return <Placeholder height="12rem" />
 
   return (
     <InRoomDetails.Provider value>
       <DetailsDocument.Provider value={handle.documentId}>
-        <Root ref={root} tabIndex={-1} data-calm-details="">
+        <div className={styles.root} ref={root} tabIndex={-1} data-calm-details="">
           <ChangeIndicatorsTracker>
             <FormBuilder
               __internal_patchChannel={patchChannel}
@@ -104,7 +104,7 @@ export function DetailsView({
               hasBaseVariant={false}
             />
           </ChangeIndicatorsTracker>
-        </Root>
+        </div>
       </DetailsDocument.Provider>
     </InRoomDetails.Provider>
   )
@@ -120,14 +120,3 @@ function withoutFields(members: ObjectMember[], names: string[]): ObjectMember[]
     return inside.length > 0 ? [{...member, fieldSet: {...member.fieldSet, members: inside}}] : []
   })
 }
-
-const Root = styled.div`
-  margin-top: var(--calm-space-xl);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-  line-height: 1.4;
-
-  &:focus {
-    outline: none;
-  }
-`

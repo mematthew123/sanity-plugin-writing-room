@@ -1,0 +1,28 @@
+@keyframes shimmer {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.8;
+  }
+}
+
+.picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--calm-space-xs);
+  border-radius: var(--calm-radius);
+}
+
+.shimmer {
+  aspect-ratio: 3 / 2;
+  margin-bottom: var(--calm-space-xs);
+  border-radius: var(--calm-radius);
+  background: var(--calm-color-surface);
+  animation: shimmer 1.2s var(--calm-motion-easing) infinite alternate;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

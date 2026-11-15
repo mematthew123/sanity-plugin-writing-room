@@ -1,0 +1,110 @@
+.placeholder {
+  color: var(--calm-color-ink-muted);
+}
+
+.prose {
+  min-height: 40vh;
+  outline: none;
+  caret-color: var(--calm-color-accent);
+  text-wrap: pretty;
+  counter-reset: calm-l1 calm-l2;
+
+  & > * {
+    margin-block: 0 var(--calm-type-prose-gap);
+  }
+
+  [data-calm-block] {
+    transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-calm-block] {
+      transition: none;
+    }
+  }
+
+  h2,
+  h3 {
+    margin-top: calc(var(--calm-type-prose-gap) * 2);
+    font-weight: var(--calm-weight-heading);
+    line-height: var(--calm-type-heading-leading);
+    text-wrap: balance;
+  }
+
+  h2 {
+    font-size: var(--calm-type-heading);
+  }
+
+  h3 {
+    font-size: var(--calm-type-subheading);
+  }
+
+  blockquote {
+    margin-inline: 0;
+    padding-inline-start: var(--calm-space-md);
+    border-inline-start: 2px solid var(--calm-color-accent);
+    color: var(--calm-color-ink-muted);
+  }
+
+  strong {
+    font-weight: var(--calm-weight-heading);
+  }
+
+  [data-link] {
+    color: var(--calm-color-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  [data-list-item] {
+    position: relative;
+    margin-bottom: calc(var(--calm-type-prose-gap) * 0.4);
+    padding-inline-start: 1.5em;
+  }
+
+  [data-list-item][data-level='2'] {
+    margin-inline-start: 1.5em;
+  }
+
+  [data-list-item]::before {
+    position: absolute;
+    left: 0;
+    color: var(--calm-color-ink-muted);
+  }
+
+  [data-list-item='bullet']::before {
+    content: '•';
+  }
+
+  [data-list-item='bullet'][data-level='2']::before {
+    content: '◦';
+  }
+
+  /* Whatever isn't nested under a numbered item ends its list.
+     Set, not reset: a reset would restart the numbering ("1, 1, 2"). */
+  & > :not([data-list-item='number'][data-level='1'], [data-list-item]:not([data-level='1'])) {
+    counter-set: calm-l1 0;
+  }
+
+  [data-list-item='number'][data-level='1'] {
+    counter-increment: calm-l1;
+    counter-reset: calm-l2;
+  }
+
+  [data-list-item='number'][data-level='1']::before {
+    content: counter(calm-l1) '.';
+  }
+
+  [data-list-item='number'][data-level='2'] {
+    counter-increment: calm-l2;
+  }
+
+  [data-list-item='number'][data-level='2']::before {
+    content: counter(calm-l2, lower-alpha) '.';
+  }
+
+  [data-list-item] + :not([data-list-item]) {
+    margin-top: calc(var(--calm-type-prose-gap) * 0.6);
+  }
+}

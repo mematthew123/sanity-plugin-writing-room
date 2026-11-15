@@ -19,10 +19,10 @@ import {
   useRef,
   useState,
 } from 'react'
-import styled from 'styled-components'
 import {useBodyAllows} from './allows'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {normalizeHref} from './link'
+import styles from './SelectionBubble.module.css'
 
 /** Alt+F10 focuses it, since it's portaled and Tab never reaches it; Esc returns to the text. */
 export function SelectionBubble({scheme, editorFocused}: {scheme: string; editorFocused: boolean}) {
@@ -102,7 +102,7 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
     <Floating anchor={anchor} scheme={scheme} role="toolbar" aria-label="Formatting">
       <FloatingSurface
         ref={surface}
-        $round
+        round
         onFocus={() => setToolbarFocused(true)}
         onBlur={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) setToolbarFocused(false)
@@ -115,7 +115,7 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
         }}
       >
         {linkDraft === null ? (
-          <Row>
+          <div className={styles.row}>
             {can.bold && (
               <BubbleButton label="Bold" icon={BoldIcon} active={bold} onPress={() => run({type: 'decorator.toggle', decorator: 'strong'})} />
             )}
@@ -134,7 +134,7 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
                 }}
               />
             )}
-            {hasMarks && hasStyles && <Divider aria-hidden />}
+            {hasMarks && hasStyles && <span className={styles.divider} aria-hidden />}
             {can.heading && (
               <BubbleButton label="Heading" active={heading} onPress={() => run({type: 'style.toggle', style: 'h2'})}>
                 Heading
@@ -150,9 +150,10 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
                 Quote
               </BubbleButton>
             )}
-          </Row>
+          </div>
         ) : (
-          <LinkInput
+          <input
+            className={styles.linkInput}
              
             autoFocus
             aria-label="Link address"
@@ -193,12 +194,12 @@ function BubbleButton({
   children?: ReactNode
 }) {
   return (
-    <Button
+    <button
+      className={styles.button}
       type="button"
       aria-label={label}
       aria-pressed={active}
       title={label}
-      $active={active}
       // Keep the editor's selection: act on mousedown, never take focus.
       onMouseDown={(event) => {
         event.preventDefault()
@@ -212,65 +213,6 @@ function BubbleButton({
       }}
     >
       {Icon ? <Icon aria-hidden /> : children}
-    </Button>
+    </button>
   )
 }
-
-const Row = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 2px;
-`
-
-const Divider = styled.span`
-  width: 1px;
-  height: 1.25rem;
-  margin-inline: var(--calm-space-xs);
-  background: var(--calm-color-rule);
-`
-
-const Button = styled.button<{$active: boolean}>`
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  height: 2rem;
-  white-space: nowrap;
-  padding: 0 var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: ${({$active}) => ($active ? 'var(--calm-color-paper)' : 'transparent')};
-  color: ${({$active}) => ($active ? 'var(--calm-color-accent)' : 'var(--calm-color-ink)')};
-  font: inherit;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--calm-color-paper);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
-  }
-
-  svg {
-    font-size: 1.25rem;
-  }
-`
-
-const LinkInput = styled.input`
-  width: min(22rem, 70vw);
-  height: 2rem;
-  padding: 0 var(--calm-space-md);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-paper);
-  color: var(--calm-color-ink);
-  font: inherit;
-  outline: none;
-
-  &::placeholder {
-    color: var(--calm-color-ink-muted);
-  }
-`

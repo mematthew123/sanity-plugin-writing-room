@@ -1,0 +1,8 @@
+.heading {
+  margin: 0 0 var(--calm-space-lg);
+  font-family: var(--calm-font-prose);
+  font-size: calc(var(--calm-prose-size-medium) * 1.4);
+  font-weight: var(--calm-weight-title);
+  line-height: var(--calm-type-heading-leading);
+  text-wrap: balance;
+}

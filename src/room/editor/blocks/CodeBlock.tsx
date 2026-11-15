@@ -1,9 +1,9 @@
 import {type BlockObjectRenderProps} from '@portabletext/editor'
 import {useLayoutEffect, useRef} from 'react'
-import styled from 'styled-components'
 import {CODE_LANGUAGES} from '../../../schema/objects/code-block'
 import {useBlockField} from '../use-block-field'
 import {BlockFrame, Controls} from './frame'
+import styles from './CodeBlock.module.css'
 
 export function CodeBlock({attributes, children, node, selected, focused}: BlockObjectRenderProps) {
   const code = useBlockField(node._key, 'code', node.code)
@@ -18,10 +18,11 @@ export function CodeBlock({attributes, children, node, selected, focused}: Block
   }, [code.value])
 
   return (
-    <BlockFrame {...attributes} data-calm-block={node._key} $selected={selected}>
+    <BlockFrame {...attributes} data-calm-block={node._key} selected={selected}>
       {children}
-      <Card>
-        <Language
+      <Controls className={styles.card}>
+        <select
+          className={styles.language}
           aria-label="Language"
           value={language.value || 'text'}
           onChange={(event) => {
@@ -34,8 +35,9 @@ export function CodeBlock({attributes, children, node, selected, focused}: Block
               {option.title}
             </option>
           ))}
-        </Language>
-        <Code
+        </select>
+        <textarea
+          className={styles.code}
           ref={textarea}
            
           autoFocus={focused && !code.value}
@@ -58,55 +60,7 @@ export function CodeBlock({attributes, children, node, selected, focused}: Block
             }
           }}
         />
-      </Card>
+      </Controls>
     </BlockFrame>
   )
 }
-
-const Card = styled(Controls)`
-  position: relative;
-  margin-top: 0;
-  padding: var(--calm-space-md);
-  border-radius: var(--calm-radius);
-  background: var(--calm-color-surface);
-`
-
-const Language = styled.select`
-  position: absolute;
-  top: var(--calm-space-sm);
-  right: var(--calm-space-sm);
-  padding: var(--calm-space-xs) var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size-small);
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--calm-color-paper);
-  }
-`
-
-const Code = styled.textarea`
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 1.6em;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--calm-color-ink);
-  caret-color: var(--calm-color-accent);
-  font-family: var(--calm-font-mono);
-  font-size: var(--calm-type-code);
-  line-height: 1.6;
-  tab-size: 2;
-  white-space: pre;
-  overflow-x: auto;
-  resize: none;
-  outline: none;
-`

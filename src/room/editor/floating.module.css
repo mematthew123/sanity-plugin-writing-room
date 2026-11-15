@@ -1,0 +1,43 @@
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+.root {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  color: var(--calm-color-ink);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+  font-weight: var(--calm-weight-ui);
+}
+
+/* 24px is twice `EDGE` in floating.tsx. */
+.surface {
+  box-sizing: border-box;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--calm-space-xs);
+  border-radius: var(--calm-radius-large);
+  background: var(--calm-color-surface);
+  box-shadow: var(--calm-color-floating-shadow);
+
+  &[data-round] {
+    border-radius: var(--calm-radius-pill);
+  }
+
+  [data-scheme='dark'] & {
+    box-shadow: inset 0 0 0 1px var(--calm-color-rule);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation: floatIn var(--calm-motion-gentle) var(--calm-motion-easing);
+  }
+}
