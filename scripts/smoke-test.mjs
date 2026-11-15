@@ -246,6 +246,19 @@ function expectOneSdk(dir, label) {
   }
 }
 
+/** Splits at the commas between animations, not those inside a `cubic-bezier()` or a `var()`. */
+function animations(value) {
+  const found = ['']
+  let depth = 0
+  for (const char of value) {
+    if (char === '(') depth++
+    if (char === ')') depth--
+    if (char === ',' && depth === 0) found.push('')
+    else found[found.length - 1] += char
+  }
+  return found
+}
+
 /** A bundler that dropped the room's CSS as unused would still build. */
 function expectRoomStyles(dir, label) {
   const all = scripts(dir)
@@ -262,8 +275,10 @@ function expectRoomStyles(dir, label) {
   const stray = new Set()
   for (const [, declarations] of css.matchAll(/\.calm-[\w-]+[^{}]*\{([^{}]*)\}/g)) {
     for (const [, value] of declarations.matchAll(/(?:^|;)animation(?:-name)?:([^;]+)/g)) {
-      const names = value.split(/[\s,()]+/)
-      if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
+      for (const animation of animations(value)) {
+        const names = animation.split(/[\s,()]+/)
+        if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
+      }
     }
   }
   console.log(`The room's animations in ${label}: ${stray.size ? 'missing their keyframes' : 'matched'}`)

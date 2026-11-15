@@ -13,6 +13,7 @@ export function Floating({
   placement = 'above',
   align = 'center',
   scheme,
+  className,
   children,
   ...props
 }: {
@@ -43,7 +44,7 @@ export function Floating({
   return createPortal(
     <div
       ref={ref}
-      className={styles.root}
+      className={cx(styles.root, className)}
       data-calm-floating=""
       data-scheme={scheme}
       style={position ? {top: position.top, left: position.left} : {visibility: 'hidden'}}

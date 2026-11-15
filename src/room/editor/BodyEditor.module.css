@@ -81,9 +81,10 @@
     content: '◦';
   }
 
-  /* Set, not reset: a reset would restart the numbering ("1, 1, 2"). */
-  :not([data-list-item='number']) + [data-list-item='number'][data-level='1'] {
-    counter-set: calm-l1 1;
+  /* Whatever isn't nested under a numbered item ends its list.
+     Set, not reset: a reset would restart the numbering ("1, 1, 2"). */
+  & > :not([data-list-item='number'][data-level='1'], [data-list-item]:not([data-level='1'])) {
+    counter-set: calm-l1 0;
   }
 
   [data-list-item='number'][data-level='1'] {

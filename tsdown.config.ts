@@ -28,11 +28,15 @@ function cssModulesInJs(): Plugin {
           this.error(`${file}: .${local} composes from another file, which this build doesn't carry.`)
         }
       }
+      const byName = new Map(Object.values(exports).map((entry) => [entry.name, entry]))
+      // Lightning CSS names only the direct target, so follow each target's own `composes`.
+      const chain = (name: string, seen = new Set<string>()): string[] => {
+        if (seen.has(name)) return []
+        seen.add(name)
+        return [name, ...(byName.get(name)?.composes ?? []).flatMap((composed) => chain(composed.name, seen))]
+      }
       const classes = Object.fromEntries(
-        Object.entries(exports).map(([local, {name, composes}]) => [
-          local,
-          [name, ...composes.map((composed) => composed.name)].join(' '),
-        ]),
+        Object.entries(exports).map(([local, {name}]) => [local, chain(name).join(' ')]),
       )
       const css = code.toString()
       const key = createHash('sha256').update(css).digest('hex').slice(0, 8)
