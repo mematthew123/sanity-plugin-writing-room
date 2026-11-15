@@ -263,7 +263,7 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 1. it installs with no peer-dependency conflicts,
 2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor` and `react`, and of every `@portabletext/*` package,
 3. a `sanity.config.ts` using the plugin and its theme type-checks against the published types,
-4. `sanity build` bundles the Studio with exactly one copy of the App SDK, and with the room's styles,
+4. `sanity build` bundles the Studio with exactly one copy of the App SDK, and with the room's styles and the keyframes of every animation in them,
 5. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
 
 ```sh
