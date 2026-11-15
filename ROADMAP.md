@@ -35,6 +35,13 @@
 - [ ] **Widen the `sanity` range?** 6.12.0 through 6.21.x pass the smoke test with `--loose` (6.12 is the first release on App SDK v3 and `@portabletext/editor` 8); 6.11 and older get a second SDK and editor copy. Try writing, publishing and previewing in a 6.12 Studio before lowering the peer from `^6.22.0`.
 - [ ] **Auto-updates.** Revisit the `autoUpdates: false` requirement whenever Sanity ships an App SDK that shares context with an auto-updated Studio.
 
+## Later
+
+Planned, not started. Neither has a design yet.
+
+- [ ] **Scheduling.** Publish at a date and time chosen in the room, next to Publish, with the status showing when the document goes live. Open question: which of Sanity's own scheduling mechanisms to build on, so the room doesn't add a second one.
+- [ ] **Paste to import, with field mapping** (possibly). Paste a whole piece written elsewhere and have the room sort it into the document: title, body, excerpt and the rest of Details. One option for the mapping is TypeSafe's Jev model, which answers choice questions with a probability for each option. Jev can't be called from the browser today (`sanity-plugin-jev-fields` reaches it through Vercel AI Gateway), so this would need a key and has to stay optional: the room must work the same without it.
+
 ## Decisions
 
 - **Name: `sanity-plugin-writing-room`, unscoped.** It follows Sanity's `sanity-plugin-*` convention, so people find it on npm and the Sanity Exchange.
