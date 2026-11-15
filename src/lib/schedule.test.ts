@@ -1,5 +1,6 @@
 import {describe, expect, it} from 'vitest'
 import {
+  changedAtLocally,
   draftFromScheduledVersion,
   formatGoLive,
   fromLocalInput,
@@ -100,6 +101,33 @@ describe('scheduleFor', () => {
     for (const state of ['published', 'archived']) {
       expect(scheduleFor('post1', ['versions.rABC.post1'], [release({state})], NOW).kind).toBe('none')
     }
+  })
+})
+
+describe('changedAtLocally', () => {
+  const updated = new Date(NOW - 10 * 60_000).toISOString()
+
+  it('times a change that arrived while watching from when it was seen, whatever Sanity’s clock says', () => {
+    // A browser clock two minutes ahead: by it, a release made this second is already old.
+    const fresh = release({state: 'active', _updatedAt: new Date(NOW - 120_000).toISOString()})
+    const at = changedAtLocally(fresh, {seenAt: NOW, arrived: true})
+    expect(at).toBe(NOW)
+    const timed = {...fresh, _updatedAt: new Date(at).toISOString()}
+    expect(scheduleFor('post1', ['versions.rABC.post1'], [timed], NOW).kind).toBe('settling')
+  })
+
+  it('takes Sanity’s word for a release that was already there', () => {
+    const old = release({state: 'active', _updatedAt: updated})
+    expect(changedAtLocally(old, {seenAt: NOW, arrived: false})).toBe(NOW - 10 * 60_000)
+  })
+
+  it('never puts a change later than when it was seen: a slow clock waits a minute at most', () => {
+    const ahead = release({state: 'active', _updatedAt: new Date(NOW + 5 * 60_000).toISOString()})
+    expect(changedAtLocally(ahead, {seenAt: NOW, arrived: false})).toBe(NOW)
+  })
+
+  it('treats a release that doesn’t say when it changed as long since', () => {
+    expect(changedAtLocally(release({_updatedAt: undefined}), {seenAt: NOW, arrived: false})).toBe(0)
   })
 })
 

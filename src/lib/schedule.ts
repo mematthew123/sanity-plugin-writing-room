@@ -98,6 +98,27 @@ export function settlesIn(release: ScheduleRelease, now: number = Date.now()): n
   return stale !== null && stale > now ? stale - now : null
 }
 
+/** A release as it stands just now: which one, in what state, last changed when. */
+export const sightingOf = (release: ScheduleRelease): string =>
+  `${release._id} ${release.state} ${release._updatedAt ?? ''}`
+
+/**
+ * When a release last changed, by this browser's clock. Sanity stamps `_updatedAt` with its own,
+ * and the two can be minutes apart, so the minute a release is given isn't counted from that alone.
+ *
+ * A change that `arrived` while the room was watching happened when it was seen. One already there
+ * when the room first looked happened no later than that, and as much earlier as Sanity says: a
+ * browser clock that runs behind can't make an old release look new for longer than the minute.
+ */
+export function changedAtLocally(
+  release: ScheduleRelease,
+  {seenAt, arrived}: {seenAt: number; arrived: boolean},
+): number {
+  if (arrived) return seenAt
+  const updated = release._updatedAt ? new Date(release._updatedAt).getTime() : 0
+  return Math.min(seenAt, Number.isNaN(updated) ? 0 : updated)
+}
+
 /**
  * Whether a published date is one the room stamped for this schedule, rather than one the Writer
  * set: it is the very moment the document was scheduled for.

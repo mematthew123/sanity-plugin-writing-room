@@ -98,9 +98,25 @@ export async function schedulePost(
 }
 
 /**
+ * Runs a step of Unlock that another Unlock, in another tab or cut short before, may already have
+ * run. Sanity turns the second one down; if what it was for is so, that is no failure.
+ */
+async function unlessAlreadySo(step: () => Promise<unknown>, alreadySo: () => Promise<boolean>) {
+  try {
+    await step()
+  } catch (error) {
+    if (!wasRejected(error) || !(await alreadySo().catch(() => false))) throw error
+  }
+}
+
+/**
  * Unlock: takes the document off the schedule, makes the Scheduled version the draft, and dismisses
  * the version and its release. Each step looks at what is there first, so an Unlock that was cut
  * short can be run again.
+ *
+ * The version becomes the draft and is dismissed in one transaction. While the version is there the
+ * draft hasn't been given it; once it's gone the draft is the Writer's again, and running Unlock
+ * again never writes over what they, or anyone, have done to it since.
  *
  * @returns the time the document was scheduled for, to offer again.
  */
@@ -111,23 +127,46 @@ export async function unlockPost(
   const release = await client.releases.get({releaseId})
   if (!release) return {scheduledFor: undefined}
   const scheduledFor = release.publishAt ?? release.metadata.intendedPublishAt
+  const stateNow = async () => (await client.releases.get({releaseId}))?.state
+  const versionId = versionIdOf(documentId, releaseId)
 
   if (release.state === 'scheduled' || release.state === 'scheduling') {
-    await client.releases.unschedule({releaseId})
+    await unlessAlreadySo(
+      () => client.releases.unschedule({releaseId}),
+      async () => {
+        const state = await stateNow()
+        return state !== 'scheduled' && state !== 'scheduling'
+      },
+    )
   }
 
   if (release.state !== 'archived') {
-    const version = await client.getDocument<Stored>(versionIdOf(documentId, releaseId))
+    const version = await client.getDocument<Stored>(versionId)
     if (version) {
-      // The version before the draft: what was going to go live is what the Writer picks up.
-      await client.createOrReplace(
-        draftFromScheduledVersion(version, {documentId, dateField, scheduledFor}) as Stored & {_type: string},
+      const draft = draftFromScheduledVersion(version, {documentId, dateField, scheduledFor})
+      // The version before the draft: what was going to go live is what the Writer picks up. And
+      // gone before the release is archived: an archived release won't let go of its versions.
+      await unlessAlreadySo(
+        () =>
+          client
+            .transaction()
+            .createOrReplace(draft as Stored & {_type: string})
+            .delete(versionId)
+            .commit(),
+        async () => !(await client.getDocument(versionId)),
       )
-      // And gone before the release is archived: an archived release won't let go of its versions.
-      await client.discardVersion({releaseId, publishedId: documentId})
     }
-    await client.releases.archive({releaseId})
+    await unlessAlreadySo(
+      () => client.releases.archive({releaseId}),
+      async () => {
+        const state = await stateNow()
+        return state === undefined || state === 'archived'
+      },
+    )
   }
-  await client.releases.delete({releaseId})
+  await unlessAlreadySo(
+    () => client.releases.delete({releaseId}),
+    async () => (await stateNow()) === undefined,
+  )
   return {scheduledFor}
 }

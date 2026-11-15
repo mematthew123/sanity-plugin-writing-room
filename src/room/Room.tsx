@@ -97,6 +97,17 @@ function LoadingRoom() {
   )
 }
 
+/** Controls a key press is meant for, rather than an attempt to write. */
+const NOT_FOR_TYPING = [
+  'button',
+  'a',
+  'select',
+  'summary',
+  'input[type="checkbox"]',
+  'input[type="radio"]',
+  ...['button', 'checkbox', 'switch', 'radio', 'tab', 'menuitem', 'option', 'link'].map((role) => `[role="${role}"]`),
+].join(', ')
+
 const NOTICE_VISIBLE_MS = 8000
 /** Long enough to reach for a notice that offers somewhere to go. */
 const NOTICE_WITH_NEXT_STEP_MS = 16000
@@ -182,8 +193,11 @@ function LoadedRoom({
       const target = event.target as Element | null
       const onThePage = target === document.body || !!page.current?.contains(target)
       // A key pressed on a control is for the control.
-      if (!onThePage || target?.closest('button, a, select, summary')) return
-      setNotice({text: lockedNotice})
+      if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
+      // Space outside a text field turns the page; it isn't a word being started.
+      if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
+      // Good news the Writer hasn't finished reading (a schedule just made) isn't talked over.
+      setNotice((current) => (current?.done || current?.text === lockedNotice ? current : {text: lockedNotice}))
     }
     window.addEventListener('keydown', explain)
     return () => window.removeEventListener('keydown', explain)

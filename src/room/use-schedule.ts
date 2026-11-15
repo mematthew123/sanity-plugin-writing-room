@@ -1,12 +1,22 @@
 import {type DocumentHandle} from '@sanity/sdk-react'
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react'
 import {
   useActiveReleases,
   useDocumentVersions,
   useFeatureEnabled,
   useScheduledDraftsEnabled,
 } from 'sanity'
-import {NOT_SCHEDULED, type Schedule, scheduleFor, type ScheduleRelease, settlesIn} from '../lib/schedule'
+import {
+  changedAtLocally,
+  NOT_SCHEDULED,
+  type Schedule,
+  scheduleFor,
+  type ScheduleRelease,
+  settlesIn,
+  sightingOf,
+} from '../lib/schedule'
+
+const NOTHING_SEEN: ReadonlyMap<string, number> = new Map()
 
 /**
  * Whether the room offers Schedule. It follows Studio: scheduled drafts are on unless the Studio's
@@ -45,19 +55,50 @@ export function useSchedule(documentId: string): Schedule | null {
     [releases, versionIds, documentId],
   )
 
+  // When each of them last changed, by this browser's clock rather than Sanity's: see
+  // `changedAtLocally`. Noted before the browser paints, so a release is never shown untimed.
+  const [seen, setSeen] = useState(NOTHING_SEEN)
+  const watching = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (!known) return
+    const arrived = watching.current === documentId
+    watching.current = documentId
+    setSeen((before) => {
+      const seenAt = Date.now()
+      const after = new Map<string, number>()
+      let changed = before.size !== mine.length
+      for (const release of mine) {
+        const sighting = sightingOf(release)
+        const at = before.get(sighting)
+        if (at === undefined) changed = true
+        after.set(sighting, at ?? changedAtLocally(release, {seenAt, arrived}))
+      }
+      return changed ? after : before
+    })
+  }, [mine, known, documentId])
+
+  const timed = useMemo(
+    () =>
+      mine.map((release) => ({
+        ...release,
+        _updatedAt: new Date(seen.get(sightingOf(release)) ?? now).toISOString(),
+      })),
+    [mine, seen, now],
+  )
+
   // A release that has just become unscheduled is looked at again once it would count as stale.
   useEffect(() => {
-    const waits = mine.map((release) => settlesIn(release)).filter((wait): wait is number => wait !== null)
+    const waits = timed.map((release) => settlesIn(release)).filter((wait): wait is number => wait !== null)
     if (waits.length === 0) return undefined
     const timer = setTimeout(() => setNow(Date.now()), Math.min(...waits) + 50)
     return () => clearTimeout(timer)
-  }, [mine, now])
+  }, [timed, now])
 
   return useMemo(() => {
     if (!known) return null
-    if (mine.length === 0) return NOT_SCHEDULED
-    return scheduleFor(documentId, versionIds, mine, Math.max(now, Date.now()))
-  }, [known, mine, versionIds, documentId, now])
+    if (timed.length === 0) return NOT_SCHEDULED
+    return scheduleFor(documentId, versionIds, timed, Math.max(now, Date.now()))
+  }, [known, timed, versionIds, documentId, now])
 }
 
 /** The handle for what the room shows: the Scheduled version while there is one, otherwise the draft. */

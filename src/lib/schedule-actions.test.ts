@@ -6,6 +6,10 @@ const FRIDAY = '2026-11-20T09:00:00.000Z'
 
 interface Fake {
   release?: Record<string, unknown>
+  /** What `releases.get` answers each time it's asked after the first; the last one from then on. */
+  releaseLater?: Array<Record<string, unknown> | undefined>
+  /** What reading the version answers after the first time. */
+  versionLater?: Record<string, unknown> | null
   version?: Record<string, unknown> | null
   draft?: Record<string, unknown> | null
   /** Calls to fail, by name, with the error to throw. */
@@ -13,7 +17,9 @@ interface Fake {
 }
 
 /** A client that writes down what it's asked, in order. */
-function fakeClient({release, version = null, draft = null, fail = {}}: Fake = {}) {
+function fakeClient({release, releaseLater, version = null, versionLater, draft = null, fail = {}}: Fake = {}) {
+  let gets = 0
+  let versionReads = 0
   const calls: Array<[string, unknown?]> = []
   const run = async <T,>(name: string, args: unknown, result?: T): Promise<T> => {
     calls.push([name, args])
@@ -33,11 +39,29 @@ function fakeClient({release, version = null, draft = null, fail = {}}: Fake = {
       unschedule: (args: unknown) => run('releases.unschedule', args),
       archive: (args: unknown) => run('releases.archive', args),
       delete: (args: unknown) => run('releases.delete', args),
-      get: (args: unknown) => run('releases.get', args, release),
+      get: (args: unknown) => {
+        const later = releaseLater && gets > 0 ? releaseLater[Math.min(gets, releaseLater.length) - 1] : release
+        gets += 1
+        return run('releases.get', args, later)
+      },
     },
     createVersion: (args: unknown) => run('createVersion', args),
     discardVersion: (args: unknown) => run('discardVersion', args),
-    getDocument: (id: string) => run('getDocument', id, id.startsWith('drafts.') ? draft : version),
+    getDocument: (id: string) => {
+      if (id.startsWith('drafts.')) return run('getDocument', id, draft)
+      const read = versionLater !== undefined && versionReads > 0 ? versionLater : version
+      versionReads += 1
+      return run('getDocument', id, read)
+    },
+    transaction: () => {
+      const operations: unknown[] = []
+      const transaction = {
+        createOrReplace: (document: unknown) => (operations.push({createOrReplace: document}), transaction),
+        delete: (id: string) => (operations.push({delete: id}), transaction),
+        commit: () => run('transaction', operations),
+      }
+      return transaction
+    },
     createOrReplace: (document: unknown) => run('createOrReplace', document),
   }
   return {client: client as unknown as SanityClient, calls, names: () => calls.map(([name]) => name)}
@@ -161,14 +185,20 @@ describe('unlockPost', () => {
       'releases.get',
       'releases.unschedule',
       'getDocument',
-      'createOrReplace',
-      'discardVersion',
+      'transaction',
       'releases.archive',
       'releases.delete',
     ])
     expect(calls[2]).toEqual(['getDocument', 'versions.rABC.post1'])
-    // The date was the room's, stamped for a schedule that is now gone.
-    expect(calls[3]).toEqual(['createOrReplace', {_id: 'drafts.post1', _type: 'post', title: 'Quiet mornings'}])
+    // In one transaction, so a second Unlock never finds the version still there and writes the
+    // draft again. The date was the room's, stamped for a schedule that is now gone.
+    expect(calls[3]).toEqual([
+      'transaction',
+      [
+        {createOrReplace: {_id: 'drafts.post1', _type: 'post', title: 'Quiet mornings'}},
+        {delete: 'versions.rABC.post1'},
+      ],
+    ])
   })
 
   it('doesn’t unschedule a Stale version: it already is', async () => {
@@ -176,7 +206,7 @@ describe('unlockPost', () => {
     const result = await unlockPost(client, args)
     expect(result).toEqual({scheduledFor: FRIDAY})
     expect(names()).not.toContain('releases.unschedule')
-    expect(names()).toContain('createOrReplace')
+    expect(names()).toContain('transaction')
   })
 
   it('leaves the draft alone when the version is already gone', async () => {
@@ -197,10 +227,57 @@ describe('unlockPost', () => {
     expect(names()).toEqual(['releases.get'])
   })
 
-  it('never dismisses the version before the draft has it', async () => {
-    const {client, names} = fakeClient({release: scheduled, version, fail: {createOrReplace: new Error('no')}})
+  it('never archives the release while the version is still the only copy', async () => {
+    const {client, names} = fakeClient({release: scheduled, version, fail: {transaction: new Error('no')}})
     await expect(unlockPost(client, args)).rejects.toThrow('no')
-    expect(names()).not.toContain('discardVersion')
     expect(names()).not.toContain('releases.archive')
+    expect(names()).not.toContain('releases.delete')
+  })
+
+  describe('alongside another Unlock', () => {
+    const rejected = Object.assign(new Error('already'), {statusCode: 409})
+
+    it('carries on when the other one unscheduled first', async () => {
+      const {client, names} = fakeClient({
+        release: scheduled,
+        releaseLater: [{...scheduled, state: 'active'}],
+        version,
+        fail: {'releases.unschedule': rejected},
+      })
+      await expect(unlockPost(client, args)).resolves.toEqual({scheduledFor: FRIDAY})
+      expect(names()).toContain('transaction')
+    })
+
+    it('still fails when the release really couldn’t be unscheduled', async () => {
+      const {client, names} = fakeClient({release: scheduled, version, fail: {'releases.unschedule': rejected}})
+      await expect(unlockPost(client, args)).rejects.toBe(rejected)
+      expect(names()).not.toContain('transaction')
+    })
+
+    it('carries on when the other one has already given the draft the version', async () => {
+      const {client, names} = fakeClient({release: scheduled, version, versionLater: null, fail: {transaction: rejected}})
+      await expect(unlockPost(client, args)).resolves.toEqual({scheduledFor: FRIDAY})
+      expect(names().slice(-2)).toEqual(['releases.archive', 'releases.delete'])
+    })
+
+    it('is done when the other one archived and deleted the release', async () => {
+      const {client} = fakeClient({
+        release: {...scheduled, state: 'active'},
+        releaseLater: [undefined],
+        fail: {'releases.archive': rejected, 'releases.delete': rejected},
+      })
+      await expect(unlockPost(client, args)).resolves.toEqual({scheduledFor: FRIDAY})
+    })
+
+    it('doesn’t take a lost request for one that was turned down', async () => {
+      const lost = new Error('network')
+      const {client} = fakeClient({
+        release: scheduled,
+        releaseLater: [{...scheduled, state: 'active'}],
+        version,
+        fail: {'releases.unschedule': lost},
+      })
+      await expect(unlockPost(client, args)).rejects.toBe(lost)
+    })
   })
 })
