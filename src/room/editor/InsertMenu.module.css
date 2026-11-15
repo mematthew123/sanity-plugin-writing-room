@@ -34,8 +34,8 @@
     font-size: 1.25rem;
   }
 
-  /* No margin for the +: the far end of the empty line, at thumb size. */
-  @media (max-width: 64rem) {
+  /* The column's padding is all the margin left, too little for the +: the far end of the empty line, at thumb size. */
+  @media (max-width: 45rem) {
     left: calc(var(--calm-line-end) - 2.25rem);
     width: 2.25rem;
     height: 2.25rem;

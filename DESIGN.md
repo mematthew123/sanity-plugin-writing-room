@@ -302,10 +302,11 @@ The Lobby never grows a search box, filters, pagination or tabs. Structure has t
 
 ### Widths
 
-The room is designed for every width, phone included. Two breakpoints, both in `src/room/primitives.tsx`:
+The room is designed for every width, phone included. Three breakpoints, written out in the CSS where they're used:
 
-- **`NARROW`** (40rem and under): the bar keeps Leave (as an arrow), presence, save state, Aa and Publish. Status is dropped (Publish's label already says it); Details and Preview move into Room Settings.
-- **`NO_MARGIN`** (64rem and under): there's no margin beside the column, so the word count moves into Room Settings.
+- **Narrow** (`40rem` and under): the bar keeps Leave (as an arrow), presence, save state, Aa and Publish. Status is dropped (Publish's label already says it); Details and Preview move into Room Settings.
+- **No margin** (`64rem` and under): there's no margin beside the column wide enough for the word count, so it moves into Room Settings.
+- **No room for the `+`** (`45rem` and under): the column's own padding is all the margin left, so the Insert Menu's `+` moves to the far end of the empty line. The `+` is small enough to stay in the margin longer than the word count does.
 
 Things that live in the margin (the Insert Menu's `+`) move inside the column when the margin runs out, and grow to a size a thumb can hit. Floating things never extend past the window; they scroll inside themselves instead. Nothing ever wraps onto a second row of controls: when the bar runs short, text shortens, then things move into Room Settings.
 
@@ -408,7 +409,7 @@ For any styling value, work down this list and stop at the first that applies:
 
 1. **A CSS custom property** — `var(--calm-color-ink)`, `var(--calm-font-prose)`, `var(--calm-radius-large)`, `var(--calm-motion-recede)`. Colour properties re-resolve per scheme, so the component works in light and dusk with no extra work.
 2. **The TypeScript export** — `import {palette, fonts} from './tokens'` — only where CSS variables can't reach: the Studio theme (`buildTheme` needs literal colours) and the accent maths.
-3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the two breakpoints (below).
+3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the three breakpoints (below).
 
 Naming in CSS is `--calm-{group}-{token}` in kebab-case: `--calm-color-ink-muted`, `--calm-type-heading`, `--calm-space-lg`, `--calm-weight-title`.
 
@@ -421,7 +422,7 @@ Naming in CSS is `--calm-{group}-{token}` in kebab-case: `--calm-color-ink-muted
 - **Nothing for the Studio to import.** The build compiles each module into the room's JavaScript, which puts the rules on the page itself, as the tokens and fonts already are. Installing the plugin is one import; there is never a stylesheet to add beside it. `pnpm smoke` checks the styles survive a Studio's own build.
 - **A component that builds on another imports it first.** `FloatingSurface`, `BlockFrame`, `Column` and `Controls` take a `className`. Rules reach the page in the order their modules are imported, so keep the `styles` import last and the later rule wins.
 
-A CSS file can't read a constant, so the two breakpoints are written out where they're used: `40rem`, a phone or a window about that narrow, and `64rem`, too narrow for anything to sit in the margin beside the column. Use those two and no others.
+A CSS file can't read a constant, so the three breakpoints are written out where they're used: `40rem`, a phone or a window about that narrow; `45rem`, too narrow for the Insert Menu's `+` to sit beside the column; and `64rem`, too narrow for the word count to sit there. Use those three and no others.
 
 ## Do's and Don'ts
 
