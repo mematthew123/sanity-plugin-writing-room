@@ -63,10 +63,6 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
   )
 }
 
-/**
- * Holds the room back until the document's schedule is known. Opened a moment early, a Scheduled
- * document would show its draft, take typing that Unlock later throws away, and offer Publish.
- */
 function RoomOnceScheduleKnown(props: {
   handle: DocumentHandle
   problem: string | null
@@ -97,7 +93,6 @@ function LoadingRoom() {
   )
 }
 
-/** Controls a key press is meant for, rather than an attempt to write. */
 const NOT_FOR_TYPING = [
   'button',
   'a',
@@ -130,13 +125,10 @@ function LoadedRoom({
   const {data} = useDocumentProjection<{_id: string}>({...handle, projection: '{_id}'})
   const status = describePostStatus(data?._status)
   const isPublished = status.label !== 'Draft'
-  // While a document is Scheduled, or has a Stale version, the room is locked and shows that
-  // version: the words that will go live, not a draft that may have moved on without them.
   const locked = schedule.kind !== 'none'
   const lockedRelease = locked ? schedule.releaseId : undefined
   const shown = useShownHandle(handle, schedule)
   const canSchedule = useSchedulingEnabled()
-  // The time the Writer unlocked this document from, to offer when they schedule it again.
   const [previousTime, setPreviousTime] = useState<string | undefined>(undefined)
   const {data: shownData} = useDocumentProjection<{slug?: string}>({
     ...shown,
@@ -177,8 +169,6 @@ function LoadedRoom({
       onProblem={onProblem}
     />
   )
-  // A locked room doesn't take typing; say why rather than seeming broken. Heard on the window:
-  // a body that can't be edited can't hold focus, so its keys never pass through the page.
   const lockedNotice =
     schedule.kind === 'none'
       ? null
@@ -192,11 +182,8 @@ function LoadedRoom({
       if (event.key.length !== 1 && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter') return
       const target = event.target as Element | null
       const onThePage = target === document.body || !!page.current?.contains(target)
-      // A key pressed on a control is for the control.
       if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
-      // Space outside a text field turns the page; it isn't a word being started.
       if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
-      // Good news the Writer hasn't finished reading (a schedule just made) isn't talked over.
       setNotice((current) => (current?.done || current?.text === lockedNotice ? current : {text: lockedNotice}))
     }
     window.addEventListener('keydown', explain)
@@ -204,7 +191,6 @@ function LoadedRoom({
   }, [lockedNotice])
 
   return (
-    // A new editor for each thing shown, so a locked one never holds the draft's words or caret.
     <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
       <RoomSyncProvider handle={handle}>
         <Layout>
@@ -340,7 +326,6 @@ function Pages({
   onProblem,
 }: {
   handle: DocumentHandle
-  /** The release whose Scheduled version is shown, read-only, in place of the draft. */
   lockedRelease: string | undefined
   fields: WritingFields
   scheme: string
@@ -394,7 +379,6 @@ function LeaveButton({
 }: {
   handle: DocumentHandle
   isPublished: boolean
-  /** A locked document has a Scheduled version, so it is never the empty one to tidy away. */
   locked: boolean
 }) {
   const router = useRouter()

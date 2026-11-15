@@ -57,7 +57,6 @@ export function BodyEditor({
   handle: DocumentHandle
   path: string
   scheme: string
-  /** A locked room shows the body and offers nothing that would change it. */
   readOnly?: boolean
   onProblem: (message: string) => void
 }) {

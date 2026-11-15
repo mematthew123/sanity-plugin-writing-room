@@ -457,7 +457,7 @@ const STATUS: Record<PostStatus['label'], string> = {
   'Published · unpublished changes': 'Unpublished changes',
 }
 
-/** "Draft", with a dot while there's something readers haven't seen: a scheduled document included. */
+/** "Draft", with a dot while there's something readers haven't seen. */
 function Status({status, schedule}: {status: PostStatus; schedule: Schedule}) {
   return (
     <span>

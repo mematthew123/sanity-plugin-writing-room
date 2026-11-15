@@ -18,7 +18,6 @@ export function TitleField({
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
-  /** A locked room shows the title of the Scheduled version and doesn't take changes to it. */
   readOnly?: boolean
   onEnter: () => void
 }) {

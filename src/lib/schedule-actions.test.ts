@@ -6,17 +6,13 @@ const FRIDAY = '2026-11-20T09:00:00.000Z'
 
 interface Fake {
   release?: Record<string, unknown>
-  /** What `releases.get` answers each time it's asked after the first; the last one from then on. */
   releaseLater?: Array<Record<string, unknown> | undefined>
-  /** What reading the version answers after the first time. */
   versionLater?: Record<string, unknown> | null
   version?: Record<string, unknown> | null
   draft?: Record<string, unknown> | null
-  /** Calls to fail, by name, with the error to throw. */
   fail?: Record<string, unknown>
 }
 
-/** A client that writes down what it's asked, in order. */
 function fakeClient({release, releaseLater, version = null, versionLater, draft = null, fail = {}}: Fake = {}) {
   let gets = 0
   let versionReads = 0
@@ -190,8 +186,6 @@ describe('unlockPost', () => {
       'releases.delete',
     ])
     expect(calls[2]).toEqual(['getDocument', 'versions.rABC.post1'])
-    // In one transaction, so a second Unlock never finds the version still there and writes the
-    // draft again. The date was the room's, stamped for a schedule that is now gone.
     expect(calls[3]).toEqual([
       'transaction',
       [

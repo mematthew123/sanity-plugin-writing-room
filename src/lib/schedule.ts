@@ -1,4 +1,3 @@
-/** The parts of a Sanity release document the room reads. */
 export interface ScheduleRelease {
   _id: string
   state: string
@@ -11,14 +10,6 @@ export interface ScheduleRelease {
   }
 }
 
-/**
- * Where a document stands with Sanity's Scheduled Drafts. See CONTEXT.md, Scheduling.
- *
- * - `scheduled`: its Scheduled version will go live at `publishAt`.
- * - `settling`: a release is on its way into or out of being scheduled. Locked, nothing to do yet.
- * - `stale`: a Scheduled version is left over and nothing will go live, or its release has been
- *   stuck between states for longer than `STALE_AFTER_MS`.
- */
 export type Schedule =
   | {kind: 'none'}
   | {kind: 'scheduled'; releaseId: string; publishAt: string}
@@ -27,10 +18,6 @@ export type Schedule =
 
 export const NOT_SCHEDULED: Schedule = {kind: 'none'}
 
-/**
- * A release is unscheduled, or between states, for a moment while it is being made, and again
- * while it is being taken apart. Only one that stays that way is a Stale version.
- */
 export const STALE_AFTER_MS = 60_000
 
 const RELEASE_ID_PREFIX = '_.releases.'
@@ -45,13 +32,8 @@ export const draftIdOf = (documentId: string): string => `drafts.${documentId}`
 
 const RANK: Record<Schedule['kind'], number> = {scheduled: 3, settling: 2, stale: 1, none: 0}
 
-/** The states a release passes through on its way somewhere else. */
 const IN_BETWEEN = ['scheduling', 'unscheduling', 'publishing', 'archiving']
 
-/**
- * When a release that isn't scheduled stops counting as on its way: null when it is scheduled, or
- * finished. One that never says when it changed has had its minute.
- */
 function staleAt(release: ScheduleRelease): number | null {
   const {state} = release
   const scheduled = state === 'scheduled' && !!(release.publishAt ?? release.metadata.intendedPublishAt)
@@ -66,16 +48,11 @@ function scheduleOf(release: ScheduleRelease, now: number): Schedule {
   if (release.state === 'scheduled' && publishAt) return {kind: 'scheduled', releaseId, publishAt}
   const stale = staleAt(release)
   if (stale === null) return NOT_SCHEDULED
-  // A release stuck between states is as stranded as an unscheduled one: Unlock is the way out.
   return now < stale
     ? {kind: 'settling', releaseId}
     : {kind: 'stale', releaseId, intendedPublishAt: release.metadata.intendedPublishAt}
 }
 
-/**
- * Reads a document's schedule from its version ids and the Studio's releases. Only single-document
- * releases count: a document in a larger Content Release is Studio's to look after.
- */
 export function scheduleFor(
   documentId: string,
   versionIds: readonly string[],
@@ -92,24 +69,14 @@ export function scheduleFor(
   return found
 }
 
-/** How long until a `settling` release would count as stale, so the room can look again then. */
 export function settlesIn(release: ScheduleRelease, now: number = Date.now()): number | null {
   const stale = staleAt(release)
   return stale !== null && stale > now ? stale - now : null
 }
 
-/** A release as it stands just now: which one, in what state, last changed when. */
 export const sightingOf = (release: ScheduleRelease): string =>
   `${release._id} ${release.state} ${release._updatedAt ?? ''}`
 
-/**
- * When a release last changed, by this browser's clock. Sanity stamps `_updatedAt` with its own,
- * and the two can be minutes apart, so the minute a release is given isn't counted from that alone.
- *
- * A change that `arrived` while the room was watching happened when it was seen. One already there
- * when the room first looked happened no later than that, and as much earlier as Sanity says: a
- * browser clock that runs behind can't make an old release look new for longer than the minute.
- */
 export function changedAtLocally(
   release: ScheduleRelease,
   {seenAt, arrived}: {seenAt: number; arrived: boolean},
@@ -119,10 +86,6 @@ export function changedAtLocally(
   return Math.min(seenAt, Number.isNaN(updated) ? 0 : updated)
 }
 
-/**
- * Whether a published date is one the room stamped for this schedule, rather than one the Writer
- * set: it is the very moment the document was scheduled for.
- */
 export function isRoomStampedDate(publishedAt: unknown, scheduledFor: string | undefined): boolean {
   if (typeof publishedAt !== 'string' || !scheduledFor) return false
   const stamped = new Date(publishedAt).getTime()
@@ -131,10 +94,6 @@ export function isRoomStampedDate(publishedAt: unknown, scheduledFor: string | u
 
 const NOT_CONTENT = ['_rev', '_updatedAt', '_createdAt', '_system']
 
-/**
- * The draft that Unlock leaves the Writer with: the Scheduled version's content, without a
- * published date the room stamped for the schedule now being taken away.
- */
 export function draftFromScheduledVersion(
   version: Record<string, unknown>,
   {
@@ -151,23 +110,17 @@ export function draftFromScheduledVersion(
   return {...draft, _id: draftIdOf(documentId)}
 }
 
-/** `YYYY-MM-DDTHH:mm` in the Writer's own time zone: what a `datetime-local` input reads and writes. */
 export function toLocalInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-/** The time a `datetime-local` input holds, or null when it's empty or not a time. */
 export function fromLocalInput(value: string): Date | null {
   if (!value) return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-/**
- * What the schedule panel opens on: the time the document was last scheduled for when that's
- * still ahead, otherwise nine tomorrow morning.
- */
 export function suggestedTime(previous: string | undefined, now: Date = new Date()): Date {
   if (previous) {
     const before = new Date(previous)
@@ -181,10 +134,6 @@ export function suggestedTime(previous: string | undefined, now: Date = new Date
 
 const DAY_MS = 24 * 3600 * 1000
 
-/**
- * A go-live time in the Writer's words: "Friday 21 November at 09:00". `short` is for the Lobby's
- * one line: the weekday alone when it's within the week.
- */
 export function formatGoLive(
   publishAt: string,
   {

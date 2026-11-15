@@ -24,10 +24,6 @@ export function describePostStatus(status: DocumentEditStatus | undefined): Post
   }
 }
 
-/**
- * The status as the room and the Lobby say it. A schedule, or one left hanging, is the thing a
- * Writer most needs to know about a document, so it leads.
- */
 export function statusText(
   status: PostStatus,
   schedule: Schedule,

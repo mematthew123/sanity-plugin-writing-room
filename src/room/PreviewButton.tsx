@@ -18,7 +18,6 @@ export function PreviewButton({
 }: {
   documentType: string
   slug: string | undefined
-  /** Set while the room is locked, so the site shows the Scheduled version and not the draft. */
   releaseId?: string
   onProblem: (problem: string) => void
 }) {

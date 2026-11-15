@@ -31,7 +31,6 @@ const FORM_EXPORTS = [
   'isNumberInputProps',
   'isObjectInputProps',
   'isStringInputProps',
-  // For scheduling: the releases a document's Scheduled version lives in, and whether the Studio has them.
   'useActiveReleases',
   'useDocumentVersions',
   'useFeatureEnabled',
@@ -163,7 +162,7 @@ if (portableText.length && !loose) {
   process.exit(1)
 }
 
-// 5. The Details view and scheduling are built on parts of Sanity that aren't all stable API.
+// 5. The Details view is built on parts of Sanity's form that aren't all stable API.
 const sanityExports = execFileSync(
   'node',
   ['--input-type=module', '-e', "import * as sanity from 'sanity'; console.log(Object.keys(sanity).join(','))"],

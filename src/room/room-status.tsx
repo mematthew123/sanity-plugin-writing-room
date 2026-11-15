@@ -217,10 +217,6 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
-/**
- * The small panel under a button where the room asks once before something real happens. Enter
- * finishes the thought, Esc and a click elsewhere back out.
- */
 function useAskOnce(asking: boolean, cancel: () => void) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -233,7 +229,8 @@ function useAskOnce(asking: boolean, cancel: () => void) {
   useEffect(measure, [measure])
   useViewportChanges(measure)
 
-  // Focus moves once the popover has been placed: it's hidden, and can't take focus, until then.
+  // The Writer asked a moment ago, so Enter should finish the thought. Focus moves once
+  // the popover has been placed: it's hidden, and can't take focus, until then.
   const open = asking && !!anchor
   useEffect(() => {
     if (!open) return undefined
@@ -265,10 +262,7 @@ function useAskOnce(asking: boolean, cancel: () => void) {
   return {anchor: open ? anchor : null, button, panel, answer, onKeyDown}
 }
 
-/**
- * Waits for the latest words to sync and validate, goes to any problem, then asks once: publish
- * now, or, where the Studio has scheduling, at a time the Writer picks.
- */
+/** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
 export function PublishButton({
   handle,
   status,
@@ -281,9 +275,7 @@ export function PublishButton({
   handle: DocumentHandle
   status: PostStatus
   scheme: string
-  /** Whether this Studio has scheduled drafts. */
   canSchedule: boolean
-  /** The time this document was scheduled for before it was unlocked, to offer again. */
   previousTime?: string
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
@@ -303,7 +295,6 @@ export function PublishButton({
   >('idle')
   const [timedOut, setTimedOut] = useState(false)
   const [plan, setPlan] = useState<PublishPlan | null>(null)
-  // The time in the schedule panel, as its input holds it; null while the panel asks about publishing now.
   const [when, setWhen] = useState<string | null>(null)
   const [whenProblem, setWhenProblem] = useState(false)
   const isFirstPublish = status.label === 'Draft'
@@ -391,14 +382,11 @@ export function PublishButton({
   }, [])
 
   const confirming = phase === 'confirming' && plan
-  // The Writer asked to publish a moment ago, so Enter should finish the thought.
   const {anchor, button, panel, answer: confirmButton, onKeyDown} = useAskOnce(!!confirming, cancel)
 
-  /**
-   * The plan's slug and date were settled when the room asked. If someone has changed either
-   * since, in Details or from elsewhere, writing the plan now would undo their change.
-   */
   async function savedIfPlanStands(basis: PublishablePost): Promise<SavedDraft | null | undefined> {
+    // The plan's slug and date were settled when the room asked. If someone has changed either
+    // since, in Details or from elsewhere, writing the plan now would undo their change.
     const saved = await client.getDocument<SavedDraft>(`drafts.${handle.documentId}`)
     const now = readPublishable(saved, kind.fields)
     if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
@@ -417,7 +405,6 @@ export function PublishButton({
     setPhase('scheduling')
     try {
       if ((await savedIfPlanStands(basis)) === null) return
-      // A date the room stamps is when the words go live, not when the Writer chose it.
       const patch = detailsPatch(
         details.publishedAt ? {...details, publishedAt: at.toISOString()} : details,
         kind.fields,
@@ -571,10 +558,6 @@ export function PublishButton({
   )
 }
 
-/**
- * What a locked room offers in place of Publish: the way back to an ordinary draft. Unlocking
- * takes the document off the schedule, so it asks once first.
- */
 export function UnlockButton({
   handle,
   schedule,
@@ -588,7 +571,6 @@ export function UnlockButton({
   scheme: string
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
-  /** Told the time the document had been scheduled for. */
   onUnlocked: (scheduledFor: string | undefined) => void
 }) {
   const client = useClient({apiVersion: API_VERSION})
@@ -616,7 +598,6 @@ export function UnlockButton({
     }
   }
 
-  // Between states there is nothing to unlock yet; the status says the schedule is being updated.
   if (schedule.kind === 'settling' && phase === 'idle') return null
 
   return (
@@ -831,12 +812,10 @@ const ConfirmActions = styled.div`
   margin-top: var(--calm-space-lg);
 `
 
-/** The other answer to "go live?", kept quiet and out of the way of the two that were there first. */
 const ScheduleInstead = styled(QuietButton)`
   margin-inline: calc(var(--calm-space-sm) * -1) auto;
 `
 
-/** Drawn like the room's own inputs in Details: a rule under it, clay while it has focus. */
 const When = styled.input`
   box-sizing: border-box;
   width: 100%;

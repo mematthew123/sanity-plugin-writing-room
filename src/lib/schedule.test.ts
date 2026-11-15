@@ -108,7 +108,6 @@ describe('changedAtLocally', () => {
   const updated = new Date(NOW - 10 * 60_000).toISOString()
 
   it('times a change that arrived while watching from when it was seen, whatever Sanity’s clock says', () => {
-    // A browser clock two minutes ahead: by it, a release made this second is already old.
     const fresh = release({state: 'active', _updatedAt: new Date(NOW - 120_000).toISOString()})
     const at = changedAtLocally(fresh, {seenAt: NOW, arrived: true})
     expect(at).toBe(NOW)
