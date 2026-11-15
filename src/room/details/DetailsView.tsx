@@ -23,15 +23,21 @@ export function DetailsView({
   handle,
   fields,
   focusField,
+  lockedRelease,
 }: {
   handle: DocumentHandle
   fields: WritingFields
+  lockedRelease?: string
   /** A publish problem or a nudge can send the Writer to one field, named by its path. */
   focusField?: string
 }) {
   const root = useRef<HTMLDivElement>(null)
   const [patchChannel] = useState(() => createPatchChannel())
-  const form = useDocumentForm({documentId: handle.documentId, documentType: handle.documentType})
+  const form = useDocumentForm({
+    documentId: handle.documentId,
+    documentType: handle.documentType,
+    ...(lockedRelease && {releaseId: lockedRelease, selectedPerspectiveName: lockedRelease, readOnly: true}),
+  })
   const {formState, onSetActiveFieldGroup, onProgrammaticFocus, ready} = form
 
   useEffect(() => {

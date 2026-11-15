@@ -20,6 +20,8 @@ import styled, {keyframes} from 'styled-components'
 import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
+import {formatGoLive, fromLocalInput, type Schedule, suggestedTime, toLocalInput} from '../lib/schedule'
+import {schedulePost, unlockPost} from '../lib/schedule-actions'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {addImageLabel, detailsPatch, readPublishable} from './fields'
 import {type PublishablePost} from '../lib/publish-details'
@@ -27,7 +29,7 @@ import {goToProblem} from './go-to-problem'
 import {Floating, FloatingSurface, useViewportChanges} from './editor/floating'
 import {useWritingKind} from './kinds'
 import {useRoomView} from './navigation'
-import {type PostStatus} from './post-status'
+import {type PostStatus, statusText} from './post-status'
 import {presenceSentence} from './presence'
 import {NARROW, QuietButton} from './primitives'
 import {type Marker, publishProblems} from './publish-problems'
@@ -150,8 +152,8 @@ export function RoomMessage({
   return null
 }
 
-export function StatusLabel({status}: {status: PostStatus}) {
-  return <Quiet>{status.label}</Quiet>
+export function StatusLabel({status, schedule}: {status: PostStatus; schedule: Schedule}) {
+  return <Quiet>{statusText(status, schedule)}</Quiet>
 }
 
 /** Never recedes: writing alongside someone without knowing is unsettling. */
@@ -215,17 +217,66 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
+function useAskOnce(asking: boolean, cancel: () => void) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null)
+  const button = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
+  const answer = useRef<HTMLButtonElement>(null)
+
+  const measure = useCallback(() => {
+    setAnchor(asking ? (button.current?.getBoundingClientRect() ?? null) : null)
+  }, [asking])
+  useEffect(measure, [measure])
+  useViewportChanges(measure)
+
+  // The Writer asked a moment ago, so Enter should finish the thought. Focus moves once
+  // the popover has been placed: it's hidden, and can't take focus, until then.
+  const open = asking && !!anchor
+  useEffect(() => {
+    if (!open) return undefined
+    const frame = requestAnimationFrame(() => answer.current?.focus())
+    return () => cancelAnimationFrame(frame)
+  }, [open])
+
+  useEffect(() => {
+    if (!asking) return undefined
+    const close = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (!panel.current?.contains(target) && !button.current?.contains(target)) cancel()
+    }
+    window.addEventListener('pointerdown', close)
+    return () => window.removeEventListener('pointerdown', close)
+  }, [asking, cancel])
+
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      cancel()
+      button.current?.focus()
+    },
+    [cancel],
+  )
+
+  return {anchor: open ? anchor : null, button, panel, answer, onKeyDown}
+}
+
 /** Waits for the latest words to sync and validate, goes to any problem, then asks once before publishing. */
 export function PublishButton({
   handle,
   status,
   scheme,
+  canSchedule,
+  previousTime,
   onProblem,
   onNotice,
 }: {
   handle: DocumentHandle
   status: PostStatus
   scheme: string
+  canSchedule: boolean
+  previousTime?: string
   onProblem: (problem: string | null) => void
   onNotice: (notice: RoomNotice) => void
 }) {
@@ -239,13 +290,13 @@ export function PublishButton({
   const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
-  const [phase, setPhase] = useState<'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing'>('idle')
+  const [phase, setPhase] = useState<
+    'idle' | 'checking' | 'preparing' | 'confirming' | 'publishing' | 'scheduling'
+  >('idle')
   const [timedOut, setTimedOut] = useState(false)
   const [plan, setPlan] = useState<PublishPlan | null>(null)
-  const [anchor, setAnchor] = useState<DOMRect | null>(null)
-  const button = useRef<HTMLButtonElement>(null)
-  const panel = useRef<HTMLDivElement>(null)
-  const confirmButton = useRef<HTMLButtonElement>(null)
+  const [when, setWhen] = useState<string | null>(null)
+  const [whenProblem, setWhenProblem] = useState(false)
   const isFirstPublish = status.label === 'Draft'
 
   useEffect(() => {
@@ -326,46 +377,66 @@ export function PublishButton({
   const cancel = useCallback(() => {
     setPhase('idle')
     setPlan(null)
+    setWhen(null)
+    setWhenProblem(false)
   }, [])
 
   const confirming = phase === 'confirming' && plan
-  const measure = useCallback(() => {
-    setAnchor(confirming ? (button.current?.getBoundingClientRect() ?? null) : null)
-  }, [confirming])
-  useEffect(measure, [measure])
-  useViewportChanges(measure)
+  const {anchor, button, panel, answer: confirmButton, onKeyDown} = useAskOnce(!!confirming, cancel)
 
-  // The Writer asked to publish a moment ago, so Enter should finish the thought. Focus moves once
-  // the popover has been placed: it's hidden, and can't take focus, until then.
-  const open = !!confirming && !!anchor
-  useEffect(() => {
-    if (!open) return undefined
-    const frame = requestAnimationFrame(() => confirmButton.current?.focus())
-    return () => cancelAnimationFrame(frame)
-  }, [open])
-
-  useEffect(() => {
-    if (!confirming) return undefined
-    const close = (event: PointerEvent) => {
-      const target = event.target as Node
-      if (!panel.current?.contains(target) && !button.current?.contains(target)) cancel()
+  async function savedIfPlanStands(basis: PublishablePost): Promise<SavedDraft | null | undefined> {
+    // The plan's slug and date were settled when the room asked. If someone has changed either
+    // since, in Details or from elsewhere, writing the plan now would undo their change.
+    const saved = await client.getDocument<SavedDraft>(`drafts.${handle.documentId}`)
+    const now = readPublishable(saved, kind.fields)
+    if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
+      onProblem(`This ${kind.singular}’s details changed while you were deciding. Publish again to use them.`)
+      return null
     }
-    window.addEventListener('pointerdown', close)
-    return () => window.removeEventListener('pointerdown', close)
-  }, [confirming, cancel])
+    return saved
+  }
+
+  async function schedule({details, basis}: PublishPlan) {
+    const at = fromLocalInput(when ?? '')
+    if (!at || at.getTime() <= Date.now()) {
+      setWhenProblem(true)
+      return
+    }
+    setPhase('scheduling')
+    try {
+      const saved = await savedIfPlanStands(basis)
+      if (saved === null) return
+      // The check was of one revision. Scheduling copies the draft as it is saved, so a later
+      // revision, a collaborator's say, would go on the schedule unchecked.
+      if (!saved?._rev || saved._rev !== draft?._rev) {
+        onProblem(`This ${kind.singular} changed while you were deciding. Publish again to schedule it as it is now.`)
+        return
+      }
+      const patch = detailsPatch(
+        details.publishedAt ? {...details, publishedAt: at.toISOString()} : details,
+        kind.fields,
+      )
+      await schedulePost(client, {
+        documentId: handle.documentId,
+        publishAt: at,
+        details: patch,
+        revision: saved._rev,
+      })
+      onProblem(null)
+      onNotice({text: `Scheduled for ${formatGoLive(at.toISOString())}`, done: true})
+    } catch {
+      onProblem(`This ${kind.singular} couldn’t be scheduled just now. Try again in a moment.`)
+    } finally {
+      cancel()
+    }
+  }
 
   async function publish({details, url, basis}: PublishPlan) {
     setPhase('publishing')
     try {
       const {fields} = kind
-      // The plan's slug and date were settled when the room asked. If someone has changed either
-      // since, in Details or from elsewhere, writing the plan now would undo their change.
-      const saved = await client.getDocument<SavedDraft>(`drafts.${handle.documentId}`)
-      const now = readPublishable(saved, fields)
-      if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
-        onProblem(`This ${kind.singular}’s details changed while you were deciding. Publish again to use them.`)
-        return
-      }
+      const saved = await savedIfPlanStands(basis)
+      if (saved === null) return
       // The date is when the Writer said yes, not when the room asked.
       const patch = detailsPatch(
         details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details,
@@ -387,14 +458,14 @@ export function PublishButton({
     } catch {
       onProblem(`This ${kind.singular} couldn’t be published just now. Try again in a moment.`)
     } finally {
-      setPhase('idle')
-      setPlan(null)
+      cancel()
     }
   }
 
   if (status.label === 'Published' && phase === 'idle') return null
 
-  const working = phase === 'checking' || phase === 'preparing' || phase === 'publishing'
+  const working =
+    phase === 'checking' || phase === 'preparing' || phase === 'publishing' || phase === 'scheduling'
   const label = isFirstPublish ? 'Publish' : 'Publish changes'
 
   return (
@@ -412,39 +483,159 @@ export function PublishButton({
           setPhase('checking')
         }}
       >
-        {phase === 'publishing' ? 'Publishing…' : working ? 'Checking…' : label}
+        {phase === 'publishing'
+          ? 'Publishing…'
+          : phase === 'scheduling'
+            ? 'Scheduling…'
+            : working
+              ? 'Checking…'
+              : label}
       </PublishPill>
       {confirming && anchor && (
-        <Floating
-          anchor={anchor}
-          placement="below"
-          scheme={scheme}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              event.stopPropagation()
-              cancel()
-              button.current?.focus()
-            }
-          }}
-        >
+        <Floating anchor={anchor} placement="below" scheme={scheme} onKeyDown={onKeyDown}>
           <Confirm ref={panel} role="dialog" aria-labelledby="calm-publish-title">
-            <ConfirmTitle id="calm-publish-title">
-              {isFirstPublish ? `Publish this ${kind.singular}?` : 'Publish these changes?'}
-            </ConfirmTitle>
-            <ConfirmText>
-              {isFirstPublish
-                ? 'It goes live straight away'
-                : 'They replace what readers see now'}
-              {plan.url ? ', at' : plan.slug ? ', under the slug' : '.'}
-            </ConfirmText>
+            {when === null ? (
+              <>
+                <ConfirmTitle id="calm-publish-title">
+                  {isFirstPublish ? `Publish this ${kind.singular}?` : 'Publish these changes?'}
+                </ConfirmTitle>
+                <ConfirmText>
+                  {isFirstPublish ? 'It goes live straight away' : 'They replace what readers see now'}
+                  {plan.url ? ', at' : plan.slug ? ', under the slug' : '.'}
+                </ConfirmText>
+              </>
+            ) : (
+              <>
+                <ConfirmTitle id="calm-publish-title">
+                  {isFirstPublish ? `Schedule this ${kind.singular}?` : 'Schedule these changes?'}
+                </ConfirmTitle>
+                <ConfirmText as="label" htmlFor="calm-schedule-when">
+                  {isFirstPublish ? 'It goes live by itself, at' : 'They go live by themselves, at'}
+                </ConfirmText>
+                <When
+                  id="calm-schedule-when"
+                  type="datetime-local"
+                  autoFocus
+                  value={when}
+                  min={toLocalInput(new Date())}
+                  aria-invalid={whenProblem}
+                  aria-describedby={whenProblem ? 'calm-schedule-problem' : undefined}
+                  onChange={(event) => {
+                    setWhen(event.currentTarget.value)
+                    setWhenProblem(false)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void schedule(plan)
+                    }
+                  }}
+                />
+                {whenProblem && (
+                  <WhenProblem id="calm-schedule-problem" role="alert">
+                    Choose a time that’s still ahead.
+                  </WhenProblem>
+                )}
+                {(plan.url || plan.slug) && (
+                  <ConfirmText>{plan.url ? 'It will be at' : 'It will be under the slug'}</ConfirmText>
+                )}
+              </>
+            )}
             {(plan.url || plan.slug) && (
               <Where>{plan.url ? `${plan.url.host}${plan.url.pathname}` : plan.slug}</Where>
             )}
             <ConfirmActions>
+              {canSchedule && when === null && (
+                <ScheduleInstead
+                  onClick={() => setWhen(toLocalInput(suggestedTime(previousTime)))}
+                >
+                  Schedule for later
+                </ScheduleInstead>
+              )}
               <QuietButton onClick={cancel}>Not yet</QuietButton>
-              <PublishPill ref={confirmButton} type="button" onClick={() => void publish(plan)}>
-                {isFirstPublish ? 'Publish now' : 'Publish changes'}
+              {when === null ? (
+                <PublishPill ref={confirmButton} type="button" onClick={() => void publish(plan)}>
+                  {isFirstPublish ? 'Publish now' : 'Publish changes'}
+                </PublishPill>
+              ) : (
+                <PublishPill type="button" onClick={() => void schedule(plan)}>
+                  Schedule
+                </PublishPill>
+              )}
+            </ConfirmActions>
+          </Confirm>
+        </Floating>
+      )}
+    </>
+  )
+}
+
+export function UnlockButton({
+  handle,
+  schedule,
+  scheme,
+  onProblem,
+  onNotice,
+  onUnlocked,
+}: {
+  handle: DocumentHandle
+  schedule: Exclude<Schedule, {kind: 'none'}>
+  scheme: string
+  onProblem: (problem: string | null) => void
+  onNotice: (notice: RoomNotice) => void
+  onUnlocked: (scheduledFor: string | undefined) => void
+}) {
+  const client = useClient({apiVersion: API_VERSION})
+  const kind = useWritingKind(handle.documentType)
+  const [phase, setPhase] = useState<'idle' | 'asking' | 'unlocking'>('idle')
+  const cancel = useCallback(() => setPhase((current) => (current === 'asking' ? 'idle' : current)), [])
+  const asking = phase === 'asking'
+  const {anchor, button, panel, answer, onKeyDown} = useAskOnce(asking, cancel)
+
+  async function unlock() {
+    setPhase('unlocking')
+    try {
+      const {scheduledFor} = await unlockPost(client, {
+        documentId: handle.documentId,
+        releaseId: schedule.releaseId,
+        dateField: kind.fields.publishedAt,
+      })
+      onProblem(null)
+      onUnlocked(scheduledFor)
+      onNotice({text: 'Unlocked. Schedule it again when you’re ready.'})
+    } catch {
+      onProblem(`This ${kind.singular} couldn’t be unlocked just now. Try again in a moment.`)
+    } finally {
+      setPhase('idle')
+    }
+  }
+
+  if (schedule.kind === 'settling' && phase === 'idle') return null
+
+  return (
+    <>
+      <QuietButton
+        ref={button}
+        disabled={phase === 'unlocking'}
+        aria-haspopup="dialog"
+        aria-expanded={asking}
+        onClick={() => setPhase(asking ? 'idle' : 'asking')}
+      >
+        {phase === 'unlocking' ? 'Unlocking…' : 'Unlock'}
+      </QuietButton>
+      {asking && anchor && (
+        <Floating anchor={anchor} placement="below" scheme={scheme} onKeyDown={onKeyDown}>
+          <Confirm ref={panel} role="dialog" aria-labelledby="calm-unlock-title">
+            <ConfirmTitle id="calm-unlock-title">Unlock this {kind.singular}?</ConfirmTitle>
+            <ConfirmText>
+              {schedule.kind === 'scheduled'
+                ? `It’s set to go live ${formatGoLive(schedule.publishAt)}. Unlocking takes it off the schedule until you schedule it again.`
+                : 'It isn’t scheduled just now, so it won’t go live. Unlocking lets you change it and schedule it again.'}
+            </ConfirmText>
+            <ConfirmActions>
+              <QuietButton onClick={cancel}>Not yet</QuietButton>
+              <PublishPill ref={answer} type="button" onClick={() => void unlock()}>
+                Unlock
               </PublishPill>
             </ConfirmActions>
           </Confirm>
@@ -598,7 +789,7 @@ const NoticeLink = styled.a`
 `
 
 const Confirm = styled(FloatingSurface)`
-  width: min(21rem, calc(100vw - 24px));
+  width: min(24rem, calc(100vw - 24px));
   padding: var(--calm-space-lg);
 `
 
@@ -626,8 +817,39 @@ const Where = styled.p`
 
 const ConfirmActions = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: var(--calm-space-xs);
   margin-top: var(--calm-space-lg);
+`
+
+const ScheduleInstead = styled(QuietButton)`
+  margin-inline: calc(var(--calm-space-sm) * -1) auto;
+`
+
+const When = styled.input`
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 var(--calm-space-sm);
+  padding: var(--calm-space-sm) 0;
+  border: 0;
+  border-bottom: 1px solid var(--calm-color-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--calm-color-ink);
+  color-scheme: inherit;
+  font: inherit;
+  font-weight: var(--calm-weight-ui-strong);
+
+  &:focus {
+    outline: none;
+    border-bottom-color: var(--calm-color-accent);
+  }
+`
+
+const WhenProblem = styled.p`
+  margin: 0 0 var(--calm-space-sm);
+  color: var(--calm-color-caution);
+  font-size: var(--calm-type-ui-size-small);
 `

@@ -51,11 +51,13 @@ export function BodyEditor({
   handle,
   path,
   scheme,
+  readOnly = false,
   onProblem,
 }: {
   handle: DocumentHandle
   path: string
   scheme: string
+  readOnly?: boolean
   onProblem: (message: string) => void
 }) {
   const editor = useEditor()
@@ -151,13 +153,13 @@ export function BodyEditor({
         renderCursor={null}
         spellCheck
         aria-label="Body"
-        renderPlaceholder={() => <Placeholder>Start writing…</Placeholder>}
+        renderPlaceholder={() => (readOnly ? null : <Placeholder>Start writing…</Placeholder>)}
       />
-      <SelectionBubble scheme={scheme} editorFocused={focused} />
-      <LinkPopover scheme={scheme} editorFocused={focused} />
+      <SelectionBubble scheme={scheme} editorFocused={focused && !readOnly} />
+      <LinkPopover scheme={scheme} editorFocused={focused && !readOnly} />
       <InsertMenu
         scheme={scheme}
-        editorFocused={focused}
+        editorFocused={focused && !readOnly}
         images={images}
         choosingSource={choosing === 'sources'}
         // Backing out of the list never closes a source that has since opened.

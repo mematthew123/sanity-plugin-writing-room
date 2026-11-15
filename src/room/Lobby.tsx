@@ -19,7 +19,9 @@ import {isEmptyPost} from './empty-post'
 import {useWritingKinds, useWritingTypes, type WritingKind} from './kinds'
 import {forgetLastOpened, readLastOpened} from './last-opened'
 import {useLeaveToStudio} from './navigation'
-import {describePostStatus, type DocumentEditStatus, type PostStatus, timeAgo} from './post-status'
+import {NOT_SCHEDULED, type Schedule} from '../lib/schedule'
+import {describePostStatus, type DocumentEditStatus, type PostStatus, statusText, timeAgo} from './post-status'
+import {useSchedule} from './use-schedule'
 import {Column, NARROW, Placeholder, QuietButton, SectionLabel} from './primitives'
 import {roomState} from './room-route'
 import {countWords} from './word-count'
@@ -444,7 +446,9 @@ function useGlimpse(handle: DocumentHandle, kinds: WritingKind[], ref?: React.Re
     ...(ref && {ref}),
     projection: `{"title": ${kind?.fields.title ?? 'title'}, "text": pt::text(${kind?.fields.body ?? 'body'})}`,
   })
-  return {data, kind, status: describePostStatus(data?._status)}
+  const status = describePostStatus(data?._status)
+  const known = useSchedule(handle.documentId)
+  return {data, kind, status, schedule: known ?? NOT_SCHEDULED, scheduleKnown: known !== null}
 }
 
 const STATUS: Record<PostStatus['label'], string> = {
@@ -454,12 +458,12 @@ const STATUS: Record<PostStatus['label'], string> = {
 }
 
 /** "Draft", with a dot while there's something readers haven't seen. */
-function Status({status}: {status: PostStatus}) {
+function Status({status, schedule}: {status: PostStatus; schedule: Schedule}) {
   return (
     <span>
       <StatusText>
-        {status.label !== 'Published' && <Dot aria-hidden />}
-        {STATUS[status.label]}
+        {(status.label !== 'Published' || schedule.kind !== 'none') && <Dot aria-hidden />}
+        {schedule.kind === 'none' ? STATUS[status.label] : statusText(status, schedule, {short: true})}
       </StatusText>
     </span>
   )
@@ -490,7 +494,7 @@ function Continue({
   onGone: () => void
 }) {
   const types = useWritingTypes()
-  const {data, kind, status} = useGlimpse(handle, kinds)
+  const {data, kind, status, schedule} = useGlimpse(handle, kinds)
   // The remembered document may have been deleted, or discarded when it was left empty.
   const gone = !status.lastEditedAt
   useEffect(() => {
@@ -508,7 +512,7 @@ function Continue({
         <ContinueFoot>
           <Meta>
             {kinds.length > 1 && kind && <span>{kind.singular}</span>}
-            <Status status={status} />
+            <Status status={status} schedule={schedule} />
             {words > 0 && (
               <span>
                 {words.toLocaleString()} {words === 1 ? 'word' : 'words'}
@@ -517,7 +521,7 @@ function Continue({
             {status.lastEditedAt && <span>Edited {timeAgo(status.lastEditedAt)}</span>}
           </Meta>
           <Go aria-hidden>
-            Continue
+            {schedule.kind === 'none' ? 'Continue' : 'Open'}
             <ArrowRightIcon />
           </Go>
         </ContinueFoot>
@@ -633,9 +637,10 @@ const Rows = styled.ul`
 function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
-  const {data, kind, status} = useGlimpse(handle, kinds, ref)
+  const {data, kind, status, schedule, scheduleKnown} = useGlimpse(handle, kinds, ref)
   // Only a never-published document with no title and no words can be an abandoned start.
-  const maybeEmpty = status.label === 'Draft' && !data?.title?.trim() && !data?.text?.trim()
+  const maybeEmpty =
+    status.label === 'Draft' && scheduleKnown && schedule.kind === 'none' && !data?.title?.trim() && !data?.text?.trim()
 
   return (
     <RowRoot ref={ref}>
@@ -643,7 +648,7 @@ function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
         <RowTitle $untitled={!data?.title}>{data?.title || 'Untitled'}</RowTitle>
         <Meta>
           {kinds.length > 1 && kind && <span>{kind.singular}</span>}
-          <Status status={status} />
+          <Status status={status} schedule={schedule} />
           {status.lastEditedAt && <span>{timeAgo(status.lastEditedAt)}</span>}
         </Meta>
       </RowLink>
