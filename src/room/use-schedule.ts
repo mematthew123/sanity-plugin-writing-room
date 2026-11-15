@@ -21,11 +21,21 @@ export function useSchedulingEnabled(): boolean {
 /**
  * A document's schedule, kept up to date. It is read whether or not scheduling is on, so a
  * document that is already Scheduled stays locked, and can be unlocked, either way.
+ *
+ * Null until the releases and the document's versions have first been read: before then a
+ * Scheduled document looks like any draft, and must not be offered as one.
  */
-export function useSchedule(documentId: string): Schedule {
-  const {data: releases} = useActiveReleases()
-  const {data: versionIds} = useDocumentVersions({documentId})
+export function useSchedule(documentId: string): Schedule | null {
+  const {data: releases, loading: releasesLoading, error: releasesError} = useActiveReleases()
+  const {data: versionIds, loading: versionsLoading, error: versionsError} = useDocumentVersions({documentId})
   const [now, setNow] = useState(() => Date.now())
+
+  // A store that failed has nothing more to say; the room opens on what there is. And once known,
+  // always known: a store that reads again later must not shut a room someone is writing in.
+  const loading = (releasesLoading && !releasesError) || (versionsLoading && !versionsError)
+  const [knownFor, setKnownFor] = useState<string | null>(null)
+  if (!loading && knownFor !== documentId) setKnownFor(documentId)
+  const known = !loading || knownFor === documentId
 
   const mine = useMemo(
     () =>
@@ -44,9 +54,10 @@ export function useSchedule(documentId: string): Schedule {
   }, [mine, now])
 
   return useMemo(() => {
+    if (!known) return null
     if (mine.length === 0) return NOT_SCHEDULED
     return scheduleFor(documentId, versionIds, mine, Math.max(now, Date.now()))
-  }, [mine, versionIds, documentId, now])
+  }, [known, mine, versionIds, documentId, now])
 }
 
 /** The handle for what the room shows: the Scheduled version while there is one, otherwise the draft. */

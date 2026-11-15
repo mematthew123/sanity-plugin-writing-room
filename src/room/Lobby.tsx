@@ -19,7 +19,7 @@ import {isEmptyPost} from './empty-post'
 import {useWritingKinds, useWritingTypes, type WritingKind} from './kinds'
 import {forgetLastOpened, readLastOpened} from './last-opened'
 import {useLeaveToStudio} from './navigation'
-import {type Schedule} from '../lib/schedule'
+import {NOT_SCHEDULED, type Schedule} from '../lib/schedule'
 import {describePostStatus, type DocumentEditStatus, type PostStatus, statusText, timeAgo} from './post-status'
 import {useSchedule} from './use-schedule'
 import {Column, NARROW, Placeholder, QuietButton, SectionLabel} from './primitives'
@@ -447,8 +447,8 @@ function useGlimpse(handle: DocumentHandle, kinds: WritingKind[], ref?: React.Re
     projection: `{"title": ${kind?.fields.title ?? 'title'}, "text": pt::text(${kind?.fields.body ?? 'body'})}`,
   })
   const status = describePostStatus(data?._status)
-  const schedule = useSchedule(handle.documentId)
-  return {data, kind, status, schedule}
+  const known = useSchedule(handle.documentId)
+  return {data, kind, status, schedule: known ?? NOT_SCHEDULED, scheduleKnown: known !== null}
 }
 
 const STATUS: Record<PostStatus['label'], string> = {
@@ -637,10 +637,10 @@ const Rows = styled.ul`
 function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
-  const {data, kind, status, schedule} = useGlimpse(handle, kinds, ref)
+  const {data, kind, status, schedule, scheduleKnown} = useGlimpse(handle, kinds, ref)
   // Only a never-published document with no title and no words can be an abandoned start.
   const maybeEmpty =
-    status.label === 'Draft' && schedule.kind === 'none' && !data?.title?.trim() && !data?.text?.trim()
+    status.label === 'Draft' && scheduleKnown && schedule.kind === 'none' && !data?.title?.trim() && !data?.text?.trim()
 
   return (
     <RowRoot ref={ref}>

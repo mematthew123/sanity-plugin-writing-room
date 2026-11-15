@@ -7,12 +7,13 @@ const FRIDAY = '2026-11-20T09:00:00.000Z'
 interface Fake {
   release?: Record<string, unknown>
   version?: Record<string, unknown> | null
+  draft?: Record<string, unknown> | null
   /** Calls to fail, by name, with the error to throw. */
   fail?: Record<string, unknown>
 }
 
 /** A client that writes down what it's asked, in order. */
-function fakeClient({release, version = null, fail = {}}: Fake = {}) {
+function fakeClient({release, version = null, draft = null, fail = {}}: Fake = {}) {
   const calls: Array<[string, unknown?]> = []
   const run = async <T,>(name: string, args: unknown, result?: T): Promise<T> => {
     calls.push([name, args])
@@ -21,7 +22,10 @@ function fakeClient({release, version = null, fail = {}}: Fake = {}) {
   }
   const client = {
     patch: (id: string) => ({
-      set: (set: unknown) => ({commit: () => run('patch', {id, set})}),
+      set: (set: unknown) => ({
+        commit: () => run('patch', {id, set}),
+        unset: (unset: unknown) => ({commit: () => run('patch', {id, set, unset})}),
+      }),
     }),
     releases: {
       create: (args: unknown) => run('releases.create', args, {releaseId: 'rNEW'}),
@@ -33,7 +37,7 @@ function fakeClient({release, version = null, fail = {}}: Fake = {}) {
     },
     createVersion: (args: unknown) => run('createVersion', args),
     discardVersion: (args: unknown) => run('discardVersion', args),
-    getDocument: (id: string) => run('getDocument', id, version),
+    getDocument: (id: string) => run('getDocument', id, id.startsWith('drafts.') ? draft : version),
     createOrReplace: (document: unknown) => run('createOrReplace', document),
   }
   return {client: client as unknown as SanityClient, calls, names: () => calls.map(([name]) => name)}
@@ -62,13 +66,14 @@ describe('schedulePost', () => {
   })
 
   it('writes the details to the draft first, so the copy carries them', async () => {
-    const {client, calls} = fakeClient()
+    const {client, calls, names} = fakeClient()
     await schedulePost(client, {
       documentId: 'post1',
       publishAt: new Date(FRIDAY),
       details: {publishedAt: FRIDAY},
     })
-    expect(calls[0]).toEqual(['patch', {id: 'drafts.post1', set: {publishedAt: FRIDAY}}])
+    expect(calls[1]).toEqual(['patch', {id: 'drafts.post1', set: {publishedAt: FRIDAY}}])
+    expect(names()).toEqual(['getDocument', 'patch', 'releases.create', 'createVersion', 'releases.schedule'])
   })
 
   it('removes what it made when Sanity turns the schedule down', async () => {
@@ -83,6 +88,63 @@ describe('schedulePost', () => {
     const {client, names} = fakeClient({fail: {'releases.schedule': lost}})
     await expect(schedulePost(client, {documentId: 'post1', publishAt: new Date(FRIDAY)})).rejects.toBe(lost)
     expect(names()).toEqual(['releases.create', 'createVersion', 'releases.schedule'])
+  })
+
+  describe('when it fails with details written', () => {
+    const rejected = Object.assign(new Error('no'), {statusCode: 403})
+    const lost = new Error('network')
+    const slug = {_type: 'slug', current: 'quiet-mornings'}
+    const input = {
+      documentId: 'post1',
+      publishAt: new Date(FRIDAY),
+      details: {publishedAt: FRIDAY, slug},
+    }
+    const putBack = ['patch', {id: 'drafts.post1', set: {slug: {_type: 'slug', current: 'old'}}, unset: ['publishedAt']}]
+
+    for (const step of ['releases.create', 'createVersion', 'releases.schedule']) {
+      it(`puts the draft’s details back when Sanity turns down ${step}`, async () => {
+        const draft = {_id: 'drafts.post1', slug: {_type: 'slug', current: 'old'}}
+        const {client, calls} = fakeClient({draft, fail: {[step]: rejected}})
+        await expect(schedulePost(client, input)).rejects.toBe(rejected)
+        expect(calls.at(-1)).toEqual(putBack)
+      })
+    }
+
+    it('takes away a date the draft never had', async () => {
+      const {client, calls} = fakeClient({draft: {_id: 'drafts.post1'}, fail: {'releases.create': rejected}})
+      await expect(schedulePost(client, input)).rejects.toBe(rejected)
+      expect(calls.at(-1)).toEqual(['patch', {id: 'drafts.post1', set: {}, unset: ['publishedAt', 'slug']}])
+    })
+
+    it('leaves the details when the schedule may have landed: Unlock clears them', async () => {
+      const {client, names} = fakeClient({fail: {'releases.schedule': lost}})
+      await expect(schedulePost(client, input)).rejects.toBe(lost)
+      expect(names().at(-1)).toBe('releases.schedule')
+    })
+  })
+
+  describe('when the copy is lost on the way', () => {
+    const lost = new Error('network')
+    const input = {documentId: 'post1', publishAt: new Date(FRIDAY)}
+
+    it('removes the empty release, which the room would never see', async () => {
+      const {client, calls, names} = fakeClient({version: null, fail: {createVersion: lost}})
+      await expect(schedulePost(client, input)).rejects.toBe(lost)
+      expect(calls[2]).toEqual(['getDocument', 'versions.rNEW.post1'])
+      expect(names().slice(3)).toEqual(['discardVersion', 'releases.archive', 'releases.delete'])
+    })
+
+    it('keeps the release when the copy landed after all: the room shows it and offers Unlock', async () => {
+      const {client, names} = fakeClient({version: {_id: 'versions.rNEW.post1'}, fail: {createVersion: lost}})
+      await expect(schedulePost(client, input)).rejects.toBe(lost)
+      expect(names()).toEqual(['releases.create', 'createVersion', 'getDocument'])
+    })
+
+    it('keeps the release when it can’t tell', async () => {
+      const {client, names} = fakeClient({fail: {createVersion: lost, getDocument: lost}})
+      await expect(schedulePost(client, input)).rejects.toBe(lost)
+      expect(names()).toEqual(['releases.create', 'createVersion', 'getDocument'])
+    })
   })
 })
 

@@ -25,6 +25,7 @@ import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
+import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
 import {
   Column,
@@ -57,9 +58,23 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
 
   return (
     <Suspense fallback={<LoadingRoom />}>
-      <LoadedRoom handle={handle} problem={problem} onProblem={setProblem} />
+      <RoomOnceScheduleKnown handle={handle} problem={problem} onProblem={setProblem} />
     </Suspense>
   )
+}
+
+/**
+ * Holds the room back until the document's schedule is known. Opened a moment early, a Scheduled
+ * document would show its draft, take typing that Unlock later throws away, and offer Publish.
+ */
+function RoomOnceScheduleKnown(props: {
+  handle: DocumentHandle
+  problem: string | null
+  onProblem: (problem: string | null) => void
+}) {
+  const schedule = useSchedule(props.handle.documentId)
+  if (!schedule) return <LoadingRoom />
+  return <LoadedRoom {...props} schedule={schedule} />
 }
 
 function LoadingRoom() {
@@ -88,10 +103,12 @@ const NOTICE_WITH_NEXT_STEP_MS = 16000
 
 function LoadedRoom({
   handle,
+  schedule,
   problem,
   onProblem,
 }: {
   handle: DocumentHandle
+  schedule: Schedule
   problem: string | null
   onProblem: (problem: string | null) => void
 }) {
@@ -104,7 +121,6 @@ function LoadedRoom({
   const isPublished = status.label !== 'Draft'
   // While a document is Scheduled, or has a Stale version, the room is locked and shows that
   // version: the words that will go live, not a draft that may have moved on without them.
-  const schedule = useSchedule(handle.documentId)
   const locked = schedule.kind !== 'none'
   const lockedRelease = locked ? schedule.releaseId : undefined
   const shown = useShownHandle(handle, schedule)

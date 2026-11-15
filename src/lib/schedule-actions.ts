@@ -24,12 +24,49 @@ async function removeUnscheduled(client: SanityClient, documentId: string, relea
 }
 
 /**
+ * Writes the details to the draft and hands back the way to undo it: each field as it was, or gone
+ * if it wasn't there. Only those fields are touched, so words written meanwhile are left alone.
+ */
+async function writeDetails(
+  client: SanityClient,
+  draftId: string,
+  details: Record<string, unknown>,
+): Promise<() => Promise<void>> {
+  const keys = Object.keys(details)
+  if (keys.length === 0) return async () => undefined
+  const before = await client.getDocument<Stored>(draftId)
+  await client.patch(draftId).set(details).commit()
+  return async () => {
+    const set: Record<string, unknown> = {}
+    const unset: string[] = []
+    for (const key of keys) {
+      if (before && before[key] !== undefined) set[key] = before[key]
+      else unset.push(key)
+    }
+    // Best effort: the schedule has already failed, and that is the error the Writer hears of.
+    await client.patch(draftId).set(set).unset(unset).commit().catch(() => undefined)
+  }
+}
+
+/** Whether the release holds a copy of the document. When that can't be read, it may. */
+async function mayHaveVersion(client: SanityClient, documentId: string, releaseId: string | undefined) {
+  if (!releaseId) return false
+  try {
+    return !!(await client.getDocument(versionIdOf(documentId, releaseId)))
+  } catch {
+    return true
+  }
+}
+
+/**
  * Schedules the draft as Studio does: a single-document release, a copy of the draft in it (the
  * Scheduled version), then the schedule. `details` are written to the draft first, so the copy
  * carries them.
  *
- * The three steps aren't one transaction. If Sanity turns one down, what was made is removed. If
- * one is lost on the way, nothing is touched: it may have landed, and the release's own state says.
+ * The steps aren't one transaction. If Sanity turns one down, or the copy was never made, what was
+ * made is removed and the draft's details are put back: a date stamped for a schedule that isn't
+ * must not be there for the next publish. If a step is lost on the way once the copy exists,
+ * nothing is touched: it may have landed, the release's own state says, and Unlock clears it.
  */
 export async function schedulePost(
   client: SanityClient,
@@ -37,16 +74,24 @@ export async function schedulePost(
 ): Promise<{releaseId: string}> {
   const draftId = draftIdOf(documentId)
   const at = publishAt.toISOString()
-  if (Object.keys(details).length > 0) await client.patch(draftId).set(details).commit()
+  const putDetailsBack = await writeDetails(client, draftId, details)
 
-  const {releaseId} = await client.releases.create({
-    metadata: {title: RELEASE_TITLE, releaseType: 'scheduled', cardinality: 'one', intendedPublishAt: at},
-  })
+  let releaseId: string | undefined
+  let copied = false
   try {
+    ;({releaseId} = await client.releases.create({
+      metadata: {title: RELEASE_TITLE, releaseType: 'scheduled', cardinality: 'one', intendedPublishAt: at},
+    }))
     await client.createVersion({publishedId: documentId, baseId: draftId, releaseId})
+    copied = true
     await client.releases.schedule({releaseId, publishAt: at})
   } catch (error) {
-    if (wasRejected(error)) await removeUnscheduled(client, documentId, releaseId)
+    // A release with no copy in it is one the room would never see, so it can't be left for Unlock.
+    const nothingToKeep = wasRejected(error) || (!copied && !(await mayHaveVersion(client, documentId, releaseId)))
+    if (nothingToKeep) {
+      if (releaseId) await removeUnscheduled(client, documentId, releaseId)
+      await putDetailsBack()
+    }
     throw error
   }
   return {releaseId}

@@ -50,9 +50,31 @@ describe('scheduleFor', () => {
   })
 
   it('is settling while a release moves between states', () => {
-    for (const state of ['scheduling', 'unscheduling', 'publishing']) {
-      expect(scheduleFor('post1', ['versions.rABC.post1'], [release({state})], NOW).kind).toBe('settling')
+    const justNow = new Date(NOW - 5_000).toISOString()
+    for (const state of ['scheduling', 'unscheduling', 'publishing', 'archiving']) {
+      const moving = release({state, _updatedAt: justNow})
+      expect(scheduleFor('post1', ['versions.rABC.post1'], [moving], NOW).kind).toBe('settling')
     }
+  })
+
+  it('calls a release stuck between states stale, so it can be unlocked', () => {
+    const aWhileAgo = new Date(NOW - STALE_AFTER_MS).toISOString()
+    for (const state of ['scheduling', 'unscheduling', 'publishing', 'archiving']) {
+      const stuck = release({state, _updatedAt: aWhileAgo})
+      expect(scheduleFor('post1', ['versions.rABC.post1'], [stuck], NOW)).toEqual({
+        kind: 'stale',
+        releaseId: 'rABC',
+        intendedPublishAt: FRIDAY,
+      })
+    }
+  })
+
+  it('does the same for a scheduled release that has no time to go live', () => {
+    const noTime = {publishAt: undefined, metadata: {releaseType: 'scheduled', cardinality: 'one'}}
+    const versions = ['versions.rABC.post1']
+    const justNow = new Date(NOW - 5_000).toISOString()
+    expect(scheduleFor('post1', versions, [release({...noTime, _updatedAt: justNow})], NOW).kind).toBe('settling')
+    expect(scheduleFor('post1', versions, [release(noTime)], NOW).kind).toBe('stale')
   })
 
   it('gives an unscheduled release a minute before calling it stale', () => {
@@ -85,6 +107,11 @@ describe('settlesIn', () => {
   it('says how long until an unscheduled release counts as stale', () => {
     const updated = new Date(NOW - 20_000).toISOString()
     expect(settlesIn(release({state: 'active', _updatedAt: updated}), NOW)).toBe(STALE_AFTER_MS - 20_000)
+  })
+
+  it('waits on a release between states too', () => {
+    const updated = new Date(NOW - 20_000).toISOString()
+    expect(settlesIn(release({state: 'unscheduling', _updatedAt: updated}), NOW)).toBe(STALE_AFTER_MS - 20_000)
   })
 
   it('has nothing to wait for otherwise', () => {

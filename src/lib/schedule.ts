@@ -16,7 +16,8 @@ export interface ScheduleRelease {
  *
  * - `scheduled`: its Scheduled version will go live at `publishAt`.
  * - `settling`: a release is on its way into or out of being scheduled. Locked, nothing to do yet.
- * - `stale`: a Scheduled version is left over and nothing will go live.
+ * - `stale`: a Scheduled version is left over and nothing will go live, or its release has been
+ *   stuck between states for longer than `STALE_AFTER_MS`.
  */
 export type Schedule =
   | {kind: 'none'}
@@ -27,8 +28,8 @@ export type Schedule =
 export const NOT_SCHEDULED: Schedule = {kind: 'none'}
 
 /**
- * A release is unscheduled for a moment while it is being made, and again while it is being taken
- * apart. Only one that stays that way is a Stale version.
+ * A release is unscheduled, or between states, for a moment while it is being made, and again
+ * while it is being taken apart. Only one that stays that way is a Stale version.
  */
 export const STALE_AFTER_MS = 60_000
 
@@ -44,26 +45,31 @@ export const draftIdOf = (documentId: string): string => `drafts.${documentId}`
 
 const RANK: Record<Schedule['kind'], number> = {scheduled: 3, settling: 2, stale: 1, none: 0}
 
+/** The states a release passes through on its way somewhere else. */
+const IN_BETWEEN = ['scheduling', 'unscheduling', 'publishing', 'archiving']
+
+/**
+ * When a release that isn't scheduled stops counting as on its way: null when it is scheduled, or
+ * finished. One that never says when it changed has had its minute.
+ */
+function staleAt(release: ScheduleRelease): number | null {
+  const {state} = release
+  const scheduled = state === 'scheduled' && !!(release.publishAt ?? release.metadata.intendedPublishAt)
+  if (scheduled || (state !== 'scheduled' && state !== 'active' && !IN_BETWEEN.includes(state))) return null
+  const updated = release._updatedAt ? new Date(release._updatedAt).getTime() : 0
+  return (Number.isNaN(updated) ? 0 : updated) + STALE_AFTER_MS
+}
+
 function scheduleOf(release: ScheduleRelease, now: number): Schedule {
   const releaseId = releaseIdOf(release)
   const publishAt = release.publishAt ?? release.metadata.intendedPublishAt
-  switch (release.state) {
-    case 'scheduled':
-      return publishAt ? {kind: 'scheduled', releaseId, publishAt} : {kind: 'settling', releaseId}
-    case 'scheduling':
-    case 'unscheduling':
-    case 'publishing':
-    case 'archiving':
-      return {kind: 'settling', releaseId}
-    case 'active': {
-      const updated = release._updatedAt ? new Date(release._updatedAt).getTime() : 0
-      return now - updated < STALE_AFTER_MS
-        ? {kind: 'settling', releaseId}
-        : {kind: 'stale', releaseId, intendedPublishAt: release.metadata.intendedPublishAt}
-    }
-    default:
-      return NOT_SCHEDULED
-  }
+  if (release.state === 'scheduled' && publishAt) return {kind: 'scheduled', releaseId, publishAt}
+  const stale = staleAt(release)
+  if (stale === null) return NOT_SCHEDULED
+  // A release stuck between states is as stranded as an unscheduled one: Unlock is the way out.
+  return now < stale
+    ? {kind: 'settling', releaseId}
+    : {kind: 'stale', releaseId, intendedPublishAt: release.metadata.intendedPublishAt}
 }
 
 /**
@@ -88,9 +94,8 @@ export function scheduleFor(
 
 /** How long until a `settling` release would count as stale, so the room can look again then. */
 export function settlesIn(release: ScheduleRelease, now: number = Date.now()): number | null {
-  if (release.state !== 'active' || !release._updatedAt) return null
-  const left = STALE_AFTER_MS - (now - new Date(release._updatedAt).getTime())
-  return left > 0 ? left : null
+  const stale = staleAt(release)
+  return stale !== null && stale > now ? stale - now : null
 }
 
 /**
