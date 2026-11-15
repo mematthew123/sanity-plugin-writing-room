@@ -37,9 +37,9 @@
 
 ## Later
 
-Planned, not started. Neither has a design yet.
+Planned, not started.
 
-- [ ] **Scheduling.** Publish at a date and time chosen in the room, next to Publish, with the status showing when the document goes live. Open question: which of Sanity's own scheduling mechanisms to build on, so the room doesn't add a second one.
+- [ ] **Scheduling.** Publish at a date and time chosen in the room, next to Publish, with the status showing when the document goes live.
 - [ ] **Paste to import, with field mapping** (possibly). Paste a whole piece written elsewhere and have the room sort it into the document: title, body, excerpt and the rest of Details. One option for the mapping is TypeSafe's Jev model, which answers choice questions with a probability for each option. Jev can't be called from the browser today (`sanity-plugin-jev-fields` reaches it through Vercel AI Gateway), so this would need a key and has to stay optional: the room must work the same without it.
 
 ## Decisions
