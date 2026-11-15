@@ -23,15 +23,24 @@ export function DetailsView({
   handle,
   fields,
   focusField,
+  lockedRelease,
 }: {
   handle: DocumentHandle
   fields: WritingFields
+  /** The release whose Scheduled version is shown, read-only, while the room is locked. */
+  lockedRelease?: string
   /** A publish problem or a nudge can send the Writer to one field, named by its path. */
   focusField?: string
 }) {
   const root = useRef<HTMLDivElement>(null)
   const [patchChannel] = useState(() => createPatchChannel())
-  const form = useDocumentForm({documentId: handle.documentId, documentType: handle.documentType})
+  const form = useDocumentForm({
+    documentId: handle.documentId,
+    documentType: handle.documentType,
+    // Sanity locks a version only while its release is scheduled. The room's lock also covers a
+    // Stale version, so it says read-only itself.
+    ...(lockedRelease && {releaseId: lockedRelease, selectedPerspectiveName: lockedRelease, readOnly: true}),
+  })
   const {formState, onSetActiveFieldGroup, onProgrammaticFocus, ready} = form
 
   useEffect(() => {

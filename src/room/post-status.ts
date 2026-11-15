@@ -1,3 +1,5 @@
+import {formatGoLive, type Schedule} from '../lib/schedule'
+
 /** The App SDK's `_status` for a document. */
 export interface DocumentEditStatus {
   lastEditedDraftAt?: string
@@ -19,6 +21,30 @@ export function describePostStatus(status: DocumentEditStatus | undefined): Post
   return {
     label: 'Published · unpublished changes',
     lastEditedAt: draft > published ? draft : published,
+  }
+}
+
+/**
+ * The status as the room and the Lobby say it. A schedule, or one left hanging, is the thing a
+ * Writer most needs to know about a document, so it leads.
+ */
+export function statusText(
+  status: PostStatus,
+  schedule: Schedule,
+  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string} = {},
+): string {
+  switch (schedule.kind) {
+    case 'none':
+      return status.label
+    case 'settling':
+      return 'Updating the schedule…'
+    case 'stale':
+      return 'Not scheduled · won’t go live'
+    case 'scheduled': {
+      const when = formatGoLive(schedule.publishAt, options)
+      if (status.label === 'Draft') return `Scheduled · ${when}`
+      return options.short ? `Changes scheduled · ${when}` : `Published · changes scheduled for ${when}`
+    }
   }
 }
 

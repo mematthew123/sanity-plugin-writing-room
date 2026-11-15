@@ -13,6 +13,7 @@
   - Prefixed block types the plugin registers itself.
   - Setup problems that explain themselves.
 - **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest. See `docs/adr/0001-details-use-the-studio-form.md`.
+- **Scheduling** (November 2026): publish at a time chosen in the room, through Sanity's Scheduled Drafts. It's offered in the panel that asks before publishing; a scheduled document is locked, shows what will go live, and is unlocked to change it or its time. Nothing to configure: the room offers it wherever the Studio has scheduled drafts.
 - **Look and feel:**
   - Fonts shipped with the plugin.
   - Tokens scoped to the room.
@@ -28,6 +29,8 @@
 
 ## Next
 
+- [ ] **Scheduling, by hand and in the pictures.** The browser tests schedule, lock, unlock and go live against a real project. Still to do: try Preview on a locked document against a real site, and add the schedule panel and the locked room to `pnpm shots` and `pnpm vrt`.
+- [ ] **Details when scheduling from Structure.** Studio's "Schedule publish" doesn't settle the slug or stamp the date as the room does. A plugin can't wrap it (Studio's own scheduled drafts plugin runs after every other and puts its action back), so the choice is an action a Studio adds in its own config, or leaving it.
 - [ ] **Try the room by hand in a real Studio** (writing, the Insert Menu on a `blockContent` body, publishing, Preview). Everything since the extraction is covered by tests and builds, not by someone writing in it.
 - [ ] **README screenshot or GIF**, and a **Sanity Exchange** listing.
 - [ ] **Sanity's inputs in the room's theme.** In Details, references, images and arrays take the Studio's theme, so they only match the room in a Studio that uses `sanity-plugin-writing-room/theme`. Wrap them in the room's theme without making `@sanity/themer` a required dependency.
@@ -39,7 +42,6 @@
 
 Planned, not started.
 
-- [ ] **Scheduling.** Publish at a date and time chosen in the room, next to Publish, with the status showing when the document goes live.
 - [ ] **Paste to import, with field mapping** (possibly). Paste a whole piece written elsewhere and have the room sort it into the document: title, body, excerpt and the rest of Details. One option for the mapping is TypeSafe's Jev model, which answers choice questions with a probability for each option. Jev can't be called from the browser today (`sanity-plugin-jev-fields` reaches it through Vercel AI Gateway), so this would need a key and has to stay optional: the room must work the same without it.
 
 ## Decisions

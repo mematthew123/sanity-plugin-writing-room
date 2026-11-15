@@ -210,6 +210,8 @@ The room has its own vocabulary. Use these words in the interface, in code and i
 - **The room**: one document, open for writing.
 - **Room Controls**: the few controls in the room's corners.
 - **Post**: the default kind of document. The room names each kind by its schema title ("Case Study"); never say "document" to a Writer.
+- **Scheduled**: set to go live by itself at a time the Writer chose. A scheduled document is locked: it can be read, in the room, but not changed.
+- **Unlock**: take a document off the schedule so it can be changed or given a new time. Never "pause", "unschedule" or "cancel" to a Writer.
 - **Image source**: a place the Studio offers existing images from: its own uploads, Media Library, or one a plugin adds. Each goes by the name it gives itself in the Studio. Never "asset", "asset source" or "media" to a Writer.
 
 ## Overview
@@ -335,13 +337,16 @@ Soft, consistent corners.
 - **Leave** — returns the Writer to where they came from: the document's form if they opened it from there, otherwise the Lobby. A document that was never published and is still completely empty is discarded on the way out.
 - **Save state** — a small "Saved" that fades after a moment. Offline it reads "Offline", in caution, and stays; the message slot says what that means for the Writer's words.
 - **Presence** — "Sam is here too." Never recedes: writing alongside someone without knowing is unsettling.
-- **Status** — "Draft", "Published", or "Published · unpublished changes". Words, not a badge.
+- **Status** — "Draft", "Published", or "Published · unpublished changes". Words, not a badge. A scheduled document says when it goes live, in the Writer's own time zone: "Scheduled · Friday 20 November at 09:00", or "Published · changes scheduled for Friday 20 November at 09:00".
 - **Room Settings (Aa)** — the one menu for how the room looks and feels: text size (S, M, L), typewriter scrolling, focus dimming, dark mode, fullscreen. Each toggle has a label and one line saying what it does. On narrower windows it also holds whatever left the bar. The Writer's choices are theirs, kept in their browser; they are not a Studio's to configure.
 - **Publish button** — the only filled clay element in the room. Labels: "Publish" (never published), "Publish changes" (published with edits); absent when there's nothing to publish.
 - **Publishing** — a publish is real: readers see it and webhooks run. So it's a moment, in three steps:
   1. *Check.* If something blocks the publish, don't list errors: take the Writer to the first one and say what it is.
   2. *Ask once.* A small panel under the button says where the document will go live (the site's address when the room knows it, otherwise the slug) and offers **Publish now** and **Not yet**. Enter confirms; Esc backs out. While it's open, the bar's button steps back to a surface tint, so the answer is the only clay thing.
   3. *Say so.* The message slot shows a clay tick and "Published", with a link to the live page when the room knows the address, and a nudge toward the cover image if there isn't one.
+- **Scheduling** — another answer to the question the room already asks, so it lives in the same panel and adds nothing to the bar. Where the Studio has scheduled drafts, the panel offers a quiet **Schedule for later** beside **Not yet**. Choosing it turns the panel into one date and time, opening on the time the document last had, or nine tomorrow morning; **Schedule** is then the clay answer. A document that can't be published can't be scheduled: the check comes first either way. A Studio without scheduled drafts never sees the offer.
+- **The locked room** — a scheduled document shows exactly what will go live, and takes no changes: the title, the body and Details are there to read. There is no Publish. In its place is one quiet button, **Unlock**. Typing gets one line in the message slot: "This post is scheduled. Unlock it to make changes."
+- **Unlock** — takes the document off the schedule, so it asks once, the way Publish does: when it was set to go live, that unlocking takes it off the schedule until it's scheduled again, then **Unlock** and **Not yet**. Nothing is lost: the Writer picks up from what was about to go live. A schedule that was left hanging (paused in Studio, or never finished) locks the room the same way, with the status "Not scheduled · won't go live", so the Writer knows before they find out the hard way.
 - **Message** — the one place the room speaks up, at the foot of the window and clear of the controls. One at a time, in this order of precedence: a problem (caution; stays until dismissed or resolved), offline (caution; stays), a notice (ink; passes after a few seconds, longer when it offers somewhere to go). Never a stack of toasts.
 - **Word count** — "1,240 words · 6 min read", in ink muted, in the margin at the foot. It recedes with the controls. It is information, never a goal.
 - **Selection Bubble** — a surface pill above selected text: Bold, Italic, Link, Heading, Subheading, Quote. Appears with the `gentle` motion, never covers the selected line.
@@ -360,8 +365,8 @@ Soft, consistent corners.
 
 - **Greeting** — "Good morning, Sam", in Newsreader at body size, ink muted. A hello, not a headline.
 - **New** — an outlined pill: "New Post". With several kinds of writing it reads "New" and asks which. It says "Starting…" while it works. It is deliberately modest: most visits are to continue something.
-- **Continue card** — a surface card: the title in Newsreader, the first two lines of the body in ink muted, then one Figtree line (status, word count, "Edited 2 hours ago") and "Continue →" in clay. It is the document the Writer last had open in the room, or failing that the most recently edited one.
-- **Row** — the title in Newsreader at body size on one line, then one Figtree line: status and relative time. A small muted dot marks anything readers haven't seen yet ("Draft", "Unpublished changes"); "Published" has none. An untitled document reads "Untitled" in ink muted.
+- **Continue card** — a surface card: the title in Newsreader, the first two lines of the body in ink muted, then one Figtree line (status, word count, "Edited 2 hours ago") and "Continue →" in clay ("Open →" for a scheduled document, which can't be continued until it's unlocked). It is the document the Writer last had open in the room, or failing that the most recently edited one.
+- **Row** — the title in Newsreader at body size on one line, then one Figtree line: status and relative time. A small muted dot marks anything readers haven't seen yet ("Draft", "Unpublished changes", "Scheduled · Friday at 09:00"); "Published" has none. An untitled document reads "Untitled" in ink muted.
 - **Discard** — appears on a row only when the document was never published and is completely empty, Details included. It's the same tidy-up the room does by itself on Leave, so it doesn't ask first. See the last Don't.
 - **Nothing written yet** — one surface card, one sentence, and the only filled clay button the Lobby ever shows: "Start your first Post".
 ### In Details
@@ -396,7 +401,7 @@ Plain, warm, brief. Write like a considerate person sitting beside the Writer.
 - Offer a way out in the Writer's words: "Not yet", not "Cancel".
 - When something fails, say it couldn't be done *just now* and that trying again is fine. Never blame, never show an error code.
 - Sentence case everywhere. No exclamation marks, no emoji, no "Oops".
-- Status is described in the Writer's words: "Draft", "Published", "Unpublished changes". Never "dirty", "synced" or "version".
+- Status is described in the Writer's words: "Draft", "Published", "Unpublished changes", "Scheduled". Never "dirty", "synced", "version" or "release".
 - Reassure only when it's true and useful: "Your words are safe here" appears only when the room is actually holding unsynced edits.
 - Use the words under [Words](#words).
 
@@ -431,4 +436,4 @@ Naming in CSS is `--calm-{group}-{token}` in kebab-case: `--calm-color-ink-muted
 - Don't show streaks, goals, targets or progress pressure. A word count is information; a word goal is not.
 - Don't add an option where a decision would do.
 - Don't turn the Lobby into a document browser.
-- Don't put a destructive action (unpublish, delete, discard) in the room. The one exception anywhere is the Lobby's Discard on a document that is completely empty, where there is nothing to lose.
+- Don't put a destructive action (unpublish, delete, discard) in the room. Unlock isn't one: what was scheduled becomes the draft. The one exception anywhere is the Lobby's Discard on a document that is completely empty, where there is nothing to lose.

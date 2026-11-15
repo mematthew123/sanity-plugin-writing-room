@@ -12,11 +12,14 @@ export function TitleField({
   handle,
   fields,
   isPublished,
+  readOnly = false,
   onEnter,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
+  /** A locked room shows the title of the Scheduled version and doesn't take changes to it. */
+  readOnly?: boolean
   onEnter: () => void
 }) {
   const {data: title} = useDocument<string>({...handle, path: fields.title})
@@ -87,7 +90,10 @@ export function TitleField({
       aria-label="Title"
       data-calm-field="title"
       spellCheck
-      onChange={(event) => setTitle(event.currentTarget.value)}
+      readOnly={readOnly}
+      onChange={(event) => {
+        if (!readOnly) setTitle(event.currentTarget.value)
+      }}
       onKeyDown={handleKeyDown}
     />
   )

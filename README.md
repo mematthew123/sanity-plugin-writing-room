@@ -17,6 +17,7 @@ Most Studios put writing in a form: panes, field labels and a toolbar around eve
 - **Any screen**: on a phone or a narrow window the controls keep to Leave, `Aa` and Publish, and the rest moves into the `Aa` menu.
 - **Live sync and presence** through the Sanity App SDK. The room says when you're offline and keeps your words until you're back.
 - **Publish from the room**: the slug is settled and the date stamped for you. If something blocks the publish, the room takes you straight to it; if nothing does, it shows where the document will go live and asks once. Afterwards, a link to the live page (when `preview` says where your site is).
+- **Or schedule it**: where your Studio has [scheduled drafts](https://www.sanity.io/docs/studio/scheduled-drafts), the same panel offers a time instead. A scheduled document is locked and shows exactly what will go live; unlock it to change the words or the time. See [Scheduling](#scheduling).
 - **Preview** opens the document on your site in draft mode, exactly as readers will see it.
 
 > **Status: 0.x.** The API may change before 1.0; breaking changes are listed in the [changelog](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/CHANGELOG.md). What's next is in the [roadmap](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/ROADMAP.md).
@@ -205,6 +206,22 @@ You don't need the plugin's schema if you already have a type to write in: the r
 The plugin doesn't register these types for you, on purpose. `post` and `body` are common names, and a clash would stop your Studio from starting, so you add them where you can see them.
 
 Only Prose (title, body, and alt text on body images) should *block* a publish, because the Writer can't fix anything else from inside the room. Publishing from the room is a real publish: webhooks and Functions that listen for it run as usual.
+
+## Scheduling
+
+There is nothing to set up. The room schedules with Sanity's own [Scheduled Drafts](https://www.sanity.io/docs/studio/scheduled-drafts), so it offers **Schedule for later** wherever your Studio has them (a paid plan, and `scheduledDrafts.enabled` not turned off in your config) and says nothing about scheduling where it doesn't. What the room schedules shows up in Studio's scheduled drafts list, and the other way round.
+
+- **The date.** A document with no published date gets the time it goes live, not the time someone clicked Schedule. A date the Writer set is left alone.
+- **Locked while scheduled.** The room shows the scheduled version, read-only: the title, the body and Details. Typing says why nothing happens.
+- **Unlock to change it.** Unlock takes the document off the schedule and hands the Writer what was about to go live, as an ordinary draft. Scheduling again opens on the time it had. If the room stamped the published date, Unlock clears it, so the next schedule or publish stamps the right one.
+- **Schedules left hanging.** A schedule paused in Studio, or one that never finished being made, won't go live. The room says so ("Not scheduled · won't go live") and stays locked until the Writer unlocks it.
+
+Four things worth knowing:
+
+- Scheduling from Studio's own form ("Schedule publish") doesn't settle the slug or stamp the published date the way the room does, and the way the plugin's wrapper does for Publish. Studio adds that action after every plugin has run, so a plugin can't wrap it. Schedule from the room when those matter.
+- The room's lock is the room's. Studio keeps its own behaviour, including "Pause to edit". If someone edits the scheduled version there, the room shows their edits; if they edit the draft underneath instead, those edits are replaced by the scheduled version at Unlock (they stay in the document's history).
+- A document unlocked in the room is not listed under Studio's Paused tab: the room removes the schedule rather than pausing it.
+- Scheduling takes three requests to Sanity. If your connection drops between them, the room tells the Writer the document isn't scheduled rather than guessing.
 
 ## Preview on your site
 

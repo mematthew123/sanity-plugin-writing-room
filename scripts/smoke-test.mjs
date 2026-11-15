@@ -31,6 +31,11 @@ const FORM_EXPORTS = [
   'isNumberInputProps',
   'isObjectInputProps',
   'isStringInputProps',
+  // For scheduling: the releases a document's Scheduled version lives in, and whether the Studio has them.
+  'useActiveReleases',
+  'useDocumentVersions',
+  'useFeatureEnabled',
+  'useScheduledDraftsEnabled',
 ]
 const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
 
@@ -158,16 +163,16 @@ if (portableText.length && !loose) {
   process.exit(1)
 }
 
-// 5. The Details view is built on parts of Sanity's form that aren't all stable API.
+// 5. The Details view and scheduling are built on parts of Sanity that aren't all stable API.
 const sanityExports = execFileSync(
   'node',
   ['--input-type=module', '-e', "import * as sanity from 'sanity'; console.log(Object.keys(sanity).join(','))"],
   {cwd: studioDir, encoding: 'utf8'},
 ).split(',')
 const missing = FORM_EXPORTS.filter((name) => !sanityExports.includes(name))
-console.log(`\nForm exports the Details view needs: ${missing.length ? `missing ${missing.join(', ')}` : 'all present'}`)
+console.log(`\nSanity exports the room needs: ${missing.length ? `missing ${missing.join(', ')}` : 'all present'}`)
 if (missing.length) {
-  console.error(`\n✗ sanity@${sanityVersion} doesn't export what the Details view is built on.`)
+  console.error(`\n✗ sanity@${sanityVersion} doesn't export what the room is built on.`)
   process.exit(1)
 }
 

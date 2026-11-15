@@ -1,6 +1,7 @@
 import {createPreviewSecret} from '@sanity/preview-url-secret/create-secret'
 import {
   urlSearchParamPreviewPathname,
+  urlSearchParamPreviewPerspective,
   urlSearchParamPreviewSecret,
 } from '@sanity/preview-url-secret/constants'
 import {useState} from 'react'
@@ -12,10 +13,13 @@ import {QuietButton} from './primitives'
 export function PreviewButton({
   documentType,
   slug,
+  releaseId,
   onProblem,
 }: {
   documentType: string
   slug: string | undefined
+  /** Set while the room is locked, so the site shows the Scheduled version and not the draft. */
+  releaseId?: string
   onProblem: (problem: string) => void
 }) {
   const client = useClient({apiVersion: API_VERSION})
@@ -42,6 +46,7 @@ export function PreviewButton({
       const url = new URL(enablePath, origin)
       url.searchParams.set(urlSearchParamPreviewSecret, secret)
       url.searchParams.set(urlSearchParamPreviewPathname, path)
+      if (releaseId) url.searchParams.set(urlSearchParamPreviewPerspective, releaseId)
       if (tab) tab.location.href = url.toString()
       else window.open(url, '_blank', 'noopener')
     } catch {

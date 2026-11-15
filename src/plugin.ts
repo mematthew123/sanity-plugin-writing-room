@@ -58,6 +58,8 @@ export const writingRoom = definePlugin<WritingRoomOptions | void>((options) => 
         if (!kind) return prev
         return [
           ...prev.map((action) =>
+            // Studio's "Schedule publish" can't be wrapped the same way: Studio adds it after every
+            // plugin has had its say, so it never passes through here.
             action.action === 'publish' ? withPostDetailsOnPublish(action, context, kind.fields) : action,
           ),
           OpenInWritingRoomAction,
