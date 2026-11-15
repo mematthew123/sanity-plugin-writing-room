@@ -51,9 +51,8 @@ const test = base.extend<{snap: Snap}>({
   },
 })
 
-/** Selects `words` from the keyboard: a drag can end a letter either way, which moves the bubble. */
-async function selectByKeys(page: Page, words: string) {
-  // On a phone the words start below the fold.
+/** Brings `words` in the body into the window: on a phone they can start below the fold, where a click misses. */
+async function scrollToWords(page: Page, words: string) {
   await page.evaluate((text) => {
     const walker = document.createTreeWalker(document.querySelector('[aria-label="Body"]')!, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -61,6 +60,11 @@ async function selectByKeys(page: Page, words: string) {
     }
     return undefined
   }, words)
+}
+
+/** Selects `words` from the keyboard: a drag can end a letter either way, which moves the bubble. */
+async function selectByKeys(page: Page, words: string) {
+  await scrollToWords(page, words)
   const box = await find(page, words)
   await page.mouse.click(box.left + 1, box.y)
   await page.keyboard.down('Shift')
@@ -95,6 +99,7 @@ test('selection-bubble: formatting above a selection', async ({page, post, snap}
 
 test('insert-menu: a slash on an empty line', async ({page, post, snap}) => {
   await new Room(page).open(post)
+  await scrollToWords(page, 'one at a time.')
   await caretAfter(page, 'one at a time.')
   await page.keyboard.press('Enter')
   await page.keyboard.type('/')

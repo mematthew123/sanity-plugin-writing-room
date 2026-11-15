@@ -473,15 +473,21 @@ async function main(options) {
         const variant = VARIANTS.find((option) => name.endsWith(`-${option}`))
         return {state: name.slice(0, -variant.length - 1), variant}
       }
-      const states = [...new Set(failing.map((result) => split(result.name).state))]
-      const variants = [...new Set(failing.map((result) => split(result.name).variant))]
+      // One run per window: states × windows in a single run would also overwrite captures that matched.
+      const statesByVariant = new Map()
+      for (const result of failing) {
+        const {state, variant} = split(result.name)
+        statesByVariant.set(variant, [...(statesByVariant.get(variant) ?? []), state])
+      }
       for (const result of failing) {
         for (const side of ['base', 'candidate']) {
           for (const extension of ['json', 'png']) rmSync(join(capturesDir, side, `${result.name}.${extension}`), {force: true})
         }
       }
       // A test's title starts with its state: "details: everything that isn't…".
-      capture({...options, capturesDir, projects: variants, grep: `(^| )(${states.join('|')}): `})
+      for (const [variant, states] of statesByVariant) {
+        capture({...options, capturesDir, projects: [variant], grep: `(^| )(${states.join('|')}): `})
+      }
       for (const result of failing) results.set(result.name, {...compare(result.name, capturesDir), attempts: attempt})
     }
 
@@ -502,7 +508,9 @@ async function main(options) {
     const failing = ordered.filter((result) => !isClean(result, limits))
     console.log(relative(repo, join(runDir, 'summary.md')))
     console.log(failing.length === 0 ? 'PASS' : `FAIL: ${failing.length} of ${ordered.length} captures differ`)
-    if (failing.length > 0) process.exitCode = 1
+    // A capture that couldn't be compared outranks one that differs.
+    if (failing.some((result) => result.error !== null)) process.exitCode = 2
+    else if (failing.length > 0) process.exitCode = 1
   } finally {
     stopAll()
   }
