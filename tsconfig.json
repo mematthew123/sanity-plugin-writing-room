@@ -19,6 +19,7 @@
     "src",
     "e2e",
     "shots",
+    "vrt",
     "*.ts"
   ],
   "exclude": [
