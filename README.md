@@ -71,7 +71,7 @@ That's all. Run `sanity dev`: **Writing Room** appears in the Studio's navigatio
 
 **Which types?** Your own `post`, `article`, `caseStudy`… The room finds each one's title, body, slug and published date by itself (see [Document types](#document-types)) and only offers what its body can store. No Post type yet? Register the starter one: `schema: {types: writingRoomSchemaTypes}` (see [Schema](#schema)).
 
-**Starting from scratch?** Calm Editor is a template with a Studio, the Writing Room and a Reading Site in the same typography and colour: both ends of a blog at once. It's linked from [writingroom.studio](https://writingroom.studio).
+**Starting from scratch?** [Calm Editor](https://github.com/mematthew123/calm-editor) is a template with a Studio, the Writing Room and a Reading Site in the same typography and colour: both ends of a blog at once.
 
 **Why auto-updates off?** The room uses Sanity's App SDK (`@sanity/sdk-react`). An auto-updating Studio loads `sanity` from a CDN but bundles its own copy of the SDK, so the two never share a React context and the room can't start. This only shows up in a **deployed** Studio, not in `sanity dev`. To upgrade later, bump `sanity` and deploy again.
 
@@ -343,7 +343,7 @@ To try a change in a Studio of your own, install a packed tarball (`pnpm pack`, 
 
 How the room should look, behave and speak is written down in [DESIGN.md](https://github.com/mematthew123/sanity-plugin-writing-room/blob/main/DESIGN.md); read it before changing the interface. A test keeps its token values in step with `src/tokens.ts`.
 
-`src/tokens.ts` and `src/embed.ts` are copies of the design tokens and embed parsing in the Calm Editor template (private), which shares them with its Reading Site. Keep the two in step.
+`src/tokens.ts` and `src/embed.ts` are copies of the design tokens and embed parsing in the [Calm Editor](https://github.com/mematthew123/calm-editor) template, which shares them with its Reading Site. Keep the two in step.
 
 ## License
 
