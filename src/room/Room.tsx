@@ -184,7 +184,7 @@ function LoadedRoom({
       const onThePage = target === document.body || !!page.current?.contains(target)
       if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
       if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
-      setNotice((current) => (current?.done || current?.text === lockedNotice ? current : {text: lockedNotice}))
+      setNotice((current) => (current?.text === lockedNotice ? current : {text: lockedNotice}))
     }
     window.addEventListener('keydown', explain)
     return () => window.removeEventListener('keydown', explain)
