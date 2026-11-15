@@ -2,6 +2,10 @@
 
 A calm, full-screen place to write long-form content inside Sanity Studio: Posts, articles, case studies, whatever your Studio writes.
 
+[![The Writing Room in dark mode: an essay's title and body, and little else.](https://raw.githubusercontent.com/mematthew123/sanity-plugin-writing-room/main/docs/images/room-dark.png)](https://writingroom.studio)
+
+**[writingroom.studio](https://writingroom.studio)** has the docs, more pictures and a short film of the room in use.
+
 Most Studios put writing in a form: panes, field labels and a toolbar around every sentence. The Writing Room is a Studio Tool with its own route that shows only a document's title and body, and gets out of the way while you type. Everything else (slug, excerpt, cover image, tags, any field of your own) is under **Details**: one click swaps the body for those fields, without leaving the room. It works with the document types you already have.
 
 - **The Lobby**: a doorway, not a document browser. Continue the piece you were last in, start something new, or pick from a few recent ones. The Studio's navbar stays above it, and Structure is one link away for everything else.
@@ -66,6 +70,8 @@ export default defineCliConfig({
 That's all. Run `sanity dev`: **Writing Room** appears in the Studio's navigation, and each of those documents gets an **Open in Writing Room** action.
 
 **Which types?** Your own `post`, `article`, `caseStudy`… The room finds each one's title, body, slug and published date by itself (see [Document types](#document-types)) and only offers what its body can store. No Post type yet? Register the starter one: `schema: {types: writingRoomSchemaTypes}` (see [Schema](#schema)).
+
+**Starting from scratch?** Calm Editor is a template with a Studio, the Writing Room and a Reading Site in the same typography and colour: both ends of a blog at once. It's linked from [writingroom.studio](https://writingroom.studio).
 
 **Why auto-updates off?** The room uses Sanity's App SDK (`@sanity/sdk-react`). An auto-updating Studio loads `sanity` from a CDN but bundles its own copy of the SDK, so the two never share a React context and the room can't start. This only shows up in a **deployed** Studio, not in `sanity dev`. To upgrade later, bump `sanity` and deploy again.
 
