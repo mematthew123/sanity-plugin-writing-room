@@ -152,8 +152,17 @@ export function RoomMessage({
   return null
 }
 
-export function StatusLabel({status, schedule}: {status: PostStatus; schedule: Schedule}) {
-  return <Quiet>{statusText(status, schedule)}</Quiet>
+/** `readOnly` when the document takes no changes and the Writer can't unlock it. */
+export function StatusLabel({
+  status,
+  schedule,
+  readOnly = false,
+}: {
+  status: PostStatus
+  schedule: Schedule
+  readOnly?: boolean
+}) {
+  return <Quiet>{statusText(status, schedule, {readOnly})}</Quiet>
 }
 
 /** Never recedes: writing alongside someone without knowing is unsettling. */

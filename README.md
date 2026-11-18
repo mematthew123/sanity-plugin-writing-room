@@ -223,6 +223,18 @@ Four things worth knowing:
 - A document unlocked in the room is not listed under Studio's Paused tab: the room removes the schedule rather than pausing it.
 - Scheduling takes three requests to Sanity. If your connection drops between them, the room tells the Writer the document isn't scheduled rather than guessing.
 
+## Locked documents
+
+There is nothing to set up here either. The room takes no changes wherever your Studio's own form wouldn't, and says why when the Writer types:
+
+- **Roles.** Someone whose role can't change a document can read it in the room: the title, the body and Details. Someone who can write but not publish gets the room without the Publish button.
+- **`readOnly` in your schema.** On the document type, it locks the whole room. On the title or the body field, it locks that field and leaves the rest. A function works as it does in the form, so a rule such as `readOnly: ({document}) => document?.status === 'approved'` or one that looks at `currentUser` locks and opens the room as the answer changes.
+- **A schedule.** See [Scheduling](#scheduling). It is the one lock the Writer can lift from the room.
+
+If your workflow locks documents some other way (a state kept in a separate document, or a custom input that refuses changes), say it with `readOnly` in the schema. The room and the standard form both follow that.
+
+A read-only document type can still be published from the room, as it can from the form: locking after approval and then publishing is a common workflow. The room doesn't yet notice a Studio that has removed or replaced the Publish action in `document.actions`, or a document linked to Canvas.
+
 ## Preview on your site
 
 Preview opens the document on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:

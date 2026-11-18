@@ -72,6 +72,13 @@ describe('statusText', () => {
     expect(statusText(draft, {kind: 'stale', releaseId: 'rABC'}, options)).toBe('Not scheduled · won’t go live')
   })
 
+  it('says when a document takes no changes and can’t be unlocked', () => {
+    expect(statusText(draft, {kind: 'none'}, {...options, readOnly: true})).toBe('Draft · read only')
+    expect(statusText(draft, scheduled, {...options, readOnly: true})).toBe(
+      'Scheduled · Friday 20 November at 09:00 · read only',
+    )
+  })
+
   it('says a schedule is being updated', () => {
     expect(statusText(draft, {kind: 'settling', releaseId: 'rABC'}, options)).toBe('Updating the schedule…')
   })

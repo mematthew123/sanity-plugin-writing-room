@@ -24,7 +24,9 @@ import {type WritingFields} from './fields'
 import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
+import {useRoomLock} from './use-lock'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
+import {lockNotice} from '../lib/lock'
 import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
 import {
@@ -125,9 +127,10 @@ function LoadedRoom({
   const {data} = useDocumentProjection<{_id: string}>({...handle, projection: '{_id}'})
   const status = describePostStatus(data?._status)
   const isPublished = status.label !== 'Draft'
-  const locked = schedule.kind !== 'none'
-  const lockedRelease = locked ? schedule.releaseId : undefined
+  const lockedRelease = schedule.kind === 'none' ? undefined : schedule.releaseId
   const shown = useShownHandle(handle, schedule)
+  const lock = useRoomLock(handle, shown, schedule, fields)
+  const locked = lock.document !== null
   const canSchedule = useSchedulingEnabled()
   const [previousTime, setPreviousTime] = useState<string | undefined>(undefined)
   const {data: shownData} = useDocumentProjection<{slug?: string}>({
@@ -169,14 +172,11 @@ function LoadedRoom({
       onProblem={onProblem}
     />
   )
-  const lockedNotice =
-    schedule.kind === 'none'
-      ? null
-      : schedule.kind === 'scheduled'
-        ? `This ${kind.singular} is scheduled. Unlock it to make changes.`
-        : `This ${kind.singular} is locked. Unlock it to make changes.`
+  // Typing that lands where nothing can be changed gets one line saying why.
+  const titleNotice = lockNotice(lock, schedule, kind.singular, 'title')
+  const bodyNotice = lockNotice(lock, schedule, kind.singular, 'body')
   useEffect(() => {
-    if (!lockedNotice) return undefined
+    if (!titleNotice && !bodyNotice) return undefined
     const explain = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return
       if (event.key.length !== 1 && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter') return
@@ -184,14 +184,17 @@ function LoadedRoom({
       const onThePage = target === document.body || !!page.current?.contains(target)
       if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
       if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
-      setNotice((current) => (current?.text === lockedNotice ? current : {text: lockedNotice}))
+      // With one field locked, Details is still the Writer's to change, and so is the other field.
+      if (!locked && (inDetails || target?.closest('[data-calm-details]'))) return
+      const text = target?.closest('[data-calm-field="title"]') ? titleNotice : bodyNotice
+      if (text) setNotice((current) => (current?.text === text ? current : {text}))
     }
     window.addEventListener('keydown', explain)
     return () => window.removeEventListener('keydown', explain)
-  }, [lockedNotice])
+  }, [titleNotice, bodyNotice, locked, inDetails])
 
   return (
-    <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
+    <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: lock.body}}>
       <RoomSyncProvider handle={handle}>
         <Layout>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
@@ -212,7 +215,7 @@ function LoadedRoom({
                 <SaveState />
                 <Recedes>
                   <WideOnly>
-                    <StatusLabel status={status} schedule={schedule} />
+                    <StatusLabel status={status} schedule={schedule} readOnly={locked && !lock.canUnlock} />
                   </WideOnly>
                   <RoomSettingsMenu
                     scheme={scheme}
@@ -227,7 +230,7 @@ function LoadedRoom({
                     {details}
                     {preview}
                   </WideOnly>
-                  {locked ? (
+                  {schedule.kind !== 'none' && lock.canUnlock && (
                     <UnlockButton
                       handle={handle}
                       schedule={schedule}
@@ -236,7 +239,8 @@ function LoadedRoom({
                       onNotice={setNotice}
                       onUnlocked={setPreviousTime}
                     />
-                  ) : (
+                  )}
+                  {schedule.kind === 'none' && lock.canPublish && (
                     <PublishButton
                       handle={handle}
                       status={status}
@@ -258,11 +262,12 @@ function LoadedRoom({
                 fields={fields}
                 isPublished={isPublished}
                 inDetails={inDetails}
-                locked={locked}
+                readOnly={lock.title}
               />
               <Pages
                 handle={shown}
                 lockedRelease={lockedRelease}
+                bodyReadOnly={lock.body}
                 fields={fields}
                 scheme={scheme}
                 page={page}
@@ -295,13 +300,13 @@ function Title({
   fields,
   isPublished,
   inDetails,
-  locked,
+  readOnly,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
   inDetails: boolean
-  locked: boolean
+  readOnly: boolean
 }) {
   const editor = useEditor()
   // Enter goes on to whatever is under the title: the body, or the first of the Details.
@@ -310,7 +315,7 @@ function Title({
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
   return (
-    <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={locked} onEnter={onEnter} />
+    <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={readOnly} onEnter={onEnter} />
   )
 }
 
@@ -318,6 +323,7 @@ function Title({
 function Pages({
   handle,
   lockedRelease,
+  bodyReadOnly,
   fields,
   scheme,
   page,
@@ -327,6 +333,7 @@ function Pages({
 }: {
   handle: DocumentHandle
   lockedRelease: string | undefined
+  bodyReadOnly: boolean
   fields: WritingFields
   scheme: string
   page: RefObject<HTMLElement | null>
@@ -349,7 +356,7 @@ function Pages({
           handle={handle}
           path={fields.body}
           scheme={scheme}
-          readOnly={!!lockedRelease}
+          readOnly={bodyReadOnly}
           onProblem={onProblem}
         />
       </Swap>

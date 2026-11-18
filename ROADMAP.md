@@ -14,6 +14,7 @@
   - Setup problems that explain themselves.
 - **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest. See `docs/adr/0001-details-use-the-studio-form.md`.
 - **Scheduling** (November 2026): publish at a time chosen in the room, through Sanity's Scheduled Drafts. It's offered in the panel that asks before publishing; a scheduled document is locked, shows what will go live, and is unlocked to change it or its time. Nothing to configure: the room offers it wherever the Studio has scheduled drafts.
+- **Locks the Studio already has** (November 2026): the room takes no changes where the Writer's role doesn't allow them or the schema's `readOnly` says so, for the whole document or for the title or body alone, and says why. Nothing to configure.
 - **Look and feel:**
   - Fonts shipped with the plugin.
   - Tokens scoped to the room.
@@ -30,6 +31,7 @@
 ## Next
 
 - [ ] **Scheduling, by hand and in the pictures.** The browser tests schedule, lock, unlock and go live against a real project. Still to do: try Preview on a locked document against a real site, and add the schedule panel and the locked room to `pnpm shots` and `pnpm vrt`.
+- [ ] **The rest of the Studio's locks.** Still to do: leave Publish out when a Studio has removed the publish action from `document.actions` (a replaced action that keeps the name can't be told apart); lock a document that is linked to Canvas; and try a role that can't edit, and a `readOnly` rule, by hand and in the browser tests, which need a second login and a type with a rule.
 - [ ] **Details when scheduling from Structure.** Studio's "Schedule publish" doesn't settle the slug or stamp the date as the room does. A plugin can't wrap it (Studio's own scheduled drafts plugin runs after every other and puts its action back), so the choice is an action a Studio adds in its own config, or leaving it.
 - [ ] **Try the room by hand in a real Studio** (writing, the Insert Menu on a `blockContent` body, publishing, Preview). Everything since the extraction is covered by tests and builds, not by someone writing in it.
 - [ ] **README screenshot or GIF**, and a **Sanity Exchange** listing.
