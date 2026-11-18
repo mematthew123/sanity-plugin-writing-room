@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Installs the packed plugin into a fresh Studio and checks it installs, dedupes, type-checks and
- * builds (also inside Next.js with `--embedded`).
+ * builds, with auto-updates off and on (also inside Next.js with `--embedded`).
  *
  * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded]
  * `--loose` ignores the plugin's peer range, to test whether it could be widened.
@@ -179,6 +179,15 @@ if (missing.length) {
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
 expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
+
+// An auto-updating Studio loads `sanity`, and the App SDK inside it, from Sanity's CDN. The bundle
+// must still carry one SDK: the copy the room makes its own instance from.
+writeFileSync(
+  join(studioDir, 'sanity.cli.ts'),
+  files['sanity.cli.ts'].replace('autoUpdates: false', 'autoUpdates: true'),
+)
+run('npx', ['sanity', 'build', '--yes'], studioDir)
+expectOneSdk(join(studioDir, 'dist'), 'the auto-updating Studio bundle')
 
 // 7. The same Studio embedded in a Next.js app.
 if (embedded) {
