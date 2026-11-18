@@ -35,6 +35,9 @@ const FORM_EXPORTS = [
   'useDocumentVersions',
   'useFeatureEnabled',
   'useScheduledDraftsEnabled',
+  // For a Studio's own action in Publish's place.
+  'GetHookCollectionState',
+  'isSanityDefinedAction',
 ]
 const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
 

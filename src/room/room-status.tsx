@@ -13,6 +13,7 @@ import {createContext, type ReactNode, useCallback, useContext, useEffect, useRe
 import {
   useClient,
   useCurrentUser,
+  useSchema,
   useSyncState,
   useValidationStatus,
 } from 'sanity'
@@ -21,6 +22,7 @@ import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
 import {formatGoLive, fromLocalInput, type Schedule, suggestedTime, toLocalInput} from '../lib/schedule'
+import {withoutReadOnly} from '../lib/lock'
 import {schedulePost, unlockPost} from '../lib/schedule-actions'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {addImageLabel, detailsPatch, readPublishable} from './fields'
@@ -69,7 +71,7 @@ export function RoomSyncProvider({handle, children}: {handle: DocumentHandle; ch
   return <RoomSynced.Provider value={proseSynced && !details.isSyncing}>{children}</RoomSynced.Provider>
 }
 
-const useRoomSynced = () => useContext(RoomSynced)
+export const useRoomSynced = () => useContext(RoomSynced)
 
 /** Offline, it stays until the connection returns. */
 export function SaveState() {
@@ -152,8 +154,17 @@ export function RoomMessage({
   return null
 }
 
-export function StatusLabel({status, schedule}: {status: PostStatus; schedule: Schedule}) {
-  return <Quiet>{statusText(status, schedule)}</Quiet>
+/** `readOnly` when the document takes no changes and the Writer can't unlock it. */
+export function StatusLabel({
+  status,
+  schedule,
+  readOnly = false,
+}: {
+  status: PostStatus
+  schedule: Schedule
+  readOnly?: boolean
+}) {
+  return <Quiet>{statusText(status, schedule, {readOnly})}</Quiet>
 }
 
 /** Never recedes: writing alongside someone without knowing is unsettling. */
@@ -173,7 +184,7 @@ export function Presence({handle}: {handle: DocumentHandle}) {
 }
 
 /** Long enough for a save, a read of the saved draft, and a validation of it. */
-const SETTLE_TIMEOUT_MS = 6000
+export const SETTLE_TIMEOUT_MS = 6000
 
 interface PublishPlan {
   details: PublishDetails
@@ -217,7 +228,7 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
-function useAskOnce(asking: boolean, cancel: () => void) {
+export function useAskOnce(asking: boolean, cancel: () => void) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
@@ -298,6 +309,15 @@ export function PublishButton({
   const [when, setWhen] = useState<string | null>(null)
   const [whenProblem, setWhenProblem] = useState(false)
   const isFirstPublish = status.label === 'Draft'
+  const schemaType = useSchema().get(handle.documentType)
+  const currentUser = useCurrentUser()
+  // The slug and the date a publish would write, less whatever the schema makes read-only: a
+  // locked document can still be published, as it can from the form, but not written to.
+  const writable = useCallback(
+    (details: PublishDetails, saved: SavedDraft | null | undefined) =>
+      withoutReadOnly(detailsPatch(details, kind.fields), schemaType, saved ?? undefined, currentUser),
+    [kind.fields, schemaType, currentUser],
+  )
 
   useEffect(() => {
     if (phase !== 'checking') return undefined
@@ -363,7 +383,8 @@ export function PublishButton({
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
         })
-        const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
+        const settled = fields.slug ? (writable(details, draft)[fields.slug] as PublishDetails['slug']) : undefined
+        const slug = fields.slug ? (settled?.current ?? basis.slug?.current) : undefined
         setPlan({details, slug, basis, url: site && slug ? liveUrl(site, slug, handle.documentType) : null})
         onProblem(null)
         setPhase('confirming')
@@ -372,7 +393,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, writable, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
@@ -412,10 +433,7 @@ export function PublishButton({
         onProblem(`This ${kind.singular} changed while you were deciding. Publish again to schedule it as it is now.`)
         return
       }
-      const patch = detailsPatch(
-        details.publishedAt ? {...details, publishedAt: at.toISOString()} : details,
-        kind.fields,
-      )
+      const patch = writable(details.publishedAt ? {...details, publishedAt: at.toISOString()} : details, saved)
       await schedulePost(client, {
         documentId: handle.documentId,
         publishAt: at,
@@ -438,10 +456,7 @@ export function PublishButton({
       const saved = await savedIfPlanStands(basis)
       if (saved === null) return
       // The date is when the Writer said yes, not when the room asked.
-      const patch = detailsPatch(
-        details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details,
-        fields,
-      )
+      const patch = writable(details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details, saved)
       const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
       await apply([...edit, publishDocument(handle)])
       onProblem(null)
@@ -735,7 +750,7 @@ const Message = styled.p<{$caution?: boolean}>`
   }
 `
 
-const PublishPill = styled.button`
+export const PublishPill = styled.button`
   min-height: 2.25rem;
   padding: var(--calm-space-sm) var(--calm-space-md);
   border: 0;
@@ -788,12 +803,12 @@ const NoticeLink = styled.a`
   }
 `
 
-const Confirm = styled(FloatingSurface)`
+export const Confirm = styled(FloatingSurface)`
   width: min(24rem, calc(100vw - 24px));
   padding: var(--calm-space-lg);
 `
 
-const ConfirmTitle = styled.h2`
+export const ConfirmTitle = styled.h2`
   margin: 0 0 var(--calm-space-sm);
   font-family: var(--calm-font-prose);
   font-size: 1.375rem;
@@ -802,7 +817,7 @@ const ConfirmTitle = styled.h2`
   text-wrap: balance;
 `
 
-const ConfirmText = styled.p`
+export const ConfirmText = styled.p`
   margin: 0;
   color: var(--calm-color-ink-muted);
 `
@@ -815,7 +830,7 @@ const Where = styled.p`
   overflow-wrap: anywhere;
 `
 
-const ConfirmActions = styled.div`
+export const ConfirmActions = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;

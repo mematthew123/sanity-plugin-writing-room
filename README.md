@@ -223,6 +223,37 @@ Four things worth knowing:
 - A document unlocked in the room is not listed under Studio's Paused tab: the room removes the schedule rather than pausing it.
 - Scheduling takes three requests to Sanity. If your connection drops between them, the room tells the Writer the document isn't scheduled rather than guessing.
 
+## Locked documents
+
+There is nothing to set up here either. The room takes no changes wherever your Studio's own form wouldn't, and says why when the Writer types:
+
+- **Roles.** Someone whose role can't change a document can read it in the room: the title, the body and Details. Someone who can write but not publish gets the room without the Publish button.
+- **`readOnly` in your schema.** On the document type, it locks the whole room. On the title or the body field, it locks that field and leaves the rest. A function works as it does in the form, so a rule such as `readOnly: ({document}) => document?.status === 'approved'` or one that looks at `currentUser` locks and opens the room as the answer changes.
+- **A schedule.** See [Scheduling](#scheduling). It is the one lock the Writer can lift from the room.
+
+If your workflow locks documents some other way (a state kept in a separate document, or a custom input that refuses changes), say it with `readOnly` in the schema. The room and the standard form both follow that.
+
+A read-only document type can still be published from the room, as it can from the form: locking after approval and then publishing is a common workflow. The publish then writes nothing to it: the room, and the plugin's wrapper around Publish in the form, leave the slug and the published date as they are wherever the type or that field is read-only, so settle them before the document locks. The room doesn't yet notice a document linked to Canvas.
+
+## Your own action instead of Publish
+
+If your Studio changes `document.actions` for a type the room writes, the room follows. Its one button is whatever the form's main button would be: the first action in the list that has something to show.
+
+- **Publish left alone:** the room's own Publish, with its check, its one question and scheduling.
+- **Your action first** ("Request review"): the room shows that action, with its label, and runs it as the form does. A disabled action is disabled in the room, with its `title` as the reason. An action that returns `null`, or one in the `paneActions` group only, is passed over for the next one.
+- **Publish removed, nothing in its place:** no button.
+
+An action's `confirm` dialog is asked in the room's own panel, under the button; a `popover` opens there too. A `dialog` or `custom` dialog opens over the room with your content in it.
+
+Four things worth knowing:
+
+- Before your action runs, the room waits until the latest words are saved. It doesn't run its own publish check, settle the slug or stamp the published date, and it doesn't offer scheduling: the action is yours, and so is what it does.
+- An action written for the form may not run in the room: one that calls `useDocumentPane`, for instance. The room then shows **Open in Structure** in its place.
+- The room tells your Publish from Sanity's by whether this plugin's wrapper is still on it. A Publish replaced in your Studio's own `document.actions`, or by a plugin listed after `writingRoom()`, is yours. One replaced by a plugin listed *before* `writingRoom()` and still marked `action: 'publish'` looks like Sanity's, and the room publishes on its own: list that plugin after this one. A later plugin that *wraps* Sanity's Publish, as this one does, also counts as yours; Sanity's Publish only runs in the form, so the room shows **Open in Structure**.
+- A scheduled document shows Unlock, not your action, until it's unlocked.
+
+If your action moves the document to a state that a `readOnly` rule in your schema looks at, the room locks as soon as it has run.
+
 ## Preview on your site
 
 Preview opens the document on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:

@@ -76,6 +76,11 @@ export function BodyEditor({
     return () => subscriptions.forEach((subscription) => subscription.unsubscribe())
   }, [editor])
 
+  // The editor is made read-only or not once; a lock that comes or goes later is told to it here.
+  useEffect(() => {
+    editor.send({type: 'update readOnly', readOnly})
+  }, [editor, readOnly])
+
   const [settings] = useRoomSettings()
   useTypewriterScrolling(settings.typewriter && focused)
   const focusKey = useEditorSelector(editor, (snapshot) => getFocusBlock(snapshot)?.node._key)

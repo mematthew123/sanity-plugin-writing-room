@@ -27,7 +27,16 @@ export function describePostStatus(status: DocumentEditStatus | undefined): Post
 export function statusText(
   status: PostStatus,
   schedule: Schedule,
-  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string} = {},
+  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string; readOnly?: boolean} = {},
+): string {
+  const text = scheduleText(status, schedule, options)
+  return options.readOnly ? `${text} · read only` : text
+}
+
+function scheduleText(
+  status: PostStatus,
+  schedule: Schedule,
+  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string},
 ): string {
   switch (schedule.kind) {
     case 'none':
