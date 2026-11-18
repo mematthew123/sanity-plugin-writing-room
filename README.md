@@ -240,7 +240,7 @@ A read-only document type can still be published from the room, as it can from t
 If your Studio changes `document.actions` for a type the room writes, the room follows. Its one button is whatever the form's main button would be: the first action in the list that has something to show.
 
 - **Publish left alone:** the room's own Publish, with its check, its one question and scheduling.
-- **Your action first** ("Request review"): the room shows that action, with its label, and runs it as the form does. A disabled action is disabled in the room, with its `title` as the reason. An action that returns `null` is passed over for the next one.
+- **Your action first** ("Request review"): the room shows that action, with its label, and runs it as the form does. A disabled action is disabled in the room, with its `title` as the reason. An action that returns `null`, or one in the `paneActions` group only, is passed over for the next one.
 - **Publish removed, nothing in its place:** no button.
 
 An action's `confirm` dialog is asked in the room's own panel, under the button; a `popover` opens there too. A `dialog` or `custom` dialog opens over the room with your content in it.

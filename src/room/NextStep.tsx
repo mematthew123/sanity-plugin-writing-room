@@ -139,13 +139,18 @@ function StudioSteps({
   return (
     <GetHookCollectionState<DocumentActionProps, StepState> hooks={hooks} args={args} resetRef={reset}>
       {({states}) => {
-        const next = nextStep(steps, (_step, index) => states.some((state) => state.writingRoomStep === index))
+        // The form's main button only takes actions in its `default` group, which is where an
+        // action without a group goes. One meant for the pane's menu alone is passed over.
+        const forTheButton = states.filter((state) => (state.group ?? ['default']).includes('default'))
+        const next = nextStep(steps, (_step, index) => forTheButton.some((state) => state.writingRoomStep === index))
         if (!next || next.step.kind === 'builtin') return null
         if (next.step.kind === 'room') return publish
-        const state = states.find((candidate) => candidate.writingRoomStep === next.index)
+        const state = forTheButton.find((candidate) => candidate.writingRoomStep === next.index)
         if (!state) return null
         return (
           <StudioActionButton
+            // Another action taking this one's place starts afresh: it was never clicked.
+            key={`${handle.documentId}:${next.index}`}
             handle={handle}
             state={state}
             draftRevision={editState.draft?._rev ?? null}
@@ -182,6 +187,8 @@ function StudioActionButton({
   // The Prose saves through another store than the one the action reads. So before the action
   // runs, the room waits for its words to be saved and for the Studio's store to have them.
   const [settling, setSettling] = useState(false)
+  // The saved draft's revision, kept only while it was read with the room saved and the Studio's
+  // draft as it is now. Anything read before a later save, or a later draft, says nothing.
   const [savedRevision, setSavedRevision] = useState<string | null | undefined>(undefined)
 
   useEffect(() => {
@@ -193,7 +200,14 @@ function StudioActionButton({
     return () => clearTimeout(timer)
   }, [settling, onProblem])
 
+  // A click is on the action as it was. If it has since become disabled, the click is off.
+  const disabled = !!state.disabled
   useEffect(() => {
+    if (settling && disabled) setSettling(false)
+  }, [settling, disabled])
+
+  useEffect(() => {
+    setSavedRevision(undefined)
     if (!settling || !isSynced) return undefined
     let superseded = false
     client.getDocument<{_rev?: string}>(`drafts.${handle.documentId}`).then(
@@ -215,6 +229,7 @@ function StudioActionButton({
     if (!settling || !isSynced || savedRevision === undefined || savedRevision !== draftRevision) return
     setSettling(false)
     setSavedRevision(undefined)
+    if (latest.current.disabled) return
     onProblem(null)
     latest.current.onHandle?.()
   }, [settling, isSynced, savedRevision, draftRevision, onProblem])
@@ -241,7 +256,6 @@ function StudioActionButton({
         aria-expanded={anchored ? true : undefined}
         onClick={() => {
           if (anchored) return close()
-          setSavedRevision(undefined)
           setSettling(true)
         }}
       >
