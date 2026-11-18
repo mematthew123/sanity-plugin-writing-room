@@ -1,11 +1,12 @@
 import {toScopedCss} from '../tokens'
-import {Suspense, useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {type Tool, useColorSchemeValue} from 'sanity'
 import {useRouter} from 'sanity/router'
 import {type WritingRoomConfig, WritingRoomConfigProvider} from '../config'
 import {Lobby} from './Lobby'
 import {Surface} from './primitives'
 import {Room} from './Room'
+import {RoomSdkProvider} from './RoomSdk'
 import {SetupProblemBoundary} from './SetupProblem'
 import {openedDocument} from './room-route'
 
@@ -55,13 +56,13 @@ export function WritingRoomTool({tool}: {tool: Tool<WritingRoomConfig>}) {
       )}
       <Surface data-scheme={scheme} data-calm-surface="">
         <SetupProblemBoundary>
-          <Suspense fallback={null}>
+          <RoomSdkProvider>
             {opened ? (
               <Room key={opened.documentId} documentId={opened.documentId} documentType={opened.documentType} />
             ) : (
               <Lobby />
             )}
-          </Suspense>
+          </RoomSdkProvider>
         </SetupProblemBoundary>
       </Surface>
     </WritingRoomConfigProvider>
