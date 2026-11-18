@@ -104,6 +104,31 @@ export function schemaReadOnly(
 }
 
 /**
+ * A patch with every field the schema makes read-only left out, and nothing at all for a
+ * read-only document type. Publishing settles a slug and stamps a date; a lock is still a lock,
+ * so the room writes neither where the Studio's form wouldn't let the Writer.
+ */
+export function withoutReadOnly<Value>(
+  patch: Record<string, Value>,
+  schemaType: TypeWithReadOnly | undefined,
+  document: Record<string, unknown> | undefined,
+  currentUser: unknown,
+): Record<string, Value> {
+  const names = Object.keys(patch)
+  if (names.length === 0) return patch
+  if (applies(schemaType?.readOnly, {document, parent: undefined, value: document, currentUser, path: []})) {
+    return {}
+  }
+  const writable: Record<string, Value> = {}
+  for (const name of names) {
+    const rule = schemaType?.fields?.find((candidate) => candidate.name === name)?.type.readOnly
+    const locked = applies(rule, {document, parent: document, value: document?.[name], currentUser, path: [name]})
+    if (!locked) writable[name] = patch[name] as Value
+  }
+  return writable
+}
+
+/**
  * The one line typing gets when it lands somewhere that takes no changes, or null where it's
  * welcome. Voice per DESIGN.md.
  */

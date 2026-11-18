@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {lockFor, lockNotice, schemaReadOnly} from './lock'
+import {lockFor, lockNotice, schemaReadOnly, withoutReadOnly} from './lock'
 import {NOT_SCHEDULED, type Schedule} from './schedule'
 
 const OPEN = {document: false, title: false, body: false}
@@ -143,6 +143,35 @@ describe('schemaReadOnly', () => {
         null,
       ).document,
     ).toBe(false)
+  })
+})
+
+describe('withoutReadOnly', () => {
+  const type = (readOnly: unknown, fieldRules: Record<string, unknown> = {}) => ({
+    readOnly,
+    fields: ['title', 'slug', 'publishedAt'].map((name) => ({name, type: {readOnly: fieldRules[name]}})),
+  })
+  const patch = {slug: {current: 'hello'}, publishedAt: '2026-11-18T12:00:00.000Z'}
+
+  it('leaves a patch alone where nothing is read-only', () => {
+    expect(withoutReadOnly(patch, type(undefined), {}, null)).toEqual(patch)
+  })
+
+  it('writes nothing to a read-only document type', () => {
+    expect(withoutReadOnly(patch, type(true), {}, null)).toEqual({})
+    const approved = ({document}: {document?: Record<string, unknown>}) => document?.status === 'approved'
+    expect(withoutReadOnly(patch, type(approved), {status: 'approved'}, null)).toEqual({})
+    expect(withoutReadOnly(patch, type(approved), {status: 'draft'}, null)).toEqual(patch)
+  })
+
+  it('leaves out only the field that is read-only', () => {
+    expect(withoutReadOnly(patch, type(undefined, {slug: true}), {}, null)).toEqual({
+      publishedAt: patch.publishedAt,
+    })
+  })
+
+  it('doesn’t mind a locked title or body: publishing never writes them', () => {
+    expect(withoutReadOnly(patch, type(undefined, {title: true}), {}, null)).toEqual(patch)
   })
 })
 

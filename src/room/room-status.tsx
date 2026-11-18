@@ -13,6 +13,7 @@ import {createContext, type ReactNode, useCallback, useContext, useEffect, useRe
 import {
   useClient,
   useCurrentUser,
+  useSchema,
   useSyncState,
   useValidationStatus,
 } from 'sanity'
@@ -21,6 +22,7 @@ import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
 import {formatGoLive, fromLocalInput, type Schedule, suggestedTime, toLocalInput} from '../lib/schedule'
+import {withoutReadOnly} from '../lib/lock'
 import {schedulePost, unlockPost} from '../lib/schedule-actions'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {addImageLabel, detailsPatch, readPublishable} from './fields'
@@ -307,6 +309,15 @@ export function PublishButton({
   const [when, setWhen] = useState<string | null>(null)
   const [whenProblem, setWhenProblem] = useState(false)
   const isFirstPublish = status.label === 'Draft'
+  const schemaType = useSchema().get(handle.documentType)
+  const currentUser = useCurrentUser()
+  // The slug and the date a publish would write, less whatever the schema makes read-only: a
+  // locked document can still be published, as it can from the form, but not written to.
+  const writable = useCallback(
+    (details: PublishDetails, saved: SavedDraft | null | undefined) =>
+      withoutReadOnly(detailsPatch(details, kind.fields), schemaType, saved ?? undefined, currentUser),
+    [kind.fields, schemaType, currentUser],
+  )
 
   useEffect(() => {
     if (phase !== 'checking') return undefined
@@ -372,7 +383,8 @@ export function PublishButton({
           isFirstPublish,
           isTaken: slugTakenByAnother(client, handle.documentType, fields.slug, handle.documentId),
         })
-        const slug = fields.slug ? (details.slug?.current ?? basis.slug?.current) : undefined
+        const settled = fields.slug ? (writable(details, draft)[fields.slug] as PublishDetails['slug']) : undefined
+        const slug = fields.slug ? (settled?.current ?? basis.slug?.current) : undefined
         setPlan({details, slug, basis, url: site && slug ? liveUrl(site, slug, handle.documentType) : null})
         onProblem(null)
         setPhase('confirming')
@@ -381,7 +393,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, writable, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
@@ -421,10 +433,7 @@ export function PublishButton({
         onProblem(`This ${kind.singular} changed while you were deciding. Publish again to schedule it as it is now.`)
         return
       }
-      const patch = detailsPatch(
-        details.publishedAt ? {...details, publishedAt: at.toISOString()} : details,
-        kind.fields,
-      )
+      const patch = writable(details.publishedAt ? {...details, publishedAt: at.toISOString()} : details, saved)
       await schedulePost(client, {
         documentId: handle.documentId,
         publishAt: at,
@@ -447,10 +456,7 @@ export function PublishButton({
       const saved = await savedIfPlanStands(basis)
       if (saved === null) return
       // The date is when the Writer said yes, not when the room asked.
-      const patch = detailsPatch(
-        details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details,
-        fields,
-      )
+      const patch = writable(details.publishedAt ? {...details, publishedAt: new Date().toISOString()} : details, saved)
       const edit = Object.keys(patch).length > 0 ? [editDocument(handle, {set: patch})] : []
       await apply([...edit, publishDocument(handle)])
       onProblem(null)

@@ -233,7 +233,7 @@ There is nothing to set up here either. The room takes no changes wherever your 
 
 If your workflow locks documents some other way (a state kept in a separate document, or a custom input that refuses changes), say it with `readOnly` in the schema. The room and the standard form both follow that.
 
-A read-only document type can still be published from the room, as it can from the form: locking after approval and then publishing is a common workflow. The room doesn't yet notice a document linked to Canvas.
+A read-only document type can still be published from the room, as it can from the form: locking after approval and then publishing is a common workflow. The publish then writes nothing to it: the room, and the plugin's wrapper around Publish in the form, leave the slug and the published date as they are wherever the type or that field is read-only, so settle them before the document locks. The room doesn't yet notice a document linked to Canvas.
 
 ## Your own action instead of Publish
 

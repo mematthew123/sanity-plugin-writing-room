@@ -185,9 +185,11 @@ function LoadedRoom({
       const onThePage = target === document.body || !!page.current?.contains(target)
       if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
       if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
+      const inTitle = !!target?.closest('[data-calm-field="title"]')
       // With one field locked, Details is still the Writer's to change, and so is the other field.
-      if (!locked && (inDetails || target?.closest('[data-calm-details]'))) return
-      const text = target?.closest('[data-calm-field="title"]') ? titleNotice : bodyNotice
+      // The title stays above Details, so typing in it there is still answered.
+      if (!locked && !inTitle && (inDetails || target?.closest('[data-calm-details]'))) return
+      const text = inTitle ? titleNotice : bodyNotice
       if (text) setNotice((current) => (current?.text === text ? current : {text}))
     }
     window.addEventListener('keydown', explain)

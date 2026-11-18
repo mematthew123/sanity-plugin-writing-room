@@ -1,5 +1,6 @@
 import {type DocumentActionComponent, type DocumentActionsContext, useDocumentOperation} from 'sanity'
 import {API_VERSION} from '../lib/api-version'
+import {withoutReadOnly} from '../lib/lock'
 import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {detailsPatch, readPublishable, type WritingFields} from '../room/fields'
@@ -34,7 +35,13 @@ export function withPostDetailsOnPublish(
           isFirstPublish: !props.published,
           isTaken: slugTakenByAnother(client, props.type, fields.slug, props.id),
         })
-        const set = detailsPatch(details, fields)
+        // A slug or a date the schema makes read-only isn't written, here or in the room.
+        const set = withoutReadOnly(
+          detailsPatch(details, fields),
+          context.schema.get(props.type),
+          document,
+          context.currentUser,
+        )
         if (Object.keys(set).length > 0) patch.execute([{set}])
         result.onHandle?.()
       },
