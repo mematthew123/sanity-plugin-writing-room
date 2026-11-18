@@ -4,6 +4,14 @@ import {detailsForPublish} from '../lib/publish-details'
 import {slugTakenByAnother} from '../lib/slug-availability'
 import {detailsPatch, readPublishable, type WritingFields} from '../room/fields'
 
+const roomPublishActions = new WeakSet<DocumentActionComponent>()
+
+/**
+ * Whether an action is Publish as this plugin wrapped it. If a Studio has put something else in
+ * its place, the room offers that instead of its own Publish.
+ */
+export const isRoomPublishAction = (action: DocumentActionComponent): boolean => roomPublishActions.has(action)
+
 /** Fills in the same slug and published date as publishing from the room. */
 export function withPostDetailsOnPublish(
   original: DocumentActionComponent,
@@ -34,5 +42,6 @@ export function withPostDetailsOnPublish(
   }
   PublishPostAction.action = original.action
   PublishPostAction.displayName = 'PublishPostAction'
+  roomPublishActions.add(PublishPostAction)
   return PublishPostAction
 }

@@ -69,7 +69,7 @@ export function RoomSyncProvider({handle, children}: {handle: DocumentHandle; ch
   return <RoomSynced.Provider value={proseSynced && !details.isSyncing}>{children}</RoomSynced.Provider>
 }
 
-const useRoomSynced = () => useContext(RoomSynced)
+export const useRoomSynced = () => useContext(RoomSynced)
 
 /** Offline, it stays until the connection returns. */
 export function SaveState() {
@@ -182,7 +182,7 @@ export function Presence({handle}: {handle: DocumentHandle}) {
 }
 
 /** Long enough for a save, a read of the saved draft, and a validation of it. */
-const SETTLE_TIMEOUT_MS = 6000
+export const SETTLE_TIMEOUT_MS = 6000
 
 interface PublishPlan {
   details: PublishDetails
@@ -226,7 +226,7 @@ function useValidated({isValidating, revision}: {isValidating: boolean; revision
   return !isValidating && revision !== undefined && settled === revision
 }
 
-function useAskOnce(asking: boolean, cancel: () => void) {
+export function useAskOnce(asking: boolean, cancel: () => void) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null)
   const button = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
@@ -744,7 +744,7 @@ const Message = styled.p<{$caution?: boolean}>`
   }
 `
 
-const PublishPill = styled.button`
+export const PublishPill = styled.button`
   min-height: 2.25rem;
   padding: var(--calm-space-sm) var(--calm-space-md);
   border: 0;
@@ -797,12 +797,12 @@ const NoticeLink = styled.a`
   }
 `
 
-const Confirm = styled(FloatingSurface)`
+export const Confirm = styled(FloatingSurface)`
   width: min(24rem, calc(100vw - 24px));
   padding: var(--calm-space-lg);
 `
 
-const ConfirmTitle = styled.h2`
+export const ConfirmTitle = styled.h2`
   margin: 0 0 var(--calm-space-sm);
   font-family: var(--calm-font-prose);
   font-size: 1.375rem;
@@ -811,7 +811,7 @@ const ConfirmTitle = styled.h2`
   text-wrap: balance;
 `
 
-const ConfirmText = styled.p`
+export const ConfirmText = styled.p`
   margin: 0;
   color: var(--calm-color-ink-muted);
 `
@@ -824,7 +824,7 @@ const Where = styled.p`
   overflow-wrap: anywhere;
 `
 
-const ConfirmActions = styled.div`
+export const ConfirmActions = styled.div`
   display: flex;
   flex-wrap: wrap;
   align-items: center;

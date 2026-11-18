@@ -28,6 +28,7 @@ import {useRoomLock} from './use-lock'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
 import {lockNotice} from '../lib/lock'
 import {type Schedule} from '../lib/schedule'
+import {NextStep} from './NextStep'
 import {PreviewButton} from './PreviewButton'
 import {
   Column,
@@ -240,15 +241,24 @@ function LoadedRoom({
                       onUnlocked={setPreviousTime}
                     />
                   )}
-                  {schedule.kind === 'none' && lock.canPublish && (
-                    <PublishButton
+                  {schedule.kind === 'none' && (
+                    <NextStep
                       handle={handle}
-                      status={status}
                       scheme={scheme}
-                      canSchedule={canSchedule}
-                      previousTime={previousTime}
                       onProblem={onProblem}
-                      onNotice={setNotice}
+                      publish={
+                        lock.canPublish && (
+                          <PublishButton
+                            handle={handle}
+                            status={status}
+                            scheme={scheme}
+                            canSchedule={canSchedule}
+                            previousTime={previousTime}
+                            onProblem={onProblem}
+                            onNotice={setNotice}
+                          />
+                        )
+                      }
                     />
                   )}
                 </Recedes>
