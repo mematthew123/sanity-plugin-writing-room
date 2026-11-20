@@ -15,6 +15,7 @@ import styled from 'styled-components'
 import {isRoomPublishAction} from '../actions/publish-post'
 import {API_VERSION} from '../lib/api-version'
 import {nextStep, type Step, type StepKind, stepsToConsider} from '../lib/next-step'
+import {readLetsActionRun, type SavedRead} from '../lib/saved-read'
 import {Floating} from './editor/floating'
 import {useOpenInStructure} from './navigation'
 import {OpenInWritingRoomAction} from './OpenInWritingRoomAction'
@@ -187,9 +188,12 @@ function StudioActionButton({
   // The Prose saves through another store than the one the action reads. So before the action
   // runs, the room waits for its words to be saved and for the Studio's store to have them.
   const [settling, setSettling] = useState(false)
-  // The saved draft's revision, kept only while it was read with the room saved and the Studio's
-  // draft as it is now. Anything read before a later save, or a later draft, says nothing.
-  const [savedRevision, setSavedRevision] = useState<string | null | undefined>(undefined)
+  // The saved draft's revision, with the lookup that read it. A lookup starts whenever the room's
+  // sync state or the Studio's draft changes, and only the one under way counts: anything read
+  // before a later save, or a later draft, says nothing. The ref changes in the lookup effect, which
+  // runs before the one that acts, so an old read stops counting in the same render.
+  const [savedRead, setSavedRead] = useState<SavedRead | null>(null)
+  const lookup = useRef<object | null>(null)
 
   useEffect(() => {
     if (!settling) return undefined
@@ -207,32 +211,33 @@ function StudioActionButton({
   }, [settling, disabled])
 
   useEffect(() => {
-    setSavedRevision(undefined)
+    const started = {}
+    lookup.current = started
+    setSavedRead(null)
     if (!settling || !isSynced) return undefined
-    let superseded = false
     client.getDocument<{_rev?: string}>(`drafts.${handle.documentId}`).then(
       (saved) => {
-        if (!superseded) setSavedRevision(saved?._rev ?? null)
+        if (lookup.current === started) setSavedRead({lookup: started, revision: saved?._rev ?? null})
       },
       () => {
-        if (superseded) return
+        if (lookup.current !== started) return
         setSettling(false)
         onProblem('That couldn’t be done just now. Try again in a moment.')
       },
     )
     return () => {
-      superseded = true
+      if (lookup.current === started) lookup.current = null
     }
   }, [settling, isSynced, draftRevision, client, handle.documentId, onProblem])
 
   useEffect(() => {
-    if (!settling || !isSynced || savedRevision === undefined || savedRevision !== draftRevision) return
+    if (!settling || !isSynced || !readLetsActionRun(savedRead, lookup.current, draftRevision)) return
     setSettling(false)
-    setSavedRevision(undefined)
+    setSavedRead(null)
     if (latest.current.disabled) return
     onProblem(null)
     latest.current.onHandle?.()
-  }, [settling, isSynced, savedRevision, draftRevision, onProblem])
+  }, [settling, isSynced, savedRead, draftRevision, onProblem])
 
   const dialog = state.dialog || null
   // A question or a popover sits under the button, like the room's own; anything bigger is the Studio's.
