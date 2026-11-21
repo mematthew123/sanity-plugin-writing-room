@@ -26,7 +26,7 @@ export const test = base.extend<{
   content: SanityClient
   /** Makes a draft Post for this test alone and removes it, published copy included, afterwards. */
   makePost: (options?: {
-    type?: 'post' | 'fieldNote'
+    type?: 'post' | 'fieldNote' | 'lockedNote' | 'reviewNote' | 'noPublishNote' | 'formOnlyNote'
     paragraphs?: number
     fields?: Record<string, unknown>
   }) => Promise<TestPost>

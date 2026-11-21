@@ -2,6 +2,8 @@ import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
 // From source, so edits reload live and the Studio shares one copy of the App SDK.
 import {fieldNote} from './e2e/field-note'
+import {lockNoteActions} from './e2e/lock-note-actions'
+import {lockNotes} from './e2e/lock-notes'
 import {testPictures} from './e2e/test-pictures'
 import {writingRoom, writingRoomSchemaTypes} from './src'
 import {writingRoomTheme} from './src/theme'
@@ -19,14 +21,17 @@ export default defineConfig({
     structureTool(),
     writingRoom({
       // The Field Note is there for the browser tests; see e2e/field-note.ts.
-      types: ['post', 'fieldNote'],
+      // The four notes after it are for the Studio's own locks and actions; see e2e/lock-notes.ts.
+      types: ['post', 'fieldNote', 'lockedNote', 'reviewNote', 'noPublishNote', 'formOnlyNote'],
       // Set SANITY_STUDIO_PREVIEW_ORIGIN to a site with a draft-mode route to try Preview.
       preview: process.env.SANITY_STUDIO_PREVIEW_ORIGIN
         ? {origin: process.env.SANITY_STUDIO_PREVIEW_ORIGIN}
         : undefined,
     }),
   ],
-  schema: {types: [...writingRoomSchemaTypes, fieldNote]},
+  schema: {types: [...writingRoomSchemaTypes, fieldNote, ...lockNotes]},
+  // After the plugin's, so these are a Studio's own; see e2e/lock-note-actions.tsx.
+  document: {actions: lockNoteActions},
   // A second image source is there for the browser tests; see e2e/test-pictures.tsx.
   form: {image: {assetSources: (previous) => [...previous, testPictures]}},
   theme: writingRoomTheme,
