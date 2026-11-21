@@ -19,6 +19,7 @@ import {
 import styled, {keyframes} from 'styled-components'
 import {useWritingRoomConfig} from '../config'
 import {API_VERSION} from '../lib/api-version'
+import {checkHold, holdSentence, type HoldVerdict} from '../lib/holds'
 import {detailsForPublish, type PublishDetails} from '../lib/publish-details'
 import {formatGoLive, fromLocalInput, type Schedule, suggestedTime, toLocalInput} from '../lib/schedule'
 import {schedulePost, unlockPost} from '../lib/schedule-actions'
@@ -152,8 +153,17 @@ export function RoomMessage({
   return null
 }
 
-export function StatusLabel({status, schedule}: {status: PostStatus; schedule: Schedule}) {
-  return <Quiet>{statusText(status, schedule)}</Quiet>
+export function StatusLabel({
+  status,
+  schedule,
+  held = false,
+}: {
+  status: PostStatus
+  schedule: Schedule
+  /** A workflow is holding a publish that the schedule will make anyway. */
+  held?: boolean
+}) {
+  return <Quiet>{statusText(status, schedule, {held})}</Quiet>
 }
 
 /** Never recedes: writing alongside someone without knowing is unsettling. */
@@ -287,6 +297,8 @@ export function PublishButton({
   const validation = useValidationStatus(`drafts.${handle.documentId}`, handle.documentType)
   const settled = useValidated(validation)
   const [draft, setDraft] = useState<SavedDraft | null>(null)
+  const [hold, setHold] = useState<HoldVerdict | null>(null)
+  const identity = useCurrentUser()?.id
   const {openDetails} = useRoomView(handle)
   const kind = useWritingKind(handle.documentType)
   const {preview: site} = useWritingRoomConfig()
@@ -304,6 +316,24 @@ export function PublishButton({
     const timer = setTimeout(() => setTimedOut(true), SETTLE_TIMEOUT_MS)
     return () => clearTimeout(timer)
   }, [phase])
+
+  // Whether a workflow is holding the document, asked afresh on each press: Holds come and go as
+  // other people move the workflow along.
+  useEffect(() => {
+    if (phase !== 'checking') return undefined
+    let superseded = false
+    void checkHold(client, {
+      action: 'publish',
+      documentId: handle.documentId,
+      documentType: handle.documentType,
+      identity,
+    }).then((verdict) => {
+      if (!superseded) setHold(verdict)
+    })
+    return () => {
+      superseded = true
+    }
+  }, [phase, client, handle.documentId, handle.documentType, identity])
 
   // The draft as it is saved, read again whenever validation moves on to another revision. Both
   // stores write to it, so only the server knows which revision is the latest.
@@ -327,11 +357,19 @@ export function PublishButton({
 
   useEffect(() => {
     if (phase !== 'checking') return
+    // A held document isn't asked to pass anything else first: nothing the Writer fixes would
+    // let it be published.
+    const held = hold ? holdSentence(hold, kind.singular, 'publish') : null
+    if (held) {
+      setPhase('idle')
+      onProblem(held)
+      return
+    }
     // Two things make validation a verdict on what would be published. It has settled: `revision`
     // moves on the moment the draft does, before the markers do. And its revision is the saved
     // draft's: the Prose saves through another store, which the Studio's hears of a moment later.
     const validated = settled && !!draft?._rev && validation.revision === draft._rev
-    if (!isSynced || !draft || !validated) {
+    if (!isSynced || !draft || !validated || !hold) {
       // Never publish on stale sync or validation: the SDK's publish doesn't enforce the schema.
       if (timedOut) {
         setPhase('idle')
@@ -372,7 +410,7 @@ export function PublishButton({
         setPhase('idle')
       }
     })()
-  }, [phase, timedOut, isSynced, validation, settled, draft, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
+  }, [phase, timedOut, isSynced, validation, settled, draft, hold, isFirstPublish, client, handle, editor, openDetails, kind, site, onProblem])
 
   const cancel = useCallback(() => {
     setPhase('idle')
@@ -391,6 +429,21 @@ export function PublishButton({
     const now = readPublishable(saved, kind.fields)
     if (now.slug?.current !== basis.slug?.current || now.publishedAt !== basis.publishedAt) {
       onProblem(`This ${kind.singular}’s details changed while you were deciding. Publish again to use them.`)
+      return null
+    }
+    // The panel may have been open a while, and a workflow can take hold in that time.
+    const held = holdSentence(
+      await checkHold(client, {
+      action: 'publish',
+      documentId: handle.documentId,
+      documentType: handle.documentType,
+      identity,
+    }),
+      kind.singular,
+      'publish',
+    )
+    if (held) {
+      onProblem(held)
       return null
     }
     return saved
@@ -480,6 +533,7 @@ export function PublishButton({
           if (confirming) return cancel()
           setTimedOut(false)
           setDraft(null)
+          setHold(null)
           setPhase('checking')
         }}
       >

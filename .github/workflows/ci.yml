@@ -67,6 +67,8 @@ jobs:
           # The declared minimum (peerDependencies.sanity) and the newest release, which also
           # gets the Studio embedded in a Next.js app.
           - sanity: 6.22.0
+            # The oldest Workflows the room checks Holds with; the other row gets the newest.
+            flags: --workflows=0.39.0
           - sanity: latest
             flags: --embedded
     steps:

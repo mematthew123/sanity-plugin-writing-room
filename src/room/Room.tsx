@@ -8,7 +8,7 @@ import {
   useDocumentProjection,
 } from '@sanity/sdk-react'
 import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
+import {useClient, useColorSchemeValue, useCurrentUser, useDataset, useEditState, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import styled, {keyframes} from 'styled-components'
 import {DetailsBoundary} from './details/DetailsBoundary'
@@ -25,7 +25,10 @@ import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
+import {API_VERSION} from '../lib/api-version'
+import {checkHold, scheduledButHeld} from '../lib/holds'
 import {type Schedule} from '../lib/schedule'
+import {useScheduledHold} from './use-hold'
 import {PreviewButton} from './PreviewButton'
 import {
   Column,
@@ -169,12 +172,22 @@ function LoadedRoom({
       onProblem={onProblem}
     />
   )
+  const scheduledHeld = useScheduledHold(
+    handle,
+    schedule.kind === 'scheduled' ? schedule.releaseId : undefined,
+  )
   const lockedNotice =
     schedule.kind === 'none'
       ? null
-      : schedule.kind === 'scheduled'
-        ? `This ${kind.singular} is scheduled. Unlock it to make changes.`
-        : `This ${kind.singular} is locked. Unlock it to make changes.`
+      : scheduledHeld
+        ? scheduledButHeld(kind.singular)
+        : schedule.kind === 'scheduled'
+          ? `This ${kind.singular} is scheduled. Unlock it to make changes.`
+          : `This ${kind.singular} is locked. Unlock it to make changes.`
+  // Said without being asked: it will go live whether or not anyone presses anything.
+  useEffect(() => {
+    if (scheduledHeld) setNotice({text: scheduledButHeld(kind.singular)})
+  }, [scheduledHeld, kind.singular])
   useEffect(() => {
     if (!lockedNotice) return undefined
     const explain = (event: KeyboardEvent) => {
@@ -212,7 +225,7 @@ function LoadedRoom({
                 <SaveState />
                 <Recedes>
                   <WideOnly>
-                    <StatusLabel status={status} schedule={schedule} />
+                    <StatusLabel status={status} schedule={schedule} held={scheduledHeld} />
                   </WideOnly>
                   <RoomSettingsMenu
                     scheme={scheme}
@@ -387,19 +400,30 @@ function LeaveButton({
   const {draft: detailsDraft} = useEditState(handle.documentId, handle.documentType)
   const {fields} = useWritingKind(handle.documentType)
   const apply = useApplyDocumentActions()
+  const client = useClient({apiVersion: API_VERSION})
+  const identity = useCurrentUser()?.id
   const openInStructure = useOpenInStructure(handle)
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
     if (!locked && !isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
-      void apply(discardDocument(handle))
+      // Tidying up, not something the Writer asked for: under a workflow's hold on deleting, the
+      // empty document is simply left where it is.
+      void checkHold(client, {
+        action: 'discard',
+        documentId: handle.documentId,
+        documentType: handle.documentType,
+        identity,
+      }).then((verdict) => {
+        if (verdict.kind === 'clear') void apply(discardDocument(handle))
+      })
       router.navigate({})
     } else if (toForm) {
       openInStructure()
     } else {
       router.navigate({})
     }
-  }, [apply, handle, isPublished, locked, post, detailsDraft, fields, router, toForm, openInStructure])
+  }, [apply, client, identity, handle, isPublished, locked, post, detailsDraft, fields, router, toForm, openInStructure])
   useEscape(leave)
 
   const label = toForm ? 'Back to the form' : 'Back to the Lobby'

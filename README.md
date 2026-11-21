@@ -223,6 +223,24 @@ Four things worth knowing:
 - A document unlocked in the room is not listed under Studio's Paused tab: the room removes the schedule rather than pausing it.
 - Scheduling takes three requests to Sanity. If your connection drops between them, the room tells the Writer the document isn't scheduled rather than guessing.
 
+## Workflows
+
+There is nothing to set up. If your Studio uses [Sanity Workflows](https://www.sanity.io/docs/workflows/introduction) (early access), the room respects a workflow's holds: where a stage [holds publishing](https://www.sanity.io/docs/workflows/guards), Structure's Publish is disabled, and the room's Publish is refused for the same reason.
+
+- **Publish and Schedule.** The Writer presses Publish and the room says "A workflow is holding this post. It can be published once the workflow allows it.", followed by the hold's `description` if its author wrote one. Scheduling is a publish agreed to now, so the same hold refuses it.
+- **Discard.** A hold on deleting keeps an empty document from being discarded, in the Lobby and on the way out of the room.
+- **Writing is never held.** Structure doesn't apply a workflow's `update` holds to its form, and the room doesn't either.
+- **Holds only.** The room knows nothing of stages, activities or assignments. Those are in Structure, under the document's Workflows view.
+
+Four things worth knowing:
+
+- **A workflow nobody started holds nothing.** The Workflows plugin's `autoStart` runs when a document is created in Structure's form. A document started in the room doesn't go through it, so its workflow hasn't begun and nothing holds it. Start the workflow from Structure for documents that begin in the room.
+- **A document scheduled before it was held still goes live.** Sanity publishes a scheduled draft whatever a workflow says. The room can't stop that, so it says so, in the status and when the document is opened, and Unlock takes it off the schedule.
+- **Holds are advisory**, here as everywhere: Sanity doesn't enforce them in the Content Lake yet, so a script with a token can still publish. Use [roles](https://www.sanity.io/docs/content-lake/roles-concepts) for rules nobody may get round.
+- **When a hold can't be read.** If a hold is there and the room can't weigh it (a Workflows release newer than the room understands), it refuses and points to Structure. If the room can't read holds at all (a role without access to them), it publishes as it would without workflows.
+
+The room checks holds with `@sanity/workflows`, which current versions of the Sanity CLI already install alongside a Studio. It's loaded only for a document that has a hold.
+
 ## Preview on your site
 
 Preview opens the document on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:
@@ -281,13 +299,15 @@ Either way the site needs a Viewer token to check the secret, and its origin mus
 1. it installs with no peer-dependency conflicts,
 2. there's exactly one copy of `@sanity/sdk-react`, `@sanity/sdk`, `@portabletext/editor`, `react` and `styled-components`, and of every `@portabletext/*` package,
 3. a `sanity.config.ts` using the plugin and its theme type-checks against the published types,
-4. `sanity build` bundles the Studio with exactly one copy of the App SDK,
-5. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
+4. there's exactly one copy of `@sanity/workflows`, and it still exports what the room checks a workflow's holds with,
+5. `sanity build` bundles the Studio with exactly one copy of the App SDK,
+6. with `--embedded`, the same Studio embedded in a Next.js App Router app (`next-sanity`'s `NextStudio`) builds too, again with one App SDK in the browser bundle.
 
 ```sh
 pnpm smoke                      # latest sanity
 pnpm smoke latest --embedded   # …and embedded in Next.js
 pnpm smoke 6.12.0 --loose      # an older one, ignoring the declared range
+pnpm smoke 6.22.0 --workflows=0.39.0   # with the oldest Workflows the room supports
 ```
 
 CI runs it on every pull request against the declared minimum (6.22.0) and the latest release, embedded too.
@@ -317,6 +337,8 @@ pnpm build       # tsdown → dist/
 pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 pnpm e2e         # Playwright: the room in a real, logged-in Studio
 ```
+
+The dev Studio also runs Sanity's Workflows plugin, with one review workflow (`e2e/workflows/post-review.ts`) whose Review stage holds publishing and deleting. `pnpm workflows:deploy` writes its definition to the project in `.env.local` (after `npx sanity login`); do it once, then start the workflow on a Post from Structure to try a hold in the room.
 
 ### Browser tests
 

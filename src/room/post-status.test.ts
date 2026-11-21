@@ -61,6 +61,12 @@ describe('statusText', () => {
     expect(statusText(draft, scheduled, options)).toBe('Scheduled · Friday 20 November at 09:00')
   })
 
+  it('says when a workflow is holding what the schedule will publish anyway', () => {
+    expect(statusText(draft, scheduled, {...options, held: true})).toBe(
+      'Scheduled · Friday 20 November at 09:00 · held by a workflow',
+    )
+  })
+
   it('says a published document’s changes are scheduled', () => {
     expect(statusText(changed, scheduled, options)).toBe(
       'Published · changes scheduled for Friday 20 November at 09:00',

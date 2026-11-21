@@ -14,6 +14,7 @@
   - Setup problems that explain themselves.
 - **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest. See `docs/adr/0001-details-use-the-studio-form.md`.
 - **Scheduling** (November 2026): publish at a time chosen in the room, through Sanity's Scheduled Drafts. It's offered in the panel that asks before publishing; a scheduled document is locked, shows what will go live, and is unlocked to change it or its time. Nothing to configure: the room offers it wherever the Studio has scheduled drafts.
+- **Workflow holds** (November 2026): where a Studio uses Sanity Workflows, the room refuses Publish, Schedule and Discard on a document a workflow is holding, as Structure does. Nothing to configure. Holds only: the room knows nothing of stages or assignments. See the README's Workflows section.
 - **Look and feel:**
   - Fonts shipped with the plugin.
   - Tokens scoped to the room.
@@ -30,6 +31,8 @@
 ## Next
 
 - [ ] **Scheduling, by hand and in the pictures.** The browser tests schedule, lock, unlock and go live against a real project. Still to do: try Preview on a locked document against a real site, and add the schedule panel and the locked room to `pnpm shots` and `pnpm vrt`.
+- [ ] **Workflow holds, by hand.** The check is tested against the engine's own evaluation and against the guards a real workflow wrote, but nobody has yet pressed Publish on a held document in the room. Do that in the dev Studio (`pnpm workflows:deploy`, then start the review on a Post). While there, open Details on a document whose type has an `autoStart` workflow and see what the Workflows plugin's form wrapper shows and starts: Details is rendered by Sanity's form, so the workflow strip may already be there.
+- [ ] **Workflows that start themselves.** A document started in the room skips the Workflows plugin's `autoStart`, so nothing holds it. If the hand check shows the plugin's own gate runs when Details opens, the room could lean on it; otherwise this stays a documented limit.
 - [ ] **Details when scheduling from Structure.** Studio's "Schedule publish" doesn't settle the slug or stamp the date as the room does. A plugin can't wrap it (Studio's own scheduled drafts plugin runs after every other and puts its action back), so the choice is an action a Studio adds in its own config, or leaving it.
 - [ ] **Try the room by hand in a real Studio** (writing, the Insert Menu on a `blockContent` body, publishing, Preview). Everything since the extraction is covered by tests and builds, not by someone writing in it.
 - [ ] **README screenshot or GIF**, and a **Sanity Exchange** listing.

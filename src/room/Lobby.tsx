@@ -10,9 +10,11 @@ import {
   useDocuments,
 } from '@sanity/sdk-react'
 import {Suspense, useEffect, useMemo, useRef, useState} from 'react'
-import {useColorSchemeValue, useCurrentUser, useDataset, useProjectId} from 'sanity'
+import {useClient, useColorSchemeValue, useCurrentUser, useDataset, useProjectId} from 'sanity'
 import {StateLink, useRouter} from 'sanity/router'
 import styled from 'styled-components'
+import {API_VERSION} from '../lib/api-version'
+import {checkHold, holdSentence} from '../lib/holds'
 import {cameFromLobby} from './came-from'
 import {Floating, FloatingSurface} from './editor/floating'
 import {isEmptyPost} from './empty-post'
@@ -384,7 +386,7 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
             {others.map((handle) => (
               <li key={handle.documentId}>
                 <Suspense fallback={<Placeholder $height="3.75rem" />}>
-                  <Row handle={handle} kinds={kinds} />
+                  <Row handle={handle} kinds={kinds} onProblem={setProblem} />
                 </Suspense>
               </li>
             ))}
@@ -634,7 +636,15 @@ const Rows = styled.ul`
   }
 `
 
-function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
+function Row({
+  handle,
+  kinds,
+  onProblem,
+}: {
+  handle: DocumentHandle
+  kinds: WritingKind[]
+  onProblem: (problem: string | null) => void
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const types = useWritingTypes()
   const {data, kind, status, schedule, scheduleKnown} = useGlimpse(handle, kinds, ref)
@@ -654,7 +664,7 @@ function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
       </RowLink>
       {maybeEmpty && kind && (
         <Suspense fallback={null}>
-          <DiscardEmpty handle={handle} kind={kind} />
+          <DiscardEmpty handle={handle} kind={kind} onProblem={onProblem} />
         </Suspense>
       )}
     </RowRoot>
@@ -666,15 +676,34 @@ function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
  * (Details too), the same test the room uses when it discards one on Leave, so there's nothing
  * to lose and nothing to confirm.
  */
-function DiscardEmpty({handle, kind}: {handle: DocumentHandle; kind: WritingKind}) {
+function DiscardEmpty({
+  handle,
+  kind,
+  onProblem,
+}: {
+  handle: DocumentHandle
+  kind: WritingKind
+  onProblem: (problem: string | null) => void
+}) {
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   const apply = useApplyDocumentActions()
+  const client = useClient({apiVersion: API_VERSION})
+  const identity = useCurrentUser()?.id
   if (!isEmptyPost(post, kind.fields)) return null
+  // A workflow can hold deleting a document, and an empty one is still a document.
+  const discard = async () => {
+    const verdict = await checkHold(client, {
+      action: 'discard',
+      documentId: handle.documentId,
+      documentType: handle.documentType,
+      identity,
+    })
+    const held = holdSentence(verdict, kind.singular, 'discard')
+    onProblem(held)
+    if (!held) await apply(discardDocument(handle))
+  }
   return (
-    <QuietButton
-      title={`Discard this empty ${kind.singular}`}
-      onClick={() => void apply(discardDocument(handle))}
-    >
+    <QuietButton title={`Discard this empty ${kind.singular}`} onClick={() => void discard()}>
       Discard
     </QuietButton>
   )

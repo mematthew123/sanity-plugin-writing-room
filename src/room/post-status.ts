@@ -27,7 +27,7 @@ export function describePostStatus(status: DocumentEditStatus | undefined): Post
 export function statusText(
   status: PostStatus,
   schedule: Schedule,
-  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string} = {},
+  options: {now?: Date; short?: boolean; locale?: string; timeZone?: string; held?: boolean} = {},
 ): string {
   switch (schedule.kind) {
     case 'none':
@@ -38,8 +38,12 @@ export function statusText(
       return 'Not scheduled · won’t go live'
     case 'scheduled': {
       const when = formatGoLive(schedule.publishAt, options)
-      if (status.label === 'Draft') return `Scheduled · ${when}`
-      return options.short ? `Changes scheduled · ${when}` : `Published · changes scheduled for ${when}`
+      // Sanity publishes on schedule whatever a workflow says, so both are true at once.
+      const held = options.held ? ' · held by a workflow' : ''
+      if (status.label === 'Draft') return `Scheduled · ${when}${held}`
+      return options.short
+        ? `Changes scheduled · ${when}${held}`
+        : `Published · changes scheduled for ${when}${held}`
     }
   }
 }

@@ -3,8 +3,10 @@
  * Installs the packed plugin into a fresh Studio and checks it installs, dedupes, type-checks and
  * builds (also inside Next.js with `--embedded`).
  *
- * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded]
+ * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded] [--workflows=<version>]
  * `--loose` ignores the plugin's peer range, to test whether it could be widened.
+ * `--workflows=0.39.0` pins `@sanity/workflows`, as a Studio with Workflows installed would; without
+ * it the plugin gets the latest its range allows.
  */
 import {execFileSync} from 'node:child_process'
 import {existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync} from 'node:fs'
@@ -15,6 +17,7 @@ const args = process.argv.slice(2)
 const loose = args.includes('--loose')
 const embedded = args.includes('--embedded')
 const sanityVersion = args.find((arg) => !arg.startsWith('--')) ?? 'latest'
+const workflowsVersion = args.find((arg) => arg.startsWith('--workflows='))?.slice('--workflows='.length)
 const pluginDir = resolve(import.meta.dirname, '..')
 const studioDir = mkdtempSync(join(tmpdir(), 'writing-room-smoke-'))
 const FORM_EXPORTS = [
@@ -36,6 +39,9 @@ const FORM_EXPORTS = [
   'useFeatureEnabled',
   'useScheduledDraftsEnabled',
 ]
+// What the room weighs a workflow's Holds with. Workflows is pre-1.0, so any minor may move these.
+const HOLD_EXPORTS = ['documentActionDenials', 'parseGuardDocument', 'clientGuardDereference']
+const GUARD_TYPE = 'temp.system.guard'
 const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
 
 function run(command, args, cwd) {
@@ -65,6 +71,7 @@ const files = {
         'react-dom': '^19.3.1',
         'styled-components': '^6.1.18',
         '@sanity/themer': '^0.10.6',
+        ...(workflowsVersion ? {'@sanity/workflows': workflowsVersion} : {}),
       },
       devDependencies: {'typescript': '~6.0', '@types/react': '^19.2.14', '@types/node': '^22'},
     },
@@ -175,12 +182,42 @@ if (missing.length) {
   process.exit(1)
 }
 
-// 6. Types and bundle.
+// 6. Holds are weighed by the Workflows engine: one copy, the Studio's own when it has one.
+const workflowsCopies = findCopies('@sanity/workflows')
+console.log(`
+@sanity/workflows: ${workflowsCopies.join(', ') || 'missing'}`)
+if (workflowsCopies.length !== 1) {
+  console.error('\n✗ Expected exactly one copy of @sanity/workflows.')
+  process.exit(1)
+}
+const workflows = JSON.parse(
+  execFileSync(
+    'node',
+    [
+      '--input-type=module',
+      '-e',
+      "import * as w from '@sanity/workflows'; console.log(JSON.stringify({names: Object.keys(w), guardType: w.GUARD_DOC_TYPE}))",
+    ],
+    {cwd: studioDir, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024},
+  ),
+)
+const missingHolds = HOLD_EXPORTS.filter((name) => !workflows.names.includes(name))
+if (missingHolds.length || workflows.guardType !== GUARD_TYPE) {
+  console.error(
+    missingHolds.length
+      ? `\n✗ @sanity/workflows doesn't export ${missingHolds.join(', ')}, which the room checks Holds with.`
+      : `\n✗ @sanity/workflows now stores Holds as "${workflows.guardType}"; the room looks for "${GUARD_TYPE}".`,
+  )
+  process.exit(1)
+}
+console.log('Workflows exports the room needs: all present')
+
+// 7. Types and bundle.
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
 expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
 
-// 7. The same Studio embedded in a Next.js app.
+// 8. The same Studio embedded in a Next.js app.
 if (embedded) {
   const next = {
     'next.config.mjs': 'export default {}\n',
