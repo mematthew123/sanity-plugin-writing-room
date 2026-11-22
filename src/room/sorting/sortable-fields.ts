@@ -9,6 +9,10 @@ export interface SortableField {
   store: 'string' | 'strings' | 'reference' | 'references'
   /** For references: the document types whose documents are the answers. They are fetched when the Writer says Sort. */
   from?: string[]
+  /** For references: the `_type` a reference is stored with, by the type of the document it points to. A named reference keeps its name. */
+  storedAs?: Record<string, string>
+  /** For references: the type of each answer's document, by its id. Known once the answers are fetched. */
+  answerTypes?: Record<string, string>
   weak?: boolean
 }
 
@@ -105,7 +109,13 @@ export function sortableFields(
 
     const from = referenceTypes(type)
     if (from) {
-      sortable.push({field: {...base, kind: 'pick', many: false, options: []}, store: 'reference', from, weak: loose(type).weak})
+      sortable.push({
+        field: {...base, kind: 'pick', many: false, options: []},
+        store: 'reference',
+        from,
+        storedAs: Object.fromEntries(from.map((name) => [name, type.name])),
+        weak: loose(type).weak,
+      })
       continue
     }
 
@@ -121,10 +131,16 @@ export function sortableFields(
     }
     const members = type.of.map(referenceTypes)
     if (members.every((member): member is string[] => member !== null)) {
+      // Where two members take the same document type, the first is the one the form would offer.
+      const storedAs: Record<string, string> = {}
+      members.forEach((names, index) => {
+        for (const name of names) storedAs[name] ??= type.of[index]!.name
+      })
       sortable.push({
         field: {...base, kind: 'pick', many: true, options: []},
         store: 'references',
         from: [...new Set(members.flat())],
+        storedAs,
         weak: type.of.every((member) => loose(member).weak),
       })
     }
@@ -132,14 +148,21 @@ export function sortableFields(
   return sortable.slice(0, LIMITS.fields)
 }
 
-/** The fields that preview documents of these types by name, for the labels of their answers. */
-export function labelPaths(types: string[], getSchemaType: (name: string) => SchemaType | undefined): string[] {
+/** The fields a document of this type may be called by, the one its preview shows first. */
+export function labelPaths(type: string, getSchemaType: (name: string) => SchemaType | undefined): string[] {
   const paths = new Set<string>()
-  for (const name of types) {
-    const select = (getSchemaType(name) as {preview?: {select?: Record<string, unknown>}} | undefined)?.preview?.select
-    const title = select?.title
-    if (typeof title === 'string' && /^[A-Za-z_]\w*$/.test(title)) paths.add(title)
-  }
+  const select = (getSchemaType(type) as {preview?: {select?: Record<string, unknown>}} | undefined)?.preview?.select
+  const title = select?.title
+  if (typeof title === 'string' && /^[A-Za-z_]\w*$/.test(title)) paths.add(title)
   for (const fallback of ['title', 'name']) paths.add(fallback)
   return [...paths]
+}
+
+/**
+ * The GROQ for an answer's label. Each document type is read by its own fields, so a type that
+ * previews by `title` is never named by a `name` it happens to also have.
+ */
+export function labelQuery(types: string[], getSchemaType: (name: string) => SchemaType | undefined): string {
+  const cases = types.map((type) => `_type == ${JSON.stringify(type)} => coalesce(${labelPaths(type, getSchemaType).join(', ')})`)
+  return `select(${cases.join(', ')})`
 }

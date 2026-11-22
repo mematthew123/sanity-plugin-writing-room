@@ -4,7 +4,7 @@ import {type SortingResponse} from '../../sorting/contract'
 import {type WritingFields} from '../fields'
 import {applySorting, contentOf, sortedMessage} from './apply'
 import {sortingMarks} from './marks'
-import {isEmptyValue, labelPaths, sortableFields} from './sortable-fields'
+import {isEmptyValue, labelQuery, sortableFields} from './sortable-fields'
 import {bodyIsEmpty, isWholePiece, unmarked, writtenBlocks} from './whole-piece'
 
 const writing: WritingFields = {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt', image: 'coverImage'}
@@ -98,7 +98,72 @@ describe('the fields Sorting may fill', () => {
   })
 
   it('finds what documents are called', () => {
-    expect(labelPaths(['author', 'category'], (name) => schema.get(name))).toEqual(['name', 'title'])
+    expect(labelQuery(['author', 'category'], (name) => schema.get(name))).toBe(
+      'select(_type == "author" => coalesce(name, title), _type == "category" => coalesce(title, name))',
+    )
+  })
+
+  it('keeps the name a reference is stored under', () => {
+    const named = createSchema({
+      name: 'named',
+      types: [
+        {name: 'author', type: 'document', fields: [{name: 'name', type: 'string'}]},
+        {name: 'category', type: 'document', fields: [{name: 'title', type: 'string'}]},
+        {name: 'authorRef', type: 'reference', to: [{type: 'author'}]},
+        {
+          name: 'article',
+          type: 'document',
+          fields: [
+            {name: 'author', type: 'authorRef'},
+            {
+              name: 'related',
+              type: 'array',
+              of: [
+                {name: 'byline', type: 'reference', to: [{type: 'author'}]},
+                {type: 'reference', to: [{type: 'category'}]},
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const fields = sortableFields(named.get('article'), {}, writing)
+    const byName = Object.fromEntries(fields.map((entry) => [entry.field.name, entry]))
+    expect(byName.author!.storedAs).toEqual({author: 'authorRef'})
+    expect(byName.related!.storedAs).toEqual({author: 'byline', category: 'reference'})
+
+    const answered = fields.map((entry) =>
+      entry.field.kind === 'pick'
+        ? {
+            ...entry,
+            field: {...entry.field, options: [{id: 'a1', label: 'Sam'}, {id: 'c1', label: 'Travel'}]},
+            answerTypes: {a1: 'author', c1: 'category'},
+          }
+        : entry,
+    )
+    let key = 0
+    const sorted = applySorting({
+      document: {},
+      writing,
+      sortable: answered,
+      response: {
+        version: 1,
+        headline: null,
+        placed: [],
+        picked: [
+          {field: 'author', options: ['a1'], kind: 'judged', line: null, confidence: 1},
+          {field: 'related', options: ['a1', 'c1'], kind: 'judged', line: null, confidence: 1},
+        ],
+        listed: [],
+      },
+      isPublished: false,
+      keyGenerator: () => `key${++key}`,
+    })
+    expect(sorted.next.author).toEqual({_type: 'authorRef', _ref: 'a1'})
+    expect(sorted.next.related).toEqual([
+      {_type: 'byline', _ref: 'a1', _key: 'key1'},
+      {_type: 'reference', _ref: 'c1', _key: 'key2'},
+    ])
   })
 })
 

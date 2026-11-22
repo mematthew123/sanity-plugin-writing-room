@@ -91,7 +91,12 @@ export function applySorting({
     const known = new Set(entry.field.options.map((option) => option.id))
     const options = picked.options.filter((id) => known.has(id))
     if (options.length === 0) continue
-    const reference = (id: string) => ({_type: 'reference', _ref: id, ...(entry.weak ? {_weak: true} : {})})
+    // A named reference type is stored under its own name, or the form can't edit it.
+    const reference = (id: string) => ({
+      _type: entry.storedAs?.[entry.answerTypes?.[id] ?? ''] ?? 'reference',
+      _ref: id,
+      ...(entry.weak ? {_weak: true} : {}),
+    })
     if (entry.store === 'string') next[picked.field] = options[0]
     else if (entry.store === 'strings') next[picked.field] = options
     else if (entry.store === 'reference') next[picked.field] = reference(options[0]!)

@@ -10,9 +10,9 @@ import {edgesOf} from '../../sorting/edges'
 import {slugByHand} from '../details/slug-by-hand'
 import {type WritingFields} from '../fields'
 import {type RoomNotice} from '../room-status'
-import {applySorting, contentOf, sortedMessage} from './apply'
+import {applySorting, contentOf, type Sorted, sortedMessage} from './apply'
 import {sortingMarks} from './marks'
-import {labelPaths, type SortableField, sortableFields} from './sortable-fields'
+import {labelQuery, type SortableField, sortableFields} from './sortable-fields'
 import {bodyIsEmpty, isWholePiece, writtenBlocks} from './whole-piece'
 
 /** Long enough not to flicker, short enough that a slow answer is given up on. */
@@ -88,11 +88,11 @@ async function withAnswers(
   const loaded = await Promise.all(
     sortable.map(async (entry): Promise<SortableField | null> => {
       if (!entry.from || entry.field.kind !== 'pick') return entry
-      const label = labelPaths(entry.from, getSchemaType).join(', ')
-      let documents: Array<{_id: string; label?: unknown}>
+      const label = labelQuery(entry.from, getSchemaType)
+      let documents: Array<{_id: string; _type: string; label?: unknown}>
       try {
         documents = await client.fetch(
-          `*[_type in $types && !(_id in path("drafts.**")) && !(_id in path("versions.**"))] | order(_id) [0...${LIMITS.options + 1}]{_id, "label": coalesce(${label})}`,
+          `*[_type in $types && !(_id in path("drafts.**")) && !(_id in path("versions.**"))] | order(_id) [0...${LIMITS.options + 1}]{_id, _type, "label": ${label}}`,
           {types: entry.from},
           {signal},
         )
@@ -106,7 +106,8 @@ async function withAnswers(
       const options = documents.flatMap((document) =>
         typeof document.label === 'string' && document.label.trim() ? [{id: document._id, label: document.label.trim()}] : [],
       )
-      return options.length > 0 ? {...entry, field: {...entry.field, options}} : null
+      const answerTypes = Object.fromEntries(documents.map((document) => [document._id, document._type]))
+      return options.length > 0 ? {...entry, field: {...entry.field, options}, answerTypes} : null
     }),
   )
   return loaded.filter((entry): entry is SortableField => entry !== null)
@@ -273,32 +274,36 @@ export function Sorting({
       ])
       if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError')
 
-      const now = latest.current ?? before
-      if (wordsOf(now) !== startedWith) {
-        setPhase('idle')
-        show({text: CHANGED})
-        return
-      }
-      const sorted = applySorting({
-        document: now,
-        writing,
-        sortable,
-        response,
-        isPublished,
-        slugByHand: slugByHand.read(handle.documentId) ?? undefined,
-        keyGenerator: randomKey,
-      })
-      if (sorted.touched.length === 0) {
-        setPhase('idle')
-        show({text: NOTHING})
-        return
-      }
-      // Only the touched keys, over the document as it is now.
+      // Read and written in one step, against the document as the store has it now: a
+      // collaborator's edit can arrive before this component has rendered it.
+      const outcome: {changed?: boolean; now?: Record<string, unknown>; sorted?: Sorted} = {}
       edit((current) => {
-        const next: Record<string, unknown> = {...(current ?? {})}
-        for (const key of sorted.touched) next[key] = sorted.next[key]
-        return next
+        const now = current ?? before
+        if (wordsOf(now) !== startedWith) {
+          outcome.changed = true
+          return now
+        }
+        const result = applySorting({
+          document: now,
+          writing,
+          sortable,
+          response,
+          isPublished,
+          slugByHand: slugByHand.read(handle.documentId) ?? undefined,
+          keyGenerator: randomKey,
+        })
+        if (result.touched.length === 0) return now
+        outcome.now = now
+        outcome.sorted = result
+        // Differs from `now` only in the touched keys.
+        return result.next
       })
+      const {now, sorted} = outcome
+      if (!now || !sorted) {
+        setPhase('idle')
+        show({text: outcome.changed ? CHANGED : NOTHING})
+        return
+      }
       sortingMarks.set(handle.documentId, Object.fromEntries(sorted.filledNames.map((name) => [name, sorted.next[name]])))
       undo.current = {
         before: now,
@@ -316,7 +321,9 @@ export function Sorting({
         dismiss()
         if (!kept) return
         edit((current) => {
-          const restored: Record<string, unknown> = {...(current ?? {})}
+          // Edited since, in a copy this component may not have rendered yet: leave it be.
+          if (contentOf(current, kept.touched) !== kept.sorted) return current ?? {}
+          const restored: Record<string, unknown> = {...current}
           for (const key of kept.touched) {
             if (kept.before[key] === undefined) delete restored[key]
             else restored[key] = kept.before[key]
