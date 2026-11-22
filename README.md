@@ -380,7 +380,7 @@ pnpm lint
 pnpm build       # tsdown → dist/
 pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 pnpm e2e         # Playwright: the room in a real, logged-in Studio
-pnpm sorting:eval  # Sorting against the pastes in fixtures/sorting; calls the model, needs AI_GATEWAY_API_KEY
+pnpm sorting:eval  # Sorting against recorded pastes you keep locally (they aren't in the repo); calls the model, needs AI_GATEWAY_API_KEY
 ```
 
 ### Browser tests

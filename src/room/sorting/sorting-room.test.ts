@@ -172,6 +172,15 @@ describe('applying what the route answered', () => {
     expect((sorted.next.body as Array<{_key: string}>).map((entry) => entry._key)).toEqual(['k3', 'k4', 'k5'])
   })
 
+  it('keeps every tag of a line longer than the route reads', () => {
+    const all = Array.from({length: 120}, (_, i) => `tag number ${i}`)
+    const long = [...body.slice(0, 3), block('k4', `Tags: ${all.join(', ')}`), body[4]]
+    // What the route saw: the line cut at its limit, so the last item is cut too.
+    const cut = all.join(', ').slice(0, 594).split(', ')
+    const sorted = apply({body: long}, {...response, listed: [{field: 'tags', values: cut, line: 'k4', confidence: 0.99}]})
+    expect(sorted.next.tags).toEqual(all)
+  })
+
   it('ignores an answer the field does not offer, and keeps its line', () => {
     const sorted = apply({body}, {...response, picked: [{field: 'author', options: ['someone-else'], kind: 'stated', line: 'k2', confidence: 1}]})
     expect(sorted.next.author).toBeUndefined()

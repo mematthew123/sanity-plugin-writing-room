@@ -54,7 +54,31 @@ const NOTHING = 'There was nothing here to sort into the title or Details.'
 
 const randomKey = () => Math.random().toString(36).slice(2, 14)
 
-/** The answers a reference field offers: the documents it can point to, by the name they go by. */
+const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
+
+/**
+ * The fields that fit in one request. The route reads only so much, and answers are most of it,
+ * so past that the field with the most answers is left out, and the rest are still sorted.
+ */
+function thatFit(sortable: SortableField[], rest: Omit<SortingRequest, 'fields'>): SortableField[] {
+  let fits = sortable
+  // Headroom for what the request holds besides: its braces and keys.
+  const room = LIMITS.body - bytes({...rest, fields: []}) - 1024
+  while (fits.length > 0 && bytes(fits.map((entry) => entry.field)) > room) {
+    const answers = (entry: SortableField) => (entry.field.kind === 'pick' ? entry.field.options.length : 0)
+    const most = fits.reduce((a, b) => (answers(b) > answers(a) ? b : a))
+    if (answers(most) === 0) break
+    fits = fits.filter((entry) => entry !== most)
+  }
+  return fits
+}
+
+const wordsIn = (body: unknown) => writtenBlocks(body).map((block) => block.text).join('\n')
+
+/**
+ * The answers a reference field offers: the documents it can point to, by the name they go by.
+ * A field whose answers can't be read (a type this Writer may not see) is left out, not fatal.
+ */
 async function withAnswers(
   sortable: SortableField[],
   client: SanityClient,
@@ -65,11 +89,18 @@ async function withAnswers(
     sortable.map(async (entry): Promise<SortableField | null> => {
       if (!entry.from || entry.field.kind !== 'pick') return entry
       const label = labelPaths(entry.from, getSchemaType).join(', ')
-      const documents = await client.fetch<Array<{_id: string; label?: unknown}>>(
-        `*[_type in $types && !(_id in path("drafts.**")) && !(_id in path("versions.**"))] | order(_id) [0...${LIMITS.options + 1}]{_id, "label": coalesce(${label})}`,
-        {types: entry.from},
-        {signal},
-      )
+      let documents: Array<{_id: string; label?: unknown}>
+      try {
+        documents = await client.fetch(
+          `*[_type in $types && !(_id in path("drafts.**")) && !(_id in path("versions.**"))] | order(_id) [0...${LIMITS.options + 1}]{_id, "label": coalesce(${label})}`,
+          {types: entry.from},
+          {signal},
+        )
+      } catch (error) {
+        // Stopped is stopped for the whole sort; anything else costs only this field.
+        if (signal.aborted) throw error
+        return null
+      }
       // More answers than one question can offer: narrowing them down is a search, not Sorting.
       if (documents.length > LIMITS.options) return null
       const options = documents.flatMap((document) =>
@@ -162,9 +193,9 @@ export function Sorting({
     seeDetails.current = onSeeDetails
   })
 
+  // Read only by the effects that need it, in the phase they need it: the room re-renders on every
+  // keystroke, and walking the whole piece each time would be paid by every Writer, sorting or not.
   const body = document?.[writing.body]
-  // The words only: keys and marks settle after a paste, and settling isn't the Writer writing on.
-  const bodyWords = useMemo(() => writtenBlocks(body).map((block) => block.text).join('\n'), [body])
 
   // Sorting takes away only the notice it showed: by now the room may be showing someone else's.
   const mine = useRef<RoomNotice | null>(null)
@@ -214,17 +245,17 @@ export function Sorting({
       writtenBlocks(document[writing.body]).map((block) => `${block.id} ${block.text}`).join('\n')
     const startedWith = wordsOf(before)
     try {
-      const sortable = await withAnswers(
-        sortableFields(schema.get(handle.documentType), before, writing),
-        client,
-        (name) => schema.get(name),
-        controller.signal,
+      const edges: Omit<SortingRequest, 'fields'> = {version: SORTING_VERSION, ...edgesOf(writtenBlocks(before[writing.body]))}
+      const sortable = thatFit(
+        await withAnswers(
+          sortableFields(schema.get(handle.documentType), before, writing),
+          client,
+          (name) => schema.get(name),
+          controller.signal,
+        ),
+        edges,
       )
-      const request: SortingRequest = {
-        version: SORTING_VERSION,
-        ...edgesOf(writtenBlocks(before[writing.body])),
-        fields: sortable.map((entry) => entry.field),
-      }
+      const request: SortingRequest = {...edges, fields: sortable.map((entry) => entry.field)}
       const [response] = await Promise.all([
         fetch(sorting.endpoint, {
           method: 'POST',
@@ -331,19 +362,20 @@ export function Sorting({
     const still = setTimeout(() => {
       if (!isWholePiece(body)) return
       pastedAt.current = 0
-      watched.current = bodyWords
+      // The words only: keys and marks settle after a paste, and settling isn't the Writer writing on.
+      watched.current = wordsIn(body)
       setPhase('offered')
       show({text: hasAccepted() ? OFFER : FIRST_OFFER, action: {label: 'Sort', onClick: () => void sortNow.current()}})
     }, PASTE_STILL_MS)
     return () => clearTimeout(still)
-  }, [enabled, phase, pastes, body, bodyWords, show])
+  }, [enabled, phase, pastes, body, show])
 
   // Going on writing is a no: the offer goes away.
   useEffect(() => {
-    if (phase !== 'offered' || bodyWords === watched.current) return
+    if (phase !== 'offered' || wordsIn(body) === watched.current) return
     setPhase('idle')
     dismiss()
-  }, [phase, bodyWords, dismiss])
+  }, [phase, body, dismiss])
 
   // The first edit, by anyone, to what Sorting touched ends Undo: putting the paste back would
   // take that edit with it. Sorting's own change is told from an edit by what it says, not by when

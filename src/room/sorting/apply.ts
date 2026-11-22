@@ -1,5 +1,6 @@
 import {followingSlug} from '../../lib/slug'
-import {type SortingResponse} from '../../sorting/contract'
+import {itemsInLine} from '../../sorting/answers'
+import {LIMITS, type SortingResponse} from '../../sorting/contract'
 import {type WritingFields} from '../fields'
 import {isEmptyValue, type SortableField} from './sortable-fields'
 import {type BodyBlock, blockText} from './whole-piece'
@@ -105,7 +106,12 @@ export function applySorting({
 
   for (const listed of response.listed) {
     const entry = byName.get(listed.field)
-    const values = listed.values.map((value) => value.trim()).filter(Boolean)
+    // The route reads a long line cut short, and the whole line leaves the body. So a line past
+    // the cut is read again here, in full: every item it lists is kept.
+    const line = body.find((block) => block._key === listed.line)
+    const whole = line ? blockText(line).trim() : ''
+    const read = whole.length > LIMITS.blockText ? itemsInLine(whole) : []
+    const values = (read.length > 0 ? read : listed.values).map((value) => value.trim()).filter(Boolean)
     if (!entry || entry.field.kind !== 'list' || values.length === 0 || !stillEmpty(listed.field)) continue
     next[listed.field] = values
     leaving.add(listed.line)
