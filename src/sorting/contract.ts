@@ -38,7 +38,15 @@ export interface SortingPickField extends FieldBase {
   options: SortingOption[]
 }
 
-export type SortingField = SortingTextField | SortingPickField
+/**
+ * A field that takes a list of the Writer's own words, with no set answers: free-form tags. It is
+ * filled only from a label line ("Tags: portugal, city breaks"), whose items are placed as they are.
+ */
+export interface SortingListField extends FieldBase {
+  kind: 'list'
+}
+
+export type SortingField = SortingTextField | SortingPickField | SortingListField
 
 export interface SortingRequest {
   version: typeof SORTING_VERSION
@@ -66,6 +74,8 @@ export interface SortingResponse {
     line: string | null
     confidence: number
   }>
+  /** List fields and the items their label line names. The line always leaves the body. */
+  listed: Array<{field: string; values: string[]; line: string; confidence: number}>
 }
 
 export const LIMITS = {
@@ -94,6 +104,7 @@ function parseField(value: unknown): SortingField | string {
   if (!name || !title) return 'A field needs a name and a title.'
   const description = text(value.description, LIMITS.description) ?? undefined
   if (value.kind === 'text') return {kind: 'text', name, title, description}
+  if (value.kind === 'list') return {kind: 'list', name, title, description}
   if (value.kind !== 'pick') return `"${name}" has a kind the route doesn't know.`
   if (!Array.isArray(value.options) || value.options.length === 0) return `"${name}" has no options.`
   if (value.options.length > LIMITS.options) return `"${name}" has more than ${LIMITS.options} options.`

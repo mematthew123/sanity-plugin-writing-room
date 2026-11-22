@@ -46,6 +46,14 @@ const FIELDS: SortingField[] = [
   },
   {
     kind: 'pick',
+    name: 'section',
+    title: 'Section',
+    description: 'The part of the site the piece belongs to.',
+    many: false,
+    options: ['Travel', 'Money', 'Tech', 'Food & drink', 'Arts'].map((label) => ({id: label, label})),
+  },
+  {
+    kind: 'pick',
     name: 'layout',
     title: 'Layout',
     description: 'How the page is laid out.',
@@ -64,6 +72,8 @@ interface Expected {
   place: Record<string, string>
   /** `mayAlso`: on a judged pick of several, further answers that are fine but not required. */
   pick: Record<string, {value: string | string[]; kind: 'stated' | 'judged'; mayAlso?: string[]}>
+  /** Fields that may be filled as given or left empty. */
+  either?: string[]
   leavesBody: string[]
   staysInBody: string[]
 }
@@ -105,7 +115,8 @@ function score(request: SortingRequest, response: SortingResponse, expected: Exp
   const outcomes: Record<string, {outcome: Outcome; got: string}> = {}
   const judge = (field: string, want: string[] | undefined, got: string[] | undefined, mayAlso: string[] = []) => {
     const required = got?.filter((value) => !mayAlso.includes(value)) ?? []
-    const outcome: Outcome = !want ? (got ? 'wrong' : 'rightly empty') : !got ? 'empty' : sameSet(want, required) ? 'correct' : 'wrong'
+    const optional = expected.either?.includes(field)
+    const outcome: Outcome = !want ? (got ? 'wrong' : 'rightly empty') : !got ? (optional ? 'rightly empty' : 'empty') : sameSet(want, required) ? 'correct' : 'wrong'
     outcomes[field] = {outcome, got: got ? got.join(', ') : '—'}
   }
 
@@ -132,7 +143,7 @@ function score(request: SortingRequest, response: SortingResponse, expected: Exp
     /** Lines taken out of the body that should have stayed: the worst kind of mistake. */
     lost: removed.filter((line) => !expected.leavesBody.includes(line)),
     /** Lines left in the body that should have gone: the Writer deletes them by hand. */
-    left: expected.leavesBody.filter((line) => !removed.includes(line)),
+    left: expected.leavesBody.filter((line) => !removed.includes(line) && !(expected.either?.includes('title') && line === expected.place.title)),
   }
 }
 
@@ -175,7 +186,7 @@ test('Sorting against the fixtures', async () => {
   const wrongs = atDefault.flatMap((row) => fields.filter((field) => row.outcomes[field].outcome === 'wrong').map((field) => `- ${row.run.name}, ${field}: got "${row.outcomes[field].got}"`))
   if (wrongs.length > 0) out.push('', 'Wrong fills:', '', ...wrongs)
 
-  out.push('', '## What the model said', '', 'The probability of the answer it chose. "none" means it chose to fill nothing.', '', '| Paste | headline | excerpt | internal notes | byline line | author | author stated | tags line | Travel | layout |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
+  out.push('', '## What the model said', '', 'The probability of the answer it chose. "none" means it chose to fill nothing.', '', '| Paste | headline | excerpt | internal notes | byline line | author | author stated | tags line | Travel | section | section settled | layout | layout settled |', '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |')
   for (const run of runs) {
     const index = (name: string) => FIELDS.findIndex((field) => field.name === name)
     const cell = (id: string) => {
@@ -186,7 +197,7 @@ test('Sorting against the fixtures', async () => {
       const label = answer.choice === 'none' ? 'none' : answer.choice.startsWith('b') ? `"${(run.request.blocks[Number(answer.choice.slice(1)) - 1]?.text ?? '?').slice(0, 18)}"` : (FIELDS[Number(id.split(':')[1])] as {options: Array<{label: string}>}).options[Number(answer.choice.slice(1)) - 1]?.label
       return `${label} ${sure === undefined ? '?' : sure.toFixed(2)}`
     }
-    out.push(`| ${run.name} | ${cell(questionId.headline)} | ${cell(questionId.place(index('excerpt')))} | ${cell(questionId.place(index('internalNotes')))} | ${cell(questionId.line(index('author')))} | ${cell(questionId.pick(index('author')))} | ${cell(questionId.stated(index('author')))} | ${cell(questionId.line(index('tags')))} | ${cell(questionId.applies(index('categories'), 0))} | ${cell(questionId.pick(index('layout')))} |`)
+    out.push(`| ${run.name} | ${cell(questionId.headline)} | ${cell(questionId.place(index('excerpt')))} | ${cell(questionId.place(index('internalNotes')))} | ${cell(questionId.line(index('author')))} | ${cell(questionId.pick(index('author')))} | ${cell(questionId.stated(index('author')))} | ${cell(questionId.line(index('tags')))} | ${cell(questionId.applies(index('categories'), 0))} | ${cell(questionId.pick(index('section')))} | ${cell(questionId.settled(index('section')))} | ${cell(questionId.pick(index('layout')))} | ${cell(questionId.settled(index('layout')))} |`)
   }
 
   out.push('', '## Trying other floors', '', 'All four floors set to the same value, over the same answers. A wrong fill is the outcome to avoid; an empty field is the price.', '', '| Floor | Correct | Empty (should have filled) | Wrong | Lines lost from body | Lines left in body |', '| --- | --- | --- | --- | --- | --- |')

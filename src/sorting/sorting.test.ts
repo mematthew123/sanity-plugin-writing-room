@@ -97,6 +97,7 @@ describe('the questions', () => {
         questionId.line(1),
         questionId.pick(1),
         questionId.stated(1),
+        questionId.settled(1),
         questionId.line(2),
         questionId.applies(2, 0),
         questionId.applies(2, 1),
@@ -122,7 +123,17 @@ describe('reading the answers', () => {
         {field: 'tags', options: ['portugal', 'city-breaks'], kind: 'stated', line: 'k-tags', confidence: 0.95},
         {field: 'categories', options: ['cat-travel'], kind: 'judged', line: null, confidence: 0.96},
       ],
+      listed: [],
     })
+  })
+
+  it('places the items of a tags line in a field with no set answers', () => {
+    const request: SortingRequest = {...lisbon, fields: [{kind: 'list', name: 'tags', title: 'Tags'}]}
+    const {questions} = buildDecision(request)
+    expect(Object.keys(questions).sort()).toEqual([questionId.headline, questionId.line(0)].sort())
+    const response = readAnswers(request, {[questionId.line(0)]: choice('b4')})
+    expect(response.listed).toEqual([{field: 'tags', values: ['portugal', 'city breaks'], line: 'k-tags', confidence: 0.95}])
+    expect(readAnswers(request, {[questionId.line(0)]: choice('b2')}).listed).toEqual([])
   })
 
   it('leaves a field empty under its floor', () => {
@@ -152,6 +163,12 @@ describe('reading the answers', () => {
       line: null,
       confidence: 0.95,
     })
+  })
+
+  it('leaves a field the text cannot settle, however sure the model sounds', () => {
+    const judged = {...good, [questionId.line(1)]: choice(NONE), [questionId.stated(1)]: yes(0.1), [questionId.pick(1)]: choice('o2', 0.97)}
+    expect(readAnswers(lisbon, {...judged, [questionId.settled(1)]: yes(0.2)}).picked.find((pick) => pick.field === 'author')).toBeUndefined()
+    expect(readAnswers(lisbon, {...judged, [questionId.settled(1)]: yes(0.9)}).picked[0]).toMatchObject({field: 'author', kind: 'judged'})
   })
 
   it('holds a judged pick to the higher floor', () => {

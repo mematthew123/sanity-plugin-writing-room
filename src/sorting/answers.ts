@@ -58,18 +58,24 @@ function probability(answers: Answers, id: string): number {
   return answer?.type === 'boolean' ? answer.probability : 0
 }
 
+/** The items a label line lists after its colon: "Tags: portugal, city breaks". */
+export function itemsInLine(line: string): string[] {
+  const colon = line.indexOf(':')
+  if (colon === -1) return []
+  const items = line
+    .slice(colon + 1)
+    .split(/[,;]/)
+    .map((item) => item.trim().replace(/^#/, ''))
+    .filter(Boolean)
+  return items.filter((item, index) => items.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index)
+}
+
 /**
  * The answers a label line names, read by code: "Tags: portugal, city breaks" against the field's
  * own options. `whole` is false when the line names something the field doesn't offer.
  */
 export function namedInLine(line: string, field: SortingPickField): {options: string[]; whole: boolean} {
-  const colon = line.indexOf(':')
-  if (colon === -1) return {options: [], whole: false}
-  const named = line
-    .slice(colon + 1)
-    .split(/[,;]/)
-    .map((item) => item.trim().replace(/^#/, '').toLowerCase())
-    .filter(Boolean)
+  const named = itemsInLine(line).map((item) => item.toLowerCase())
   const options: string[] = []
   let whole = named.length > 0
   for (const item of named) {
@@ -81,7 +87,11 @@ export function namedInLine(line: string, field: SortingPickField): {options: st
 }
 
 type Picked = SortingResponse['picked'][number]
-type Claim = {block: number; confidence: number} & ({what: 'headline'} | {what: 'place' | 'line'; field: number})
+type Claim = {block: number; confidence: number} & (
+  | {what: 'headline'}
+  | {what: 'place' | 'line'; field: number}
+  | {what: 'list'; field: number; values: string[]}
+)
 
 /** Turns the model's answers into what the room should do, holding each to its floor. */
 export function readAnswers(
@@ -112,6 +122,14 @@ export function readAnswers(
     const found = chosen(answers, confidence, questionId.line(index), blockName, blocks)
     const line = found && found.confidence >= floors.line ? found : null
 
+    if (field.kind === 'list') {
+      const values = line ? itemsInLine(request.blocks[line.index].text) : []
+      if (line && values.length > 0) {
+        claims.push({what: 'list', field: index, block: line.index, confidence: line.confidence, values})
+      }
+      return
+    }
+
     if (field.many) {
       const named = line ? namedInLine(request.blocks[line.index].text, field) : null
       if (line && named && named.options.length > 0) {
@@ -141,6 +159,8 @@ export function readAnswers(
     if (!pick) return
     const stated = line !== null || probability(answers, questionId.stated(index)) >= 0.5
     if (pick.confidence < (stated ? floors.pick : floors.judged)) return
+    // A page layout has an answer that sounds like a default; the text of a piece doesn't settle it.
+    if (!stated && probability(answers, questionId.settled(index)) < 0.5) return
     picked.set(index, {
       field: field.name,
       options: [field.options[pick.index].id],
@@ -154,7 +174,7 @@ export function readAnswers(
   // Every block ends up in one place: the surest claim on it wins, and the headline wins a tie.
   claims.sort((a, b) => b.confidence - a.confidence || Number(b.what === 'headline') - Number(a.what === 'headline'))
   const taken = new Set<number>()
-  const response: SortingResponse = {version: SORTING_VERSION, headline: null, placed: [], picked: []}
+  const response: SortingResponse = {version: SORTING_VERSION, headline: null, placed: [], picked: [], listed: []}
   for (const claim of claims) {
     if (taken.has(claim.block)) continue
     taken.add(claim.block)
@@ -163,6 +183,8 @@ export function readAnswers(
       response.headline = {block, confidence: claim.confidence}
     } else if (claim.what === 'place') {
       response.placed.push({field: request.fields[claim.field].name, block, confidence: claim.confidence})
+    } else if (claim.what === 'list') {
+      response.listed.push({field: request.fields[claim.field].name, values: claim.values, line: block, confidence: claim.confidence})
     } else {
       const pick = picked.get(claim.field)
       if (pick) pick.line = block

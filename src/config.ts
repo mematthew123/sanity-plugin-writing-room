@@ -22,6 +22,18 @@ export interface WritingRoomPreviewOptions {
   pathname?: (slug: string, documentType: string) => string
 }
 
+/**
+ * Experimental. Sorting: after a whole piece is pasted into an empty document, the room offers to
+ * sort it into the title and Details. It needs a route you host; see the README.
+ */
+export interface WritingRoomSortingOptions {
+  /**
+   * The address of the route made with `createSortingHandler` from
+   * `sanity-plugin-writing-room/sorting`: `/api/sort`, or a full URL on another origin.
+   */
+  endpoint: string
+}
+
 export type WritingRoomScheme = 'light' | 'dark'
 
 /**
@@ -43,6 +55,8 @@ export interface WritingRoomOptions {
    * paper in both schemes and derives the selection and on-Publish text from it. Inside the room only.
    */
   accent?: WritingRoomAccent
+  /** Experimental. Off unless set: the room is the same without it. */
+  sorting?: WritingRoomSortingOptions
 }
 
 export interface WritingRoomConfig {
@@ -51,6 +65,7 @@ export interface WritingRoomConfig {
   /** The room's whole palette per scheme, with the Studio's accent worked in. */
   colors: Record<WritingRoomScheme, Palette>
   preview: Required<WritingRoomPreviewOptions> | null
+  sorting: WritingRoomSortingOptions | null
 }
 
 function defaultPathname(slug: string, documentType: string) {
@@ -82,6 +97,7 @@ export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConf
           pathname: preview.pathname ?? defaultPathname,
         }
       : null,
+    sorting: options.sorting?.endpoint ? {endpoint: options.sorting.endpoint} : null,
   }
 }
 

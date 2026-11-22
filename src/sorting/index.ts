@@ -30,6 +30,7 @@ export type {SortingAnswer} from './answers'
 export type {
   SortingBlock,
   SortingField,
+  SortingListField,
   SortingOption,
   SortingPickField,
   SortingRequest,

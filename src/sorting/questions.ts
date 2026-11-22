@@ -28,6 +28,7 @@ export const questionId = {
   line: (field: number) => `line:${field}`,
   pick: (field: number) => `pick:${field}`,
   stated: (field: number) => `stated:${field}`,
+  settled: (field: number) => `settled:${field}`,
   applies: (field: number, option: number) => `applies:${field}:${option}`,
 }
 
@@ -89,6 +90,8 @@ export function buildDecision(request: SortingRequest): SortingDecision {
       },
     }
 
+    if (field.kind === 'list') return
+
     if (field.many) {
       field.options.forEach((option, optionIndex) => {
         questions[questionId.applies(index, optionIndex)] = {
@@ -110,6 +113,10 @@ export function buildDecision(request: SortingRequest): SortingDecision {
         ...options,
         [NONE]: `None of these is clearly the ${field.title} of this piece, or the piece gives no way to tell.`,
       },
+    }
+    questions[questionId.settled(index)] = {
+      type: 'boolean',
+      instructions: `${STATE} A document has ${describe(field)}, which takes one of these answers: ${field.options.map((option) => `"${option.label}"`).join(', ')}. Could a careful reader work out the right answer from the text of the piece alone, because it follows from what the piece says or is about? Answer no when it is an editorial or presentational choice, such as a page layout, a status or a placement, that the text of a piece does not settle.`,
     }
     questions[questionId.stated(index)] = {
       type: 'boolean',
