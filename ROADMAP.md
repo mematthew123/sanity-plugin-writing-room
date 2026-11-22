@@ -31,18 +31,13 @@
 
 - [ ] **Scheduling, by hand and in the pictures.** The browser tests schedule, lock, unlock and go live against a real project. Still to do: try Preview on a locked document against a real site, and add the schedule panel and the locked room to `pnpm shots` and `pnpm vrt`.
 - [ ] **Details when scheduling from Structure.** Studio's "Schedule publish" doesn't settle the slug or stamp the date as the room does. A plugin can't wrap it (Studio's own scheduled drafts plugin runs after every other and puts its action back), so the choice is an action a Studio adds in its own config, or leaving it.
+- [ ] **Sorting a whole-piece paste** (experimental, optional). Paste a whole piece written elsewhere into an empty document; the room offers once to sort it: the headline into the title, the rest into Details, everything but the published date. It places what was pasted and picks among existing options (authors, categories, tags, lists); it never writes. The judging is done by TypeSafe's Jev model through Vercel AI Gateway, from a route the Studio's owner hosts with a handler this package ships (`sorting: {endpoint}`); without the option the room is unchanged. The plan is in `docs/sorting-plan.md`; the decisions are in `docs/adr/0002-…` and `0003-…`. Before it ships: about twenty real clipboard captures (Google Docs, Notion, Word, Markdown) with expected results, and a confidence floor measured against them.
 - [ ] **Try the room by hand in a real Studio** (writing, the Insert Menu on a `blockContent` body, publishing, Preview). Everything since the extraction is covered by tests and builds, not by someone writing in it.
 - [ ] **README screenshot or GIF**, and a **Sanity Exchange** listing.
 - [ ] **Sanity's inputs in the room's theme.** In Details, references, images and arrays take the Studio's theme, so they only match the room in a Studio that uses `sanity-plugin-writing-room/theme`. Wrap them in the room's theme without making `@sanity/themer` a required dependency.
 - [ ] **Browser tests in CI.** The Playwright tests (`pnpm e2e`) exist and the CI job is written; it needs a test project and the three `SANITY_E2E_*` secrets to do anything.
 - [ ] **Widen the `sanity` range?** 6.12.0 through 6.21.x pass the smoke test with `--loose` (6.12 is the first release on App SDK v3 and `@portabletext/editor` 8); 6.11 and older get a second SDK and editor copy. Try writing, publishing and previewing in a 6.12 Studio before lowering the peer from `^6.22.0`.
 - [ ] **Auto-updates.** Revisit the `autoUpdates: false` requirement whenever Sanity ships an App SDK that shares context with an auto-updated Studio.
-
-## Later
-
-Planned, not started.
-
-- [ ] **Paste to import, with field mapping** (possibly). Paste a whole piece written elsewhere and have the room sort it into the document: title, body, excerpt and the rest of Details. One option for the mapping is TypeSafe's Jev model, which answers choice questions with a probability for each option. Jev can't be called from the browser today (`sanity-plugin-jev-fields` reaches it through Vercel AI Gateway), so this would need a key and has to stay optional: the room must work the same without it.
 
 ## Decisions
 

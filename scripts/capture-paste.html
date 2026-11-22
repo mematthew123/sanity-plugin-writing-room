@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Capture a paste</title>
+    <style>
+      body {font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem}
+      #target {border: 2px dashed #999; border-radius: 0.5rem; padding: 2rem; text-align: center}
+      input {font: inherit; padding: 0.25rem 0.5rem; width: 100%; box-sizing: border-box}
+      pre {white-space: pre-wrap; word-break: break-word; background: #f4f1ec; padding: 1rem; max-height: 20rem; overflow: auto}
+    </style>
+  </head>
+  <body>
+    <h1>Capture a paste</h1>
+    <p>
+      Saves exactly what the clipboard holds, as a fixture for Sorting. Copy in Google Docs, Notion or Word, name the
+      capture, click the box and paste. Nothing leaves this page; it downloads one JSON file.
+    </p>
+    <p><label>Name <input id="name" value="google-docs-heading1-full" /></label></p>
+    <div id="target" tabindex="0">Click here, then paste</div>
+    <p id="said"></p>
+    <pre id="seen"></pre>
+    <script>
+      const target = document.getElementById('target')
+      target.addEventListener('paste', (event) => {
+        event.preventDefault()
+        const data = event.clipboardData
+        const capture = {
+          name: document.getElementById('name').value.trim() || 'capture',
+          capturedAt: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          types: [...data.types],
+          html: data.getData('text/html'),
+          text: data.getData('text/plain'),
+        }
+        const link = document.createElement('a')
+        link.href = URL.createObjectURL(new Blob([JSON.stringify(capture, null, 2)], {type: 'application/json'}))
+        link.download = `${capture.name}.json`
+        link.click()
+        document.getElementById('said').textContent =
+          `Saved ${link.download}: ${capture.html.length} characters of HTML, ${capture.text.length} of text.`
+        document.getElementById('seen').textContent = capture.html.slice(0, 3000)
+      })
+    </script>
+  </body>
+</html>
