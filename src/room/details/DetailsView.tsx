@@ -33,9 +33,7 @@ export function DetailsView({
   focusField?: string
 }) {
   const root = useRef<HTMLDivElement>(null)
-  // Sanity's array input draws a long list a window at a time, and asks what it scrolls in. In
-  // Structure the document pane answers; here it is the room. Without an answer, an array with
-  // anything in it (a list of references, say) can't be drawn at all.
+  // Sanity's array input virtualizes long lists and needs to know what it scrolls in.
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const attach = useCallback((node: HTMLDivElement | null) => {
     root.current = node

@@ -74,7 +74,6 @@ function describe(field: ObjectField): Pick<SortingField, 'name' | 'title' | 'de
  * published date, images, booleans, numbers, dates or objects. A field whose `hidden` or
  * `readOnly` is a rule and not a plain yes or no is left alone: only the form can say how it
  * comes out. References with a filter are left alone for the same reason.
- * See docs/adr/0003-sorting-places-and-picks-but-never-writes.md.
  */
 export function sortableFields(
   schemaType: SchemaType | undefined,

@@ -37,7 +37,7 @@ async function isMember(token: string, projectId: string, doFetch: typeof fetch,
     headers: {authorization: `Bearer ${token}`},
     signal,
   })
-  // A bad token is a 401. No token at all is a 200 with an empty object, so check what came back.
+  // No token at all is a 200 with an empty object, so check the body.
   if (!response.ok) return false
   const user = (await response.json()) as {id?: unknown; roles?: unknown}
   return typeof user.id === 'string' && user.id !== '' && Array.isArray(user.roles) && user.roles.length > 0
@@ -99,7 +99,7 @@ export function createSortingRoute(options: SortingHandlerOptions): (request: Re
 
     if (Number(request.headers.get('content-length') ?? 0) > LIMITS.body) return answer(413, {error: 'too-large'})
 
-    // Who is asking comes first: nothing a stranger sends is read.
+    // Membership first: nothing a stranger sends is read.
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(timeout)])
     try {
       if (!(await isMember(token, projectId, doFetch, signal))) return answer(403, {error: 'forbidden'})
@@ -119,13 +119,13 @@ export function createSortingRoute(options: SortingHandlerOptions): (request: Re
     if ('problem' in parsed) return answer(400, {error: 'invalid', problem: parsed.problem})
 
     const decision = buildDecision(parsed.request)
-    // Nothing to ask: no top blocks and no fields.
+    // Nothing to ask.
     if (Object.keys(decision.questions).length === 0) return answer(200, readAnswers(parsed.request, {}, {floors}))
     try {
       const {answers, confidence} = await decide({...decision, abortSignal: signal})
       return answer(200, readAnswers(parsed.request, answers, {floors, confidence}))
     } catch {
-      // Never the model's or the gateway's own words: the room says it couldn't be done just now.
+      // Never pass on the model's or the gateway's own error text.
       return answer(502, {error: 'unavailable'})
     }
   }

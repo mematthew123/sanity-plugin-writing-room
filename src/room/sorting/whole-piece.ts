@@ -24,7 +24,7 @@ export function bodyIsEmpty(body: unknown): boolean {
   return (body as BodyBlock[]).every((block) => block._type === 'block' && !blockText(block).trim())
 }
 
-/** Starting guesses, to be tuned by hand. See docs/sorting-plan.md. */
+/** Starting guesses, to be tuned by hand. */
 export const WHOLE_PIECE = {blocks: 3, words: 150} as const
 
 /**

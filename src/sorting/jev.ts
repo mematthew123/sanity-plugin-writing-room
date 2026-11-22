@@ -17,7 +17,7 @@ type DecideInput = Parameters<typeof decide>[0]
 export function jev(model: DecideInput['model'] = JEV): SortingDecide {
   return async ({state, questions, abortSignal}) => {
     const result = await decide({model, state, questions, abortSignal})
-    // TypeSafe reports a confidence per question beside the answers.
+    // TypeSafe reports a confidence per question.
     const reported = (result.providerMetadata as Record<string, {confidence?: unknown}> | undefined)?.typesafe?.confidence
     const confidence: Record<string, number> = {}
     if (reported && typeof reported === 'object') {

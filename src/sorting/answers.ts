@@ -9,8 +9,7 @@ export type SortingAnswer =
  * How sure the model must be before Sorting acts. Under a floor the field stays empty and the
  * line stays in the body: an empty field shows, a wrong one doesn't.
  *
- * These are starting guesses. They are to be set from the fixtures in fixtures/sorting, where
- * wrong fills are near zero. See docs/sorting-plan.md.
+ * These are starting guesses, to be tuned until wrong fills are near zero.
  */
 export interface SortingFloors {
   /** A block is the headline, or a text field's value. */
@@ -47,7 +46,7 @@ function chosen(
   if (answer?.type !== 'choice' || answer.choice === NONE) return null
   for (let index = 0; index < count; index++) {
     if (name(index) !== answer.choice) continue
-    // Without a probability the answer can't be held to a floor, so it counts for nothing.
+    // No probability means it can't be held to a floor.
     return {index, confidence: answer.probabilities?.[answer.choice] ?? confidence?.[id] ?? 0}
   }
   return null
@@ -141,7 +140,7 @@ export function readAnswers(
       const named = line ? namedInLine(request.blocks[line.index].text, field) : null
       if (line && named && named.options.length > 0) {
         picked.set(index, {field: field.name, options: named.options, kind: 'stated', line: null, confidence: line.confidence})
-        // The line only leaves the body when every answer it names was picked.
+        // The line leaves only when every answer it names was picked.
         if (named.whole) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
         return
       }
@@ -164,12 +163,12 @@ export function readAnswers(
 
     const pick = chosen(answers, confidence, questionId.pick(index), optionName, field.options.length)
     if (!pick) return
-    // A label line only states the pick when it names it: "By Dana Whitfield" says nothing for Sam Okafor.
+    // A label line states the pick only when it names it.
     const names = line !== null && namesOption(request.blocks[line.index].text, field.options[pick.index].label)
-    // A line that names someone else is what the piece states, so the pick can only be a judged one.
+    // A line naming someone else makes the pick a judged one.
     const stated = line !== null ? names : probability(answers, questionId.stated(index)) >= 0.5
     if (pick.confidence < (stated ? floors.pick : floors.judged)) return
-    // A page layout has an answer that sounds like a default; the text of a piece doesn't settle it.
+    // Some fields (a page layout) can't be settled by the text.
     if (!stated && probability(answers, questionId.settled(index)) < 0.5) return
     picked.set(index, {
       field: field.name,
@@ -181,7 +180,7 @@ export function readAnswers(
     if (line && names) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
   })
 
-  // Every block ends up in one place: the surest claim on it wins, and the headline wins a tie.
+  // One place per block: the surest claim wins, the headline wins a tie.
   claims.sort((a, b) => b.confidence - a.confidence || Number(b.what === 'headline') - Number(a.what === 'headline'))
   const taken = new Set<number>()
   const response: SortingResponse = {version: SORTING_VERSION, headline: null, placed: [], picked: [], listed: []}
@@ -201,7 +200,7 @@ export function readAnswers(
     }
   }
 
-  // In the order the room listed the fields.
+  // In field order.
   response.placed.sort(
     (a, b) => request.fields.findIndex((f) => f.name === a.field) - request.fields.findIndex((f) => f.name === b.field),
   )

@@ -39,10 +39,10 @@ export const DetailsDocument = createContext<string | null>(null)
 export function RoomField(props: FieldProps) {
   const inRoom = useContext(InRoomDetails)
   const documentId = useContext(DetailsDocument)
-  // Sorting filled this one, and the Writer hasn't changed it since.
+  // Still holds what Sorting filled.
   const fromPaste = inRoom && props.path.length === 1 && sortingMarks.has(documentId, props.name, props.value)
   if (!inRoom || !hasRoomChrome(props.schemaType)) {
-    // Sanity draws this field, label and all; the room only adds its one line beneath.
+    // Sanity draws the field; the room adds one line beneath.
     return fromPaste ? (
       <Field>
         {props.renderDefault(props)}

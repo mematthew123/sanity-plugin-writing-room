@@ -2,7 +2,7 @@
  * The Sorting evaluation: runs every paste in fixtures/sorting against Jev and reports, field by
  * field, what was filled correctly, what was left empty that should have been filled, and what
  * was filled wrongly. Run by hand with `pnpm sorting:eval`; it needs AI_GATEWAY_API_KEY in
- * .env.local and costs a fraction of a cent. See docs/sorting-plan.md.
+ * .env.local and costs a fraction of a cent.
  *
  * Each paste is asked about once. The floors are then tried over the same answers, so the table
  * of floors costs nothing extra.

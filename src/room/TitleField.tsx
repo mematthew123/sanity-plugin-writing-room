@@ -104,7 +104,7 @@ export function TitleField({
         if (readOnly || !onPastePiece) return
         const text = event.clipboardData.getData('text/plain')
         const {selectionStart, selectionEnd, value} = event.currentTarget
-        // What the paste would have done by itself, should the body not take it.
+        // The default paste, if the body doesn't take it.
         const asTitle = () => setTitle(value.slice(0, selectionStart) + text + value.slice(selectionEnd))
         if (onPastePiece(event.clipboardData, asTitle)) event.preventDefault()
       }}

@@ -148,7 +148,7 @@ function LoadedRoom({
     rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
   }, [projectId, dataset, handle.documentId, handle.documentType])
 
-  // While a piece is being sorted the page is held: blurred, and not for typing in.
+  // Held (blurred, read-only) while a piece is sorted.
   const [holding, setHolding] = useState(false)
 
   useEffect(() => {
@@ -323,14 +323,13 @@ function Title({
     if (inDetails) askForFirstDetail()
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
-  // Paragraphs pasted into the title of a document with nothing in its body belong in the body: a
-  // title can't hold them. The paste is handed to the editor whole, formatting and all.
+  // Paragraphs pasted into the title of an empty document go to the body.
   const onPastePiece = useCallback(
     (data: DataTransfer, asTitle: () => void) => {
       const paragraphs = data.getData('text/plain').split(/\n+/).filter((line) => line.trim()).length
       const editable = editor.dom.getEditorElement?.()
       if (paragraphs < 2 || inDetails || !editable || !bodyIsEmpty(editor.getSnapshot().context.value)) return false
-      // The clipboard's own data can't be read once this event is over, so it's copied.
+      // Clipboard data can't be read after this event, so copy it.
       const copy = new DataTransfer()
       for (const type of ['text/html', 'text/plain']) {
         const value = data.getData(type)
@@ -340,7 +339,7 @@ function Title({
       requestAnimationFrame(() => {
         const paste = new ClipboardEvent('paste', {clipboardData: copy, bubbles: true, cancelable: true})
         editable.dispatchEvent(paste)
-        // The editor says it took a paste by cancelling it. If it didn't, nothing may be lost.
+        // The editor cancels a paste it took.
         if (!paste.defaultPrevented) asTitle()
       })
       return true
@@ -510,7 +509,7 @@ const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
     filter var(--calm-motion-gentle) var(--calm-motion-easing),
     opacity var(--calm-motion-gentle) var(--calm-motion-easing);
 
-  /* The hold while a piece is sorted: the one blur in the room. A dim and no blur under reduced motion. */
+  /* The hold while a piece is sorted. A dim, not a blur, under reduced motion. */
   &[data-holding='true'] {
     opacity: 0.55;
     filter: blur(3px);

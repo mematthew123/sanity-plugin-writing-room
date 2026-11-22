@@ -40,7 +40,7 @@ function rememberAccepted() {
   try {
     window.localStorage.setItem(ACCEPTED_KEY, '1')
   } catch {
-    // Storage unavailable: the longer line is shown again next time, which is harmless.
+    // No storage: the longer offer shows again next time.
   }
 }
 
@@ -62,7 +62,7 @@ const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)
  */
 function thatFit(sortable: SortableField[], rest: Omit<SortingRequest, 'fields'>): SortableField[] {
   let fits = sortable
-  // Headroom for what the request holds besides: its braces and keys.
+  // Headroom for the request's own keys.
   const room = LIMITS.body - bytes({...rest, fields: []}) - 1024
   while (fits.length > 0 && bytes(fits.map((entry) => entry.field)) > room) {
     const answers = (entry: SortableField) => (entry.field.kind === 'pick' ? entry.field.options.length : 0)
@@ -97,11 +97,11 @@ async function withAnswers(
           {signal},
         )
       } catch (error) {
-        // Stopped is stopped for the whole sort; anything else costs only this field.
+        // An abort stops the whole sort; any other error costs only this field.
         if (signal.aborted) throw error
         return null
       }
-      // More answers than one question can offer: narrowing them down is a search, not Sorting.
+      // More answers than one question can offer.
       if (documents.length > LIMITS.options) return null
       const options = documents.flatMap((document) =>
         typeof document.label === 'string' && document.label.trim() ? [{id: document._id, label: document.label.trim()}] : [],
@@ -132,7 +132,7 @@ let saidWhyOff = false
  * holds the page, asks the Studio's own route where the parts belong, and applies the answer. It
  * renders nothing of its own. Only in a Studio that has set Sorting up; anywhere else, and for a
  * Writer signed in without a token to show the route, the room is as it always was.
- * See docs/sorting-plan.md and DESIGN.md.
+ * See DESIGN.md.
  */
 export function Sorting({
   handle,
@@ -159,7 +159,7 @@ export function Sorting({
   const edit = useEditDocument<Record<string, unknown>>(handle)
   const enabled = !!sorting && !!token && !locked
 
-  // Set up but silent is a puzzle for whoever set it up, so say why, once, where they will look.
+  // Tell whoever set Sorting up why it's silent, once.
   useEffect(() => {
     if (sorting && !token && !saidWhyOff) {
       saidWhyOff = true
@@ -193,11 +193,10 @@ export function Sorting({
     seeDetails.current = onSeeDetails
   })
 
-  // Read only by the effects that need it, in the phase they need it: the room re-renders on every
-  // keystroke, and walking the whole piece each time would be paid by every Writer, sorting or not.
+  // Read only inside effects: this component re-renders on every keystroke.
   const body = document?.[writing.body]
 
-  // Sorting takes away only the notice it showed: by now the room may be showing someone else's.
+  // Dismiss only Sorting's own notice; the room may be showing another by now.
   const mine = useRef<RoomNotice | null>(null)
   const show = useCallback(
     (notice: RoomNotice) => {
@@ -212,7 +211,7 @@ export function Sorting({
     if (shown) onNotice((current) => (current === shown ? null : current))
   }, [onNotice])
 
-  // Whether the body was empty is only knowable before the paste lands, so it's noted on the way in.
+  // Whether the body was empty can only be known before the paste lands.
   const behaviors = useMemo(
     () => [
       defineBehavior({
@@ -222,7 +221,7 @@ export function Sorting({
             pastedAt.current = Date.now()
             queueMicrotask(() => setPastes((count) => count + 1))
           }
-          // Never handles the paste: it lands exactly as it would have.
+          // Never handles the paste.
           return false
         },
         actions: [],
@@ -292,7 +291,7 @@ export function Sorting({
         show({text: NOTHING})
         return
       }
-      // Only what Sorting changed, laid over the document as it is this instant.
+      // Only the touched keys, over the document as it is now.
       edit((current) => {
         const next: Record<string, unknown> = {...(current ?? {})}
         for (const key of sorted.touched) next[key] = sorted.next[key]
@@ -334,7 +333,7 @@ export function Sorting({
       })
     } catch {
       setPhase('idle')
-      // Esc is the Writer's own doing and needs no message; running out of time is not.
+      // Esc needs no message; a timeout does.
       const stopped = controller.signal.aborted && abort.current === null
       if (stopped) dismiss()
       else show({text: COULD_NOT})
@@ -345,14 +344,13 @@ export function Sorting({
     }
   }, [sorting, token, schema, client, handle.documentId, handle.documentType, writing, isPublished, edit, onHolding, show, dismiss])
 
-  // Read through a ref, so a new function from a re-render never restarts the wait below.
+  // A ref, so a re-render never restarts the wait below.
   const sortNow = useRef(sort)
   useEffect(() => {
     sortNow.current = sort
   })
 
-  // The offer: once the paste has landed and the body has held still, if it was empty before and
-  // holds a piece now.
+  // Offer once the paste has settled, if the body was empty before and holds a piece now.
   useEffect(() => {
     if (!enabled || phase !== 'idle' || !pastedAt.current) return undefined
     if (Date.now() - pastedAt.current > PASTE_GIVE_UP_MS) {
@@ -362,7 +360,7 @@ export function Sorting({
     const still = setTimeout(() => {
       if (!isWholePiece(body)) return
       pastedAt.current = 0
-      // The words only: keys and marks settle after a paste, and settling isn't the Writer writing on.
+      // Words only: keys and marks settle after a paste.
       watched.current = wordsIn(body)
       setPhase('offered')
       show({text: hasAccepted() ? OFFER : FIRST_OFFER, action: {label: 'Sort', onClick: () => void sortNow.current()}})
@@ -370,16 +368,14 @@ export function Sorting({
     return () => clearTimeout(still)
   }, [enabled, phase, pastes, body, show])
 
-  // Going on writing is a no: the offer goes away.
+  // Writing on declines the offer.
   useEffect(() => {
     if (phase !== 'offered' || wordsIn(body) === watched.current) return
     setPhase('idle')
     dismiss()
   }, [phase, body, dismiss])
 
-  // The first edit, by anyone, to what Sorting touched ends Undo: putting the paste back would
-  // take that edit with it. Sorting's own change is told from an edit by what it says, not by when
-  // it arrives: a slow save is still Sorting's, and a quick edit is still an edit.
+  // An edit to what Sorting touched ends Undo, which would overwrite it. Told by content, not timing.
   useEffect(() => {
     const kept = undo.current
     if (phase !== 'sorted' || !kept) return
@@ -388,15 +384,14 @@ export function Sorting({
       kept.landed = true
       return
     }
-    // Not here yet: the room is still showing the document from before.
+    // The sorted document hasn't rendered yet.
     if (!kept.landed && now === kept.unsorted) return
     undo.current = null
     setPhase('idle')
     dismiss()
   }, [phase, document, dismiss])
 
-  // Leaving the room, or opening another piece, stops a sort that is still out: its answer must
-  // not land on a document the Writer has left. The marks are for this visit only, too.
+  // Leaving the room or the document stops a sort in flight and clears the marks.
   useEffect(
     () => () => {
       const controller = abort.current
@@ -407,7 +402,7 @@ export function Sorting({
     [handle.documentId],
   )
 
-  // Esc ends the hold and nothing else: it mustn't also leave the room.
+  // Esc ends the hold without also leaving the room.
   useEffect(() => {
     if (phase !== 'holding') return undefined
     const stop = (event: KeyboardEvent) => {

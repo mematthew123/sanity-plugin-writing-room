@@ -29,7 +29,7 @@ export interface Sorted {
 /**
  * What the document becomes when the route's answer is applied. Only empty fields are filled,
  * and text that is placed is moved: every block the answer uses leaves the body, and nothing else
- * does. See docs/adr/0003-sorting-places-and-picks-but-never-writes.md.
+ * does.
  */
 export function applySorting({
   document,
@@ -74,7 +74,7 @@ export function applySorting({
         if (slug) next[writing.slug] = {_type: 'slug', current: slug}
       }
     } else if (headline && sameWords(headline, title)) {
-      // The Writer already typed this title: the pasted copy of it goes, theirs stays.
+      // Same title already typed: drop the pasted copy.
       leaving.add(response.headline.block)
     }
   }
@@ -100,14 +100,13 @@ export function applySorting({
     else if (entry.store === 'reference') next[picked.field] = reference(options[0]!)
     else next[picked.field] = options.map((id) => ({...reference(id), _key: keyGenerator()}))
     filled.push(picked.field)
-    // A label line only leaves when every answer it named was picked, which the route decides.
+    // The line leaves only when every answer it named was picked.
     if (picked.line && options.length === picked.options.length) leaving.add(picked.line)
   }
 
   for (const listed of response.listed) {
     const entry = byName.get(listed.field)
-    // The route reads a long line cut short, and the whole line leaves the body. So a line past
-    // the cut is read again here, in full: every item it lists is kept.
+    // The route saw a long line cut short, so read it again here in full.
     const line = body.find((block) => block._key === listed.line)
     const whole = line ? blockText(line).trim() : ''
     const read = whole.length > LIMITS.blockText ? itemsInLine(whole) : []

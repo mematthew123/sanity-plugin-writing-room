@@ -4,7 +4,6 @@ import {LIMITS, type SortingField, type SortingRequest} from './contract'
  * The questions Sorting puts to the model, and the shared state they are asked about. The model
  * only ever chooses among answers given here (a pasted block, an existing option, yes or no), so
  * nothing it returns can be text the Writer didn't write.
- * See docs/adr/0003-sorting-places-and-picks-but-never-writes.md.
  */
 export type SortingQuestion =
   | {type: 'choice'; instructions: string; criteria: Record<string, string>}
@@ -110,7 +109,7 @@ export function buildDecision(request: SortingRequest): SortingDecision {
     if (field.kind === 'list') return
 
     if (field.many) {
-      // Too many answers to judge one by one: the label line, read by code, is all it is filled from.
+      // Too many answers to judge: filled from a label line only.
       if (!judged.has(index)) return
       field.options.forEach((option, optionIndex) => {
         questions[questionId.applies(index, optionIndex)] = {

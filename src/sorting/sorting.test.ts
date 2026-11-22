@@ -126,7 +126,7 @@ describe('the questions', () => {
     expect([...judgedFields(request)]).toEqual([0, 2])
     const asked = Object.keys(buildDecision(request).questions)
     expect(asked.filter((id) => id.startsWith('applies:'))).toHaveLength(LIMITS.judged)
-    // A field that isn't judged is still asked for its label line.
+    // Still asked for its label line.
     expect(asked).toContain(questionId.line(1))
     expect(asked).not.toContain(questionId.applies(1, 0))
   })
@@ -177,10 +177,10 @@ describe('reading the answers', () => {
   it('keeps a byline that names someone the field does not offer', () => {
     const request = structuredClone(lisbon)
     request.blocks[1].text = 'By Dana Whitfield'
-    // Sure enough for a stated pick, but the line states someone else: it is held as a judged one.
+    // The line states someone else, so the pick is held as judged.
     const guessed = {...good, [questionId.pick(1)]: choice('o2', 0.82), [questionId.settled(1)]: yes(0.9)}
     expect(readAnswers(request, guessed).picked.find((pick) => pick.field === 'author')).toBeUndefined()
-    // Over the judged floor the pick is made, and the byline still stays in the body.
+    // Over the judged floor: picked, and the byline stays.
     const sure = {...guessed, [questionId.pick(1)]: choice('o2', 0.95)}
     expect(readAnswers(request, sure).picked[0]).toEqual({
       field: 'author',

@@ -1,7 +1,6 @@
 /**
  * What the room sends to the Sorting route and what comes back. The room and the route can be on
  * different versions of the package, so this shape is a contract: change it by adding a version.
- * See docs/adr/0002-sorting-runs-through-a-route-the-studio-hosts.md.
  */
 export const SORTING_VERSION = 1
 

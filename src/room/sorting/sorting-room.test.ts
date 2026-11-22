@@ -175,7 +175,7 @@ describe('applying what the route answered', () => {
   it('keeps every tag of a line longer than the route reads', () => {
     const all = Array.from({length: 120}, (_, i) => `tag number ${i}`)
     const long = [...body.slice(0, 3), block('k4', `Tags: ${all.join(', ')}`), body[4]]
-    // What the route saw: the line cut at its limit, so the last item is cut too.
+    // What the route saw: the line cut at its limit.
     const cut = all.join(', ').slice(0, 594).split(', ')
     const sorted = apply({body: long}, {...response, listed: [{field: 'tags', values: cut, line: 'k4', confidence: 0.99}]})
     expect(sorted.next.tags).toEqual(all)
@@ -213,9 +213,9 @@ describe('applying what the route answered', () => {
   it('compares content, not bookkeeping', () => {
     expect(contentOf({_rev: 'a', title: 'T', body})).toBe(contentOf({_rev: 'b', _updatedAt: 'now', body, title: 'T'}))
     expect(contentOf({title: 'T'})).not.toBe(contentOf({title: 'T2'}))
-    // A save can hand an object's keys back in another order: that is not an edit.
+    // Key order is not an edit.
     expect(contentOf({author: {_type: 'reference', _ref: 'a'}})).toBe(contentOf({author: {_ref: 'a', _type: 'reference'}}))
-    // Only the fields asked about count, so an edit elsewhere leaves Undo alone.
+    // Only the fields asked about count.
     expect(contentOf({title: 'T', excerpt: 'one'}, ['title'])).toBe(contentOf({title: 'T', excerpt: 'two'}, ['title']))
     expect(contentOf({title: 'T'}, ['title'])).not.toBe(contentOf({title: 'T2'}, ['title']))
   })
