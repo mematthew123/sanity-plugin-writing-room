@@ -103,6 +103,43 @@ describe('the fields Sorting may fill', () => {
     )
   })
 
+  it('prefers a nested preview title to the fallback fields', () => {
+    const nested = createSchema({
+      name: 'nested',
+      types: [
+        {
+          name: 'person',
+          type: 'document',
+          fields: [
+            {name: 'profile', type: 'object', fields: [{name: 'displayName', type: 'string'}]},
+          ],
+          preview: {select: {title: 'profile.displayName'}},
+        },
+      ],
+    })
+    expect(labelQuery(['person'], (name) => nested.get(name))).toBe(
+      'select(_type == "person" => coalesce(profile.displayName, title, name))',
+    )
+  })
+
+  it.each([
+    '.name',
+    'profile.',
+    'profile..name',
+    'profile.1name',
+    'profile.display-name',
+    'profile[0].name',
+    'profile. name',
+  ])(
+    'falls back when the preview title contains an invalid path: %s',
+    (title) => {
+      const author = {...schema.get('author')!, preview: {select: {title}}}
+      expect(labelQuery(['author'], () => author)).toBe(
+        'select(_type == "author" => coalesce(title, name))',
+      )
+    },
+  )
+
   it('keeps the name a reference is stored under', () => {
     const named = createSchema({
       name: 'named',

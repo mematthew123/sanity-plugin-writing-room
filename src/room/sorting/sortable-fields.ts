@@ -153,7 +153,9 @@ export function labelPaths(type: string, getSchemaType: (name: string) => Schema
   const paths = new Set<string>()
   const select = (getSchemaType(type) as {preview?: {select?: Record<string, unknown>}} | undefined)?.preview?.select
   const title = select?.title
-  if (typeof title === 'string' && /^[A-Za-z_]\w*$/.test(title)) paths.add(title)
+  if (typeof title === 'string' && title.split('.').every((segment) => /^[A-Za-z_]\w*$/.test(segment))) {
+    paths.add(title)
+  }
   for (const fallback of ['title', 'name']) paths.add(fallback)
   return [...paths]
 }
