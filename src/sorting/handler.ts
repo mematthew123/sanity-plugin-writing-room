@@ -44,6 +44,29 @@ async function isMember(token: string, projectId: string, doFetch: typeof fetch,
 }
 
 /**
+ * The request body as text, or null once it runs past `max` bytes. It stops reading there, so a
+ * body with no content-length is never held in memory whole.
+ */
+async function readBody(request: Request, max: number): Promise<string | null> {
+  const reader = request.body?.getReader()
+  if (!reader) return ''
+  const decoder = new TextDecoder()
+  let size = 0
+  let text = ''
+  for (;;) {
+    const {done, value} = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > max) {
+      await reader.cancel().catch(() => undefined)
+      return null
+    }
+    text += decoder.decode(value, {stream: true})
+  }
+  return text + decoder.decode()
+}
+
+/**
  * The Sorting route, for a Studio's owner to mount. It checks the caller is a member of the
  * project, asks the model where the parts of a whole-piece paste belong, and answers. It reads
  * and writes no documents and holds no Sanity token of its own.
@@ -75,23 +98,25 @@ export function createSortingRoute(options: SortingHandlerOptions): (request: Re
     if (!token) return answer(401, {error: 'unauthorized'})
 
     if (Number(request.headers.get('content-length') ?? 0) > LIMITS.body) return answer(413, {error: 'too-large'})
-    let body: unknown
-    try {
-      const raw = await request.text()
-      if (raw.length > LIMITS.body) return answer(413, {error: 'too-large'})
-      body = JSON.parse(raw)
-    } catch {
-      return answer(400, {error: 'invalid', problem: 'The request is not JSON.'})
-    }
-    const parsed = parseSortingRequest(body)
-    if ('problem' in parsed) return answer(400, {error: 'invalid', problem: parsed.problem})
 
+    // Who is asking comes first: nothing a stranger sends is read.
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(timeout)])
     try {
       if (!(await isMember(token, projectId, doFetch, signal))) return answer(403, {error: 'forbidden'})
     } catch {
       return answer(502, {error: 'unavailable'})
     }
+
+    let body: unknown
+    try {
+      const raw = await readBody(request, LIMITS.body)
+      if (raw === null) return answer(413, {error: 'too-large'})
+      body = JSON.parse(raw)
+    } catch {
+      return answer(400, {error: 'invalid', problem: 'The request is not JSON.'})
+    }
+    const parsed = parseSortingRequest(body)
+    if ('problem' in parsed) return answer(400, {error: 'invalid', problem: parsed.problem})
 
     const decision = buildDecision(parsed.request)
     // Nothing to ask: no top blocks and no fields.

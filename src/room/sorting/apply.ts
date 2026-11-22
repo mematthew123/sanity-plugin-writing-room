@@ -134,12 +134,27 @@ export function sortedMessage({filled, titled}: Pick<Sorted, 'filled' | 'titled'
   return `Sorted. ${list} ${names.length === 1 ? 'is' : 'are'} in Details.`
 }
 
-/** What Sorting compares to know the document has been edited since: its content, not its bookkeeping. */
-export function contentOf(document: Record<string, unknown> | null | undefined): string {
+/** The same value whatever order its keys came back in: a save can return an object's keys reordered. */
+function inKeyOrder(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(inKeyOrder)
+  if (typeof value !== 'object' || value === null) return value
+  const record = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.keys(record)
+      .sort()
+      .map((key) => [key, inKeyOrder(record[key])]),
+  )
+}
+
+/**
+ * What Sorting compares to know the document has been edited since: its content, not its
+ * bookkeeping. With `keys`, only those fields: the ones Undo would put back.
+ */
+export function contentOf(document: Record<string, unknown> | null | undefined, keys?: string[]): string {
   if (!document) return ''
-  const content = Object.keys(document)
-    .filter((key) => !key.startsWith('_'))
+  const content = (keys ?? Object.keys(document).filter((key) => !key.startsWith('_')))
+    .slice()
     .sort()
-    .map((key) => [key, document[key]])
+    .map((key) => [key, inKeyOrder(document[key])])
   return JSON.stringify(content)
 }

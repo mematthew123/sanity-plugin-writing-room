@@ -87,6 +87,12 @@ export const LIMITS = {
   fields: 40,
   /** A Choice takes at most 255 options; one is kept for "none of these". */
   options: 254,
+  /**
+   * Yes-or-no questions one request spends on judging the answers of fields that take several:
+   * one per answer. The model reads every question in one call, inside one context and one
+   * timeout, so a field whose answers don't fit is filled from a label line or not at all.
+   */
+  judged: 60,
   label: 200,
   description: 400,
 } as const

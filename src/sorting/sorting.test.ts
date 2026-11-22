@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest'
-import {namedInLine, readAnswers, type SortingAnswer} from './answers'
+import {namedInLine, namesOption, readAnswers, type SortingAnswer} from './answers'
 import {LIMITS, parseSortingRequest, type SortingPickField, type SortingRequest} from './contract'
 import {createSortingRoute, type SortingDecide} from './handler'
-import {buildDecision, NONE, questionId} from './questions'
+import {buildDecision, judgedFields, NONE, questionId} from './questions'
 
 const tags: SortingPickField = {
   kind: 'pick',
@@ -110,6 +110,26 @@ describe('the questions', () => {
     const place = questions[questionId.place(0)]
     expect(place.instructions).toContain('A one-line summary shown in lists.')
   })
+
+  it('judges answer by answer only while the questions last', () => {
+    const many = (name: string, count: number): SortingPickField => ({
+      kind: 'pick',
+      name,
+      title: name,
+      many: true,
+      options: Array.from({length: count}, (_, i) => ({id: `${name}-${i}`, label: `${name} ${i}`})),
+    })
+    const request: SortingRequest = {
+      ...lisbon,
+      fields: [many('topics', LIMITS.judged - 10), many('tags', 200), many('series', 10), many('places', 1)],
+    }
+    expect([...judgedFields(request)]).toEqual([0, 2])
+    const asked = Object.keys(buildDecision(request).questions)
+    expect(asked.filter((id) => id.startsWith('applies:'))).toHaveLength(LIMITS.judged)
+    // A field that isn't judged is still asked for its label line.
+    expect(asked).toContain(questionId.line(1))
+    expect(asked).not.toContain(questionId.applies(1, 0))
+  })
 })
 
 describe('reading the answers', () => {
@@ -152,6 +172,30 @@ describe('reading the answers', () => {
   it('keeps the byline in the body when no author was picked', () => {
     const unknown = {...good, [questionId.pick(1)]: choice(NONE)}
     expect(readAnswers(lisbon, unknown).picked.find((pick) => pick.field === 'author')).toBeUndefined()
+  })
+
+  it('keeps a byline that names someone the field does not offer', () => {
+    const request = structuredClone(lisbon)
+    request.blocks[1].text = 'By Dana Whitfield'
+    // Sure enough for a stated pick, but the line states someone else: it is held as a judged one.
+    const guessed = {...good, [questionId.pick(1)]: choice('o2', 0.82), [questionId.settled(1)]: yes(0.9)}
+    expect(readAnswers(request, guessed).picked.find((pick) => pick.field === 'author')).toBeUndefined()
+    // Over the judged floor the pick is made, and the byline still stays in the body.
+    const sure = {...guessed, [questionId.pick(1)]: choice('o2', 0.95)}
+    expect(readAnswers(request, sure).picked[0]).toEqual({
+      field: 'author',
+      options: ['author-sam'],
+      kind: 'judged',
+      line: null,
+      confidence: 0.95,
+    })
+  })
+
+  it('reads whether a line names an answer', () => {
+    expect(namesOption('By Sam Okafor', 'Sam Okafor')).toBe(true)
+    expect(namesOption('Category:  NEWS.', 'news')).toBe(true)
+    expect(namesOption('By Dana Whitfield', 'Sam Okafor')).toBe(false)
+    expect(namesOption('Category: Newsletters', 'News')).toBe(false)
   })
 
   it('picks the author from a note at the foot and keeps the note', () => {
@@ -270,6 +314,32 @@ describe('the route', () => {
     expect(invalid.status).toBe(400)
     expect(await invalid.json()).toEqual({error: 'invalid', problem: 'There are no blocks to sort.'})
     expect((await route()(post('x'.repeat(LIMITS.body + 1)))).status).toBe(413)
+  })
+
+  it('stops reading a body that runs past the limit, and counts bytes', async () => {
+    let sent = 0
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += 1
+        controller.enqueue(new Uint8Array(64 * 1024))
+      },
+    })
+    const request = new Request('https://site.example/api/sort', {
+      method: 'POST',
+      headers: {authorization: 'Bearer writer-token'},
+      body: endless,
+      duplex: 'half',
+    } as RequestInit)
+    expect((await route()(request)).status).toBe(413)
+    expect(sent).toBeLessThan(10)
+    // Under the limit in characters, over it in bytes.
+    expect((await route()(post('é'.repeat(LIMITS.body / 2 + 1)))).status).toBe(413)
+  })
+
+  it('reads nothing from a caller who is not a member', async () => {
+    const request = post()
+    expect((await route({fetch: async () => Response.json({})})(request)).status).toBe(403)
+    expect(request.bodyUsed).toBe(false)
   })
 
   it('says only that it is unavailable when the model or Sanity fails', async () => {

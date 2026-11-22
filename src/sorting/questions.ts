@@ -1,4 +1,4 @@
-import {type SortingField, type SortingRequest} from './contract'
+import {LIMITS, type SortingField, type SortingRequest} from './contract'
 
 /**
  * The questions Sorting puts to the model, and the shared state they are asked about. The model
@@ -43,7 +43,24 @@ function describe(field: SortingField): string {
 const STATE =
   'The state is a piece of writing pasted from another editor. `top` holds its first blocks in order and `bottom` its last, each under a short name; `opening` is the running text that follows the top blocks.'
 
+/**
+ * The fields that take several answers and are judged answer by answer, by index. Each answer
+ * costs a question, so they are taken in the room's order while `LIMITS.judged` lasts. A field is
+ * judged whole or not at all: judging only its first answers would favour them.
+ */
+export function judgedFields(request: SortingRequest): Set<number> {
+  const judged = new Set<number>()
+  let left: number = LIMITS.judged
+  request.fields.forEach((field, index) => {
+    if (field.kind !== 'pick' || !field.many || field.options.length > left) return
+    left -= field.options.length
+    judged.add(index)
+  })
+  return judged
+}
+
 export function buildDecision(request: SortingRequest): SortingDecision {
+  const judged = judgedFields(request)
   const top: Record<string, string> = {}
   const bottom: Record<string, string> = {}
   const everyBlock: Record<string, string> = {}
@@ -93,6 +110,8 @@ export function buildDecision(request: SortingRequest): SortingDecision {
     if (field.kind === 'list') return
 
     if (field.many) {
+      // Too many answers to judge one by one: the label line, read by code, is all it is filled from.
+      if (!judged.has(index)) return
       field.options.forEach((option, optionIndex) => {
         questions[questionId.applies(index, optionIndex)] = {
           type: 'boolean',

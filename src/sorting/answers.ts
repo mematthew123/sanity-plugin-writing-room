@@ -86,6 +86,13 @@ export function namedInLine(line: string, field: SortingPickField): {options: st
   return {options, whole}
 }
 
+/** Whether a label line names an answer, read by code: "By Sam Okafor" names "Sam Okafor". */
+export function namesOption(line: string, label: string): boolean {
+  const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  const wanted = plain(label)
+  return wanted !== '' && ` ${plain(line)} `.includes(` ${wanted} `)
+}
+
 type Picked = SortingResponse['picked'][number]
 type Claim = {block: number; confidence: number} & (
   | {what: 'headline'}
@@ -157,7 +164,10 @@ export function readAnswers(
 
     const pick = chosen(answers, confidence, questionId.pick(index), optionName, field.options.length)
     if (!pick) return
-    const stated = line !== null || probability(answers, questionId.stated(index)) >= 0.5
+    // A label line only states the pick when it names it: "By Dana Whitfield" says nothing for Sam Okafor.
+    const names = line !== null && namesOption(request.blocks[line.index].text, field.options[pick.index].label)
+    // A line that names someone else is what the piece states, so the pick can only be a judged one.
+    const stated = line !== null ? names : probability(answers, questionId.stated(index)) >= 0.5
     if (pick.confidence < (stated ? floors.pick : floors.judged)) return
     // A page layout has an answer that sounds like a default; the text of a piece doesn't settle it.
     if (!stated && probability(answers, questionId.settled(index)) < 0.5) return
@@ -168,7 +178,7 @@ export function readAnswers(
       line: null,
       confidence: pick.confidence,
     })
-    if (line) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
+    if (line && names) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
   })
 
   // Every block ends up in one place: the surest claim on it wins, and the headline wins a tie.

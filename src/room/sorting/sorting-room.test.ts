@@ -204,5 +204,10 @@ describe('applying what the route answered', () => {
   it('compares content, not bookkeeping', () => {
     expect(contentOf({_rev: 'a', title: 'T', body})).toBe(contentOf({_rev: 'b', _updatedAt: 'now', body, title: 'T'}))
     expect(contentOf({title: 'T'})).not.toBe(contentOf({title: 'T2'}))
+    // A save can hand an object's keys back in another order: that is not an edit.
+    expect(contentOf({author: {_type: 'reference', _ref: 'a'}})).toBe(contentOf({author: {_ref: 'a', _type: 'reference'}}))
+    // Only the fields asked about count, so an edit elsewhere leaves Undo alone.
+    expect(contentOf({title: 'T', excerpt: 'one'}, ['title'])).toBe(contentOf({title: 'T', excerpt: 'two'}, ['title']))
+    expect(contentOf({title: 'T'}, ['title'])).not.toBe(contentOf({title: 'T2'}, ['title']))
   })
 })

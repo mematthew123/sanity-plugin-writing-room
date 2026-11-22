@@ -1,7 +1,7 @@
 import {defineBehavior} from '@portabletext/editor/behaviors'
 import {BehaviorPlugin} from '@portabletext/editor/plugins'
 import {type DocumentHandle, useDocument, useEditDocument} from '@sanity/sdk-react'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {type SanityClient, type SchemaType, useClient, useSchema} from 'sanity'
 import {useWritingRoomConfig} from '../../config'
 import {API_VERSION} from '../../lib/api-version'
@@ -24,8 +24,6 @@ const HOLD_AT_MOST_MS = 8000
  */
 const PASTE_STILL_MS = 600
 const PASTE_GIVE_UP_MS = 6000
-/** The same goes for Sorting's own change: what follows it at once is its echo, not an edit. */
-const APPLY_SETTLES_MS = 1500
 
 /** One key for every Studio: storage is already per origin. */
 const ACCEPTED_KEY = 'sanity-plugin-writing-room:sorting-accepted'
@@ -118,7 +116,7 @@ export function Sorting({
   writing: WritingFields
   locked: boolean
   isPublished: boolean
-  onNotice: (notice: RoomNotice | null) => void
+  onNotice: Dispatch<SetStateAction<RoomNotice | null>>
   onHolding: (holding: boolean) => void
   onSeeDetails: () => void
 }) {
@@ -143,9 +141,19 @@ export function Sorting({
   const [phase, setPhase] = useState<Phase>('idle')
   const [pastes, setPastes] = useState(0)
   const pastedAt = useRef(0)
-  /** The body as it was when the offer was made, or the document as Sorting left it. */
+  /** The body as it was when the offer was made. */
   const watched = useRef('')
-  const undo = useRef<{before: Record<string, unknown>; touched: string[]} | null>(null)
+  /**
+   * The way back. `unsorted` and `sorted` are what Sorting touched, before and after; `landed` is
+   * whether the room has shown the sorted document yet, which it may not have on the first render.
+   */
+  const undo = useRef<{
+    before: Record<string, unknown>
+    touched: string[]
+    unsorted: string
+    sorted: string
+    landed: boolean
+  } | null>(null)
   const abort = useRef<AbortController | null>(null)
   const latest = useRef(document)
   const seeDetails = useRef(onSeeDetails)
@@ -157,8 +165,21 @@ export function Sorting({
   const body = document?.[writing.body]
   // The words only: keys and marks settle after a paste, and settling isn't the Writer writing on.
   const bodyWords = useMemo(() => writtenBlocks(body).map((block) => block.text).join('\n'), [body])
-  const appliedAt = useRef(0)
-  const content = useMemo(() => contentOf(document), [document])
+
+  // Sorting takes away only the notice it showed: by now the room may be showing someone else's.
+  const mine = useRef<RoomNotice | null>(null)
+  const show = useCallback(
+    (notice: RoomNotice) => {
+      mine.current = notice
+      onNotice(notice)
+    },
+    [onNotice],
+  )
+  const dismiss = useCallback(() => {
+    const shown = mine.current
+    mine.current = null
+    if (shown) onNotice((current) => (current === shown ? null : current))
+  }, [onNotice])
 
   // Whether the body was empty is only knowable before the paste lands, so it's noted on the way in.
   const behaviors = useMemo(
@@ -188,7 +209,7 @@ export function Sorting({
     const tooLong = setTimeout(() => controller.abort(), HOLD_AT_MOST_MS)
     setPhase('holding')
     onHolding(true)
-    onNotice({text: 'Sorting…', stays: true})
+    show({text: 'Sorting…', stays: true})
     const wordsOf = (document: Record<string, unknown>) =>
       writtenBlocks(document[writing.body]).map((block) => `${block.id} ${block.text}`).join('\n')
     const startedWith = wordsOf(before)
@@ -222,7 +243,7 @@ export function Sorting({
       const now = latest.current ?? before
       if (wordsOf(now) !== startedWith) {
         setPhase('idle')
-        onNotice({text: CHANGED})
+        show({text: CHANGED})
         return
       }
       const sorted = applySorting({
@@ -237,7 +258,7 @@ export function Sorting({
       const message = sortedMessage(sorted)
       if (!message || sorted.touched.length === 0) {
         setPhase('idle')
-        onNotice({text: NOTHING})
+        show({text: NOTHING})
         return
       }
       // Only what Sorting changed, laid over the document as it is this instant.
@@ -247,16 +268,20 @@ export function Sorting({
         return next
       })
       sortingMarks.set(handle.documentId, Object.fromEntries(sorted.filledNames.map((name) => [name, sorted.next[name]])))
-      undo.current = {before: now, touched: sorted.touched}
-      watched.current = contentOf(sorted.next)
-      appliedAt.current = Date.now()
+      undo.current = {
+        before: now,
+        touched: sorted.touched,
+        unsorted: contentOf(now, sorted.touched),
+        sorted: contentOf(sorted.next, sorted.touched),
+        landed: false,
+      }
       setPhase('sorted')
       const putBack = () => {
         const kept = undo.current
         undo.current = null
         sortingMarks.clear(handle.documentId)
         setPhase('idle')
-        onNotice(null)
+        dismiss()
         if (!kept) return
         edit((current) => {
           const restored: Record<string, unknown> = {...(current ?? {})}
@@ -267,7 +292,7 @@ export function Sorting({
           return restored
         })
       }
-      onNotice({
+      show({
         text: message,
         done: true,
         stays: true,
@@ -280,13 +305,14 @@ export function Sorting({
       setPhase('idle')
       // Esc is the Writer's own doing and needs no message; running out of time is not.
       const stopped = controller.signal.aborted && abort.current === null
-      onNotice(stopped ? null : {text: COULD_NOT})
+      if (stopped) dismiss()
+      else show({text: COULD_NOT})
     } finally {
       clearTimeout(tooLong)
       abort.current = null
       onHolding(false)
     }
-  }, [sorting, token, schema, client, handle.documentId, handle.documentType, writing, isPublished, edit, onHolding, onNotice])
+  }, [sorting, token, schema, client, handle.documentId, handle.documentType, writing, isPublished, edit, onHolding, show, dismiss])
 
   // Read through a ref, so a new function from a re-render never restarts the wait below.
   const sortNow = useRef(sort)
@@ -307,32 +333,47 @@ export function Sorting({
       pastedAt.current = 0
       watched.current = bodyWords
       setPhase('offered')
-      onNotice({text: hasAccepted() ? OFFER : FIRST_OFFER, action: {label: 'Sort', onClick: () => void sortNow.current()}})
+      show({text: hasAccepted() ? OFFER : FIRST_OFFER, action: {label: 'Sort', onClick: () => void sortNow.current()}})
     }, PASTE_STILL_MS)
     return () => clearTimeout(still)
-  }, [enabled, phase, pastes, body, bodyWords, onNotice])
+  }, [enabled, phase, pastes, body, bodyWords, show])
 
   // Going on writing is a no: the offer goes away.
   useEffect(() => {
     if (phase !== 'offered' || bodyWords === watched.current) return
     setPhase('idle')
-    onNotice(null)
-  }, [phase, bodyWords, onNotice])
+    dismiss()
+  }, [phase, bodyWords, dismiss])
 
-  // The first edit, by anyone, ends Undo: putting the paste back would take that edit with it.
+  // The first edit, by anyone, to what Sorting touched ends Undo: putting the paste back would
+  // take that edit with it. Sorting's own change is told from an edit by what it says, not by when
+  // it arrives: a slow save is still Sorting's, and a quick edit is still an edit.
   useEffect(() => {
-    if (phase !== 'sorted' || content === watched.current) return
-    if (Date.now() - appliedAt.current < APPLY_SETTLES_MS) {
-      watched.current = content
+    const kept = undo.current
+    if (phase !== 'sorted' || !kept) return
+    const now = contentOf(document, kept.touched)
+    if (now === kept.sorted) {
+      kept.landed = true
       return
     }
+    // Not here yet: the room is still showing the document from before.
+    if (!kept.landed && now === kept.unsorted) return
     undo.current = null
     setPhase('idle')
-    onNotice(null)
-  }, [phase, content, onNotice])
+    dismiss()
+  }, [phase, document, dismiss])
 
-  // The marks are for this visit to the room only.
-  useEffect(() => () => sortingMarks.clear(handle.documentId), [handle.documentId])
+  // Leaving the room, or opening another piece, stops a sort that is still out: its answer must
+  // not land on a document the Writer has left. The marks are for this visit only, too.
+  useEffect(
+    () => () => {
+      const controller = abort.current
+      abort.current = null
+      controller?.abort()
+      sortingMarks.clear(handle.documentId)
+    },
+    [handle.documentId],
+  )
 
   // Esc ends the hold and nothing else: it mustn't also leave the room.
   useEffect(() => {
