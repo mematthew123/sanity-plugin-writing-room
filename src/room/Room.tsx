@@ -23,6 +23,8 @@ import {type WritingFields} from './fields'
 import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
+import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
+import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
 import {
   Column,
@@ -40,6 +42,7 @@ import {
   RoomSyncProvider,
   SaveState,
   StatusLabel,
+  UnlockButton,
 } from './room-status'
 import {useRoomSettings} from './room-settings'
 import {TitleField} from './TitleField'
@@ -53,9 +56,19 @@ export function Room({documentId, documentType}: {documentId: string; documentTy
 
   return (
     <Suspense fallback={<LoadingRoom />}>
-      <LoadedRoom handle={handle} problem={problem} onProblem={setProblem} />
+      <RoomOnceScheduleKnown handle={handle} problem={problem} onProblem={setProblem} />
     </Suspense>
   )
+}
+
+function RoomOnceScheduleKnown(props: {
+  handle: DocumentHandle
+  problem: string | null
+  onProblem: (problem: string | null) => void
+}) {
+  const schedule = useSchedule(props.handle.documentId)
+  if (!schedule) return <LoadingRoom />
+  return <LoadedRoom {...props} schedule={schedule} />
 }
 
 function LoadingRoom() {
@@ -78,28 +91,47 @@ function LoadingRoom() {
   )
 }
 
+const NOT_FOR_TYPING = [
+  'button',
+  'a',
+  'select',
+  'summary',
+  'input[type="checkbox"]',
+  'input[type="radio"]',
+  ...['button', 'checkbox', 'switch', 'radio', 'tab', 'menuitem', 'option', 'link'].map((role) => `[role="${role}"]`),
+].join(', ')
+
 const NOTICE_VISIBLE_MS = 8000
 /** Long enough to reach for a notice that offers somewhere to go. */
 const NOTICE_WITH_NEXT_STEP_MS = 16000
 
 function LoadedRoom({
   handle,
+  schedule,
   problem,
   onProblem,
 }: {
   handle: DocumentHandle
+  schedule: Schedule
   problem: string | null
   onProblem: (problem: string | null) => void
 }) {
   const scheme = useColorSchemeValue()
-  const {fields} = useWritingKind(handle.documentType)
+  const kind = useWritingKind(handle.documentType)
+  const {fields} = kind
   const schemaDefinition = useBodySchema(handle.documentType, fields.body)
-  const {data} = useDocumentProjection<{_id: string; slug?: string}>({
-    ...handle,
-    projection: fields.slug ? `{_id, "slug": ${fields.slug}.current}` : '{_id}',
-  })
+  const {data} = useDocumentProjection<{_id: string}>({...handle, projection: '{_id}'})
   const status = describePostStatus(data?._status)
   const isPublished = status.label !== 'Draft'
+  const locked = schedule.kind !== 'none'
+  const lockedRelease = locked ? schedule.releaseId : undefined
+  const shown = useShownHandle(handle, schedule)
+  const canSchedule = useSchedulingEnabled()
+  const [previousTime, setPreviousTime] = useState<string | undefined>(undefined)
+  const {data: shownData} = useDocumentProjection<{slug?: string}>({
+    ...shown,
+    projection: fields.slug ? `{"slug": ${fields.slug}.current}` : '{"slug": null}',
+  })
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
   const [notice, setNotice] = useState<RoomNotice | null>(null)
@@ -128,11 +160,36 @@ function LoadedRoom({
     </QuietButton>
   ) : null
   const preview = (
-    <PreviewButton documentType={handle.documentType} slug={data?.slug} onProblem={onProblem} />
+    <PreviewButton
+      documentType={handle.documentType}
+      slug={shownData?.slug ?? undefined}
+      releaseId={lockedRelease}
+      onProblem={onProblem}
+    />
   )
+  const lockedNotice =
+    schedule.kind === 'none'
+      ? null
+      : schedule.kind === 'scheduled'
+        ? `This ${kind.singular} is scheduled. Unlock it to make changes.`
+        : `This ${kind.singular} is locked. Unlock it to make changes.`
+  useEffect(() => {
+    if (!lockedNotice) return undefined
+    const explain = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.defaultPrevented) return
+      if (event.key.length !== 1 && event.key !== 'Backspace' && event.key !== 'Delete' && event.key !== 'Enter') return
+      const target = event.target as Element | null
+      const onThePage = target === document.body || !!page.current?.contains(target)
+      if (!onThePage || target?.closest(NOT_FOR_TYPING)) return
+      if (event.key === ' ' && !target?.closest('input, textarea, [contenteditable]')) return
+      setNotice((current) => (current?.text === lockedNotice ? current : {text: lockedNotice}))
+    }
+    window.addEventListener('keydown', explain)
+    return () => window.removeEventListener('keydown', explain)
+  }, [lockedNotice])
 
   return (
-    <EditorProvider initialConfig={{schemaDefinition}}>
+    <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
       <RoomSyncProvider handle={handle}>
         <div className={styles.layout}>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
@@ -143,7 +200,7 @@ function LoadedRoom({
                 {inDetails ? (
                   <BackToProse onBack={view.toProse} />
                 ) : (
-                  <LeaveButton handle={handle} isPublished={isPublished} />
+                  <LeaveButton handle={handle} isPublished={isPublished} locked={locked} />
                 )}
               </Recedes>
             }
@@ -153,7 +210,7 @@ function LoadedRoom({
                 <SaveState />
                 <Recedes>
                   <WideOnly>
-                    <StatusLabel status={status} />
+                    <StatusLabel status={status} schedule={schedule} />
                   </WideOnly>
                   <RoomSettingsMenu
                     scheme={scheme}
@@ -168,22 +225,42 @@ function LoadedRoom({
                     {details}
                     {preview}
                   </WideOnly>
-                  <PublishButton
-                    handle={handle}
-                    status={status}
-                    scheme={scheme}
-                    onProblem={onProblem}
-                    onNotice={setNotice}
-                  />
+                  {locked ? (
+                    <UnlockButton
+                      handle={handle}
+                      schedule={schedule}
+                      scheme={scheme}
+                      onProblem={onProblem}
+                      onNotice={setNotice}
+                      onUnlocked={setPreviousTime}
+                    />
+                  ) : (
+                    <PublishButton
+                      handle={handle}
+                      status={status}
+                      scheme={scheme}
+                      canSchedule={canSchedule}
+                      previousTime={previousTime}
+                      onProblem={onProblem}
+                      onNotice={setNotice}
+                    />
+                  )}
                 </Recedes>
               </>
             }
           />
           <div className={styles.main}>
             <Column as="article" className={styles.page} ref={page} data-text-size={settings.textSize}>
-              <Title handle={handle} fields={fields} isPublished={isPublished} inDetails={inDetails} />
+              <Title
+                handle={shown}
+                fields={fields}
+                isPublished={isPublished}
+                inDetails={inDetails}
+                locked={locked}
+              />
               <Pages
-                handle={handle}
+                handle={shown}
+                lockedRelease={lockedRelease}
                 fields={fields}
                 scheme={scheme}
                 page={page}
@@ -216,11 +293,13 @@ function Title({
   fields,
   isPublished,
   inDetails,
+  locked,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
   inDetails: boolean
+  locked: boolean
 }) {
   const editor = useEditor()
   // Enter goes on to whatever is under the title: the body, or the first of the Details.
@@ -228,12 +307,15 @@ function Title({
     if (inDetails) askForFirstDetail()
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
-  return <TitleField handle={handle} fields={fields} isPublished={isPublished} onEnter={onEnter} />
+  return (
+    <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={locked} onEnter={onEnter} />
+  )
 }
 
 /** The body and Details take turns under the title. The editor stays mounted, so the caret keeps its place. */
 function Pages({
   handle,
+  lockedRelease,
   fields,
   scheme,
   page,
@@ -242,6 +324,7 @@ function Pages({
   onProblem,
 }: {
   handle: DocumentHandle
+  lockedRelease: string | undefined
   fields: WritingFields
   scheme: string
   page: RefObject<HTMLElement | null>
@@ -260,13 +343,24 @@ function Pages({
     <>
       {/* Inert as soon as it starts to go, so nothing typed lands in an editor that can't be seen. */}
       <div className={styles.swap} hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
-        <BodyEditor handle={handle} path={fields.body} scheme={scheme} onProblem={onProblem} />
+        <BodyEditor
+          handle={handle}
+          path={fields.body}
+          scheme={scheme}
+          readOnly={!!lockedRelease}
+          onProblem={onProblem}
+        />
       </div>
       {shown === 'details' && (
         <div className={styles.swap} inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
           <DetailsBoundary onOpenInStructure={openInStructure}>
             <Suspense fallback={<Placeholder height="12rem" />}>
-              <DetailsView handle={handle} fields={fields} focusField={focusField} />
+              <DetailsView
+                handle={handle}
+                fields={fields}
+                focusField={focusField}
+                lockedRelease={lockedRelease}
+              />
             </Suspense>
           </DetailsBoundary>
         </div>
@@ -276,7 +370,15 @@ function Pages({
 }
 
 /** Returns to wherever the Writer came from; a never-published, empty document is discarded on the way out. */
-function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished: boolean}) {
+function LeaveButton({
+  handle,
+  isPublished,
+  locked,
+}: {
+  handle: DocumentHandle
+  isPublished: boolean
+  locked: boolean
+}) {
   const router = useRouter()
   const {data: post} = useDocument<Record<string, unknown>>(handle)
   // Details saves through the Studio's store, so what was just typed there is in its draft first.
@@ -287,7 +389,7 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
   const toForm = didComeFromForm(handle.documentId)
 
   const leave = useCallback(() => {
-    if (!isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
+    if (!locked && !isPublished && isEmptyPost(post, fields) && isEmptyPost(detailsDraft, fields)) {
       void apply(discardDocument(handle))
       router.navigate({})
     } else if (toForm) {
@@ -295,7 +397,7 @@ function LeaveButton({handle, isPublished}: {handle: DocumentHandle; isPublished
     } else {
       router.navigate({})
     }
-  }, [apply, handle, isPublished, post, detailsDraft, fields, router, toForm, openInStructure])
+  }, [apply, handle, isPublished, locked, post, detailsDraft, fields, router, toForm, openInStructure])
   useEscape(leave)
 
   const label = toForm ? 'Back to the form' : 'Back to the Lobby'

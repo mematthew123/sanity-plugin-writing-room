@@ -31,6 +31,10 @@ const FORM_EXPORTS = [
   'isNumberInputProps',
   'isObjectInputProps',
   'isStringInputProps',
+  'useActiveReleases',
+  'useDocumentVersions',
+  'useFeatureEnabled',
+  'useScheduledDraftsEnabled',
 ]
 const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react']
 
@@ -165,9 +169,9 @@ const sanityExports = execFileSync(
   {cwd: studioDir, encoding: 'utf8'},
 ).split(',')
 const missing = FORM_EXPORTS.filter((name) => !sanityExports.includes(name))
-console.log(`\nForm exports the Details view needs: ${missing.length ? `missing ${missing.join(', ')}` : 'all present'}`)
+console.log(`\nSanity exports the room needs: ${missing.length ? `missing ${missing.join(', ')}` : 'all present'}`)
 if (missing.length) {
-  console.error(`\n✗ sanity@${sanityVersion} doesn't export what the Details view is built on.`)
+  console.error(`\n✗ sanity@${sanityVersion} doesn't export what the room is built on.`)
   process.exit(1)
 }
 
