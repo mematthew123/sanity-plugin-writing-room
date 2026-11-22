@@ -2,10 +2,10 @@ import {createSchema} from 'sanity'
 import {describe, expect, it} from 'vitest'
 import {type SortingResponse} from '../../sorting/contract'
 import {type WritingFields} from '../fields'
-import {applySorting, contentOf, sortedMessage, unmarked} from './apply'
+import {applySorting, contentOf, sortedMessage} from './apply'
 import {sortingMarks} from './marks'
 import {isEmptyValue, labelPaths, sortableFields} from './sortable-fields'
-import {bodyIsEmpty, isWholePiece, writtenBlocks} from './whole-piece'
+import {bodyIsEmpty, isWholePiece, unmarked, writtenBlocks} from './whole-piece'
 
 const writing: WritingFields = {title: 'title', body: 'body', slug: 'slug', publishedAt: 'publishedAt', image: 'coverImage'}
 
@@ -155,6 +155,7 @@ describe('applying what the route answered', () => {
     const same = apply({title: 'A week in Lisbon!', body}, {...response, placed: [], picked: [], listed: []})
     expect(same.next.title).toBe('A week in Lisbon!')
     expect((same.next.body as unknown[]).length).toBe(4)
+    expect(same.touched).toEqual(['body'])
     const different = apply({title: 'Lisbon, slowly', body}, {...response, placed: [], picked: [], listed: []})
     expect(different.touched).toEqual([])
     expect(different.next.body).toBe(body)
@@ -185,6 +186,17 @@ describe('applying what the route answered', () => {
     const sorted = apply({body}, {...response, picked: [{field: 'author', options: ['someone-else'], kind: 'stated', line: 'k2', confidence: 1}]})
     expect(sorted.next.author).toBeUndefined()
     expect((sorted.next.body as Array<{_key: string}>).map((entry) => entry._key)).toContain('k2')
+  })
+
+  it('keeps unmatched text from a line claimed by an older route', () => {
+    const long = block('k6', `Categories: Travel, ${'Travel, '.repeat(90)}unrecognized`)
+    const mixed = block('k7', 'By Sam Okafor and Ana Reis')
+    const sorted = apply(
+      {body: [long, mixed]},
+      {...response, listed: [], picked: [{...response.picked[0], line: 'k7'}, {...response.picked[1], line: 'k6'}]},
+    )
+    expect(sorted.filledNames).toEqual(['author', 'categories'])
+    expect(sorted.next.body).toEqual([long, mixed])
   })
 
   it('says what it did', () => {

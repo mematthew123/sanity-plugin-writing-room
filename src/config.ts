@@ -30,6 +30,7 @@ export interface WritingRoomSortingOptions {
   /**
    * The address of the route made with `createSortingHandler` from
    * `sanity-plugin-writing-room/sorting`: `/api/sort`, or a full URL on another origin.
+   * Requires HTTPS, except on localhost, 127.0.0.1 or [::1] for local development.
    */
   endpoint: string
 }
@@ -85,8 +86,21 @@ function resolveTypes(types: WritingRoomOptions['types'] = ['post']): WritingRoo
   return resolved
 }
 
+export function resolveSortingEndpoint(endpoint: string | undefined, studioUrl = globalThis.location?.href): string | null {
+  if (!endpoint?.trim()) return null
+  try {
+    const url = new URL(endpoint, studioUrl)
+    if (url.username || url.password) return null
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    return url.protocol === 'https:' || (url.protocol === 'http:' && loopback) ? url.href : null
+  } catch {
+    return null
+  }
+}
+
 export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConfig {
   const {preview} = options
+  const endpoint = resolveSortingEndpoint(options.sorting?.endpoint)
   return {
     types: resolveTypes(options.types),
     colors: resolvePalette(options.accent),
@@ -97,7 +111,7 @@ export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConf
           pathname: preview.pathname ?? defaultPathname,
         }
       : null,
-    sorting: options.sorting?.endpoint ? {endpoint: options.sorting.endpoint} : null,
+    sorting: endpoint ? {endpoint} : null,
   }
 }
 

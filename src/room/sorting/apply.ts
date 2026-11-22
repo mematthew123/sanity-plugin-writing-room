@@ -1,12 +1,9 @@
 import {followingSlug} from '../../lib/slug'
-import {itemsInLine} from '../../sorting/answers'
+import {itemsInLine, namedInLine, namesOnlyOption} from '../../sorting/answers'
 import {LIMITS, type SortingResponse} from '../../sorting/contract'
 import {type WritingFields} from '../fields'
 import {isEmptyValue, type SortableField} from './sortable-fields'
-import {type BodyBlock, blockText} from './whole-piece'
-
-/** Markdown pasted as plain text keeps its marks, so a placed line may begin with one. */
-export const unmarked = (text: string) => text.trim().replace(/^#{1,6}\s+/, '').trim()
+import {type BodyBlock, blockText, unmarked} from './whole-piece'
 
 const sameWords = (a: string, b: string) => {
   const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
@@ -101,7 +98,21 @@ export function applySorting({
     else next[picked.field] = options.map((id) => ({...reference(id), _key: keyGenerator()}))
     filled.push(picked.field)
     // The line leaves only when every answer it named was picked.
-    if (picked.line && options.length === picked.options.length) leaving.add(picked.line)
+    if (picked.line && options.length === picked.options.length) {
+      // An older route may have claimed a line without seeing the whole thing.
+      const block = body.find((candidate) => candidate._key === picked.line)
+      if (!block) continue
+      const line = blockText(block)
+      if (entry.field.many) {
+        const named = namedInLine(line, entry.field)
+        if (named.whole && named.options.length === options.length && named.options.every((id) => options.includes(id))) {
+          leaving.add(picked.line)
+        }
+      } else {
+        const option = entry.field.options.find(({id}) => id === options[0])
+        if (options.length === 1 && option && namesOnlyOption(line, entry.field, option.label)) leaving.add(picked.line)
+      }
+    }
   }
 
   for (const listed of response.listed) {

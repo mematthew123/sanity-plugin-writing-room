@@ -11,8 +11,9 @@ import {readdirSync, readFileSync, writeFileSync} from 'node:fs'
 import {htmlToPortableText} from '@portabletext/html'
 import {JSDOM} from 'jsdom'
 import {expect, test} from 'vitest'
+import {unmarked} from '../src/room/sorting/whole-piece'
 import {DEFAULT_FLOORS, readAnswers, type SortingAnswer, type SortingFloors} from '../src/sorting/answers'
-import {SORTING_VERSION, type SortingField, type SortingRequest, type SortingResponse} from '../src/sorting/contract'
+import {LIMITS, parseSortingRequest, SORTING_VERSION, type ParsedSortingRequest, type SortingField, type SortingRequest, type SortingResponse} from '../src/sorting/contract'
 import {edgesOf} from '../src/sorting/edges'
 import {jev} from '../src/sorting/jev'
 import {buildDecision, questionId} from '../src/sorting/questions'
@@ -103,15 +104,12 @@ function blocksOf(capture: Capture): {blocks: Array<{id: string; text: string}>;
   return {blocks, empty: blocks.filter((block) => !block.text.trim()).length}
 }
 
-/** Markdown pasted as plain text keeps its marks; the room will have to strip them when it places a line. */
-const unmarked = (text: string) => text.replace(/^#{1,6}\s+/, '').trim()
-
 type Outcome = 'correct' | 'empty' | 'wrong' | 'rightly empty'
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('|') === [...b].sort().join('|')
 
-function score(request: SortingRequest, response: SortingResponse, expected: Expected) {
-  const textOf = (id: string) => request.blocks.find((block) => block.id === id)?.text ?? ''
+function score(blocks: ReturnType<typeof blocksOf>['blocks'], response: SortingResponse, expected: Expected) {
+  const textOf = (id: string) => blocks.find((block) => block.id === id)?.text ?? ''
   const outcomes: Record<string, {outcome: Outcome; got: string}> = {}
   const judge = (field: string, want: string[] | undefined, got: string[] | undefined, mayAlso: string[] = []) => {
     const required = got?.filter((value) => !mayAlso.includes(value)) ?? []
@@ -125,7 +123,7 @@ function score(request: SortingRequest, response: SortingResponse, expected: Exp
     if (field.kind === 'text') {
       const placed = response.placed.find((entry) => entry.field === field.name)
       const want = expected.place[field.name]
-      judge(field.name, want ? [want] : undefined, placed ? [textOf(placed.block)] : undefined)
+      judge(field.name, want ? [want] : undefined, placed ? [unmarked(textOf(placed.block))] : undefined)
     } else {
       const picked = response.picked.find((entry) => entry.field === field.name)
       const want = expected.pick[field.name]
@@ -157,24 +155,28 @@ test('Sorting against the fixtures', async () => {
   expect(names.length, 'no fixtures in fixtures/sorting').toBeGreaterThan(0)
   const decide = jev()
   const out: string[] = ['# Sorting evaluation', '', `${names.length} pastes, ${new Date().toISOString()}`, '']
-  const runs: Array<{name: string; request: SortingRequest; expected: Expected; answers: Record<string, SortingAnswer | undefined>; confidence?: Record<string, number>}> = []
+  const runs: Array<{name: string; blocks: ReturnType<typeof blocksOf>['blocks']; request: ParsedSortingRequest; expected: Expected; answers: Record<string, SortingAnswer | undefined>; confidence?: Record<string, number>}> = []
 
   out.push('## The pastes', '', '| Paste | Blocks | Empty blocks dropped | Sent (top + foot) | Opening | Questions | Time |', '| --- | --- | --- | --- | --- | --- | --- |')
   for (const name of names) {
     const capture = JSON.parse(readFileSync(new URL(`${name}.json`, FIXTURES), 'utf8')) as Capture
     const expected = JSON.parse(readFileSync(new URL(`${name}.expected.json`, FIXTURES), 'utf8')) as Expected
     const {blocks, empty} = blocksOf(capture)
-    const request: SortingRequest = {version: SORTING_VERSION, ...edgesOf(blocks), fields: FIELDS}
+    const sent: SortingRequest = {version: SORTING_VERSION, ...edgesOf(blocks), fields: FIELDS}
+    if (new TextEncoder().encode(JSON.stringify(sent)).length > LIMITS.body) throw new Error(`${name}: request is too large.`)
+    const parsed = parseSortingRequest(sent)
+    if ('problem' in parsed) throw new Error(`${name}: ${parsed.problem}`)
+    const {request} = parsed
     const decision = buildDecision(request)
     const started = Date.now()
     const {answers, confidence} = await decide({...decision, abortSignal: AbortSignal.timeout(30_000)})
     const top = request.blocks.filter((block) => block.edge === 'top').length
     out.push(`| ${name} | ${blocks.length} | ${empty} | ${top} + ${request.blocks.length - top} | ${request.opening.length} chars | ${Object.keys(decision.questions).length} | ${Date.now() - started}ms |`)
-    runs.push({name, request, expected, answers, confidence})
+    runs.push({name, blocks, request, expected, answers, confidence})
   }
 
   const report = (floors: SortingFloors) =>
-    runs.map((run) => ({run, ...score(run.request, readAnswers(run.request, run.answers, {floors, confidence: run.confidence}), run.expected)}))
+    runs.map((run) => ({run, ...score(run.blocks, readAnswers(run.request, run.answers, {floors, confidence: run.confidence}), run.expected)}))
 
   const fields = ['title', ...FIELDS.map((field) => field.name)]
   const mark: Record<Outcome, string> = {correct: 'correct', empty: '**empty**', wrong: '**WRONG**', 'rightly empty': '·'}

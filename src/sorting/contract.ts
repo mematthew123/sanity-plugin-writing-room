@@ -57,6 +57,10 @@ export interface SortingRequest {
   fields: SortingField[]
 }
 
+/** Route-only metadata. The room still sends the same version 1 request. */
+type ParsedSortingBlock = SortingBlock & {truncated?: true}
+export type ParsedSortingRequest = Omit<SortingRequest, 'blocks'> & {blocks: ParsedSortingBlock[]}
+
 export interface SortingResponse {
   version: typeof SORTING_VERSION
   /** The block that is the piece's headline. The room decides whether it becomes the title. */
@@ -124,7 +128,7 @@ function parseField(value: unknown): SortingField | string {
 }
 
 /** Checks a request body and trims its text to the limits. Never throws. */
-export function parseSortingRequest(body: unknown): {request: SortingRequest} | {problem: string} {
+export function parseSortingRequest(body: unknown): {request: ParsedSortingRequest} | {problem: string} {
   if (!isRecord(body)) return {problem: 'The request must be an object.'}
   if (body.version !== SORTING_VERSION) return {problem: `The route speaks version ${SORTING_VERSION}.`}
   if (!Array.isArray(body.blocks) || body.blocks.length === 0) return {problem: 'There are no blocks to sort.'}
@@ -132,18 +136,23 @@ export function parseSortingRequest(body: unknown): {request: SortingRequest} | 
   if (!Array.isArray(body.fields)) return {problem: '`fields` must be a list.'}
   if (body.fields.length > LIMITS.fields) return {problem: `More than ${LIMITS.fields} fields.`}
 
-  const blocks: SortingBlock[] = []
+  const blocks: ParsedSortingBlock[] = []
   const seen = new Set<string>()
   for (const block of body.blocks) {
     const id = isRecord(block) ? text(block.id, LIMITS.label) : null
-    const blockText = isRecord(block) ? text(block.text, LIMITS.blockText) : null
+    const whole = isRecord(block) && typeof block.text === 'string' ? block.text.trim() : ''
     const edge = isRecord(block) ? block.edge : null
-    if (!id || !blockText || (edge !== 'top' && edge !== 'bottom')) {
+    if (!id || !whole || (edge !== 'top' && edge !== 'bottom')) {
       return {problem: 'A block needs an id, some text and an edge.'}
     }
     if (seen.has(id)) return {problem: `The block "${id}" is listed twice.`}
     seen.add(id)
-    blocks.push({id, text: blockText, edge})
+    blocks.push({
+      id,
+      text: whole.slice(0, LIMITS.blockText),
+      edge,
+      ...(whole.length > LIMITS.blockText ? {truncated: true} : {}),
+    })
   }
 
   const fields: SortingField[] = []

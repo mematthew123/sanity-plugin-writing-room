@@ -1,3 +1,6 @@
+/** Markdown pasted as plain text keeps its marks, so a placed line may begin with one. */
+export const unmarked = (text: string) => text.trim().replace(/^#{1,6}\s+/, '').trim()
+
 /** A body block as the room reads it for Sorting: only its key and its words matter. */
 export interface BodyBlock {
   _key?: string

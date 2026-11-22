@@ -3,7 +3,7 @@ import {BehaviorPlugin} from '@portabletext/editor/plugins'
 import {type DocumentHandle, useDocument, useEditDocument} from '@sanity/sdk-react'
 import {type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {type SanityClient, type SchemaType, useClient, useSchema} from 'sanity'
-import {useWritingRoomConfig} from '../../config'
+import {resolveSortingEndpoint, useWritingRoomConfig} from '../../config'
 import {API_VERSION} from '../../lib/api-version'
 import {LIMITS, SORTING_VERSION, type SortingRequest, type SortingResponse} from '../../sorting/contract'
 import {edgesOf} from '../../sorting/edges'
@@ -254,10 +254,13 @@ export function Sorting({
         ),
         edges,
       )
+      const endpoint = resolveSortingEndpoint(sorting.endpoint)
+      if (!endpoint) throw new Error('The Sorting endpoint is invalid.')
       const request: SortingRequest = {...edges, fields: sortable.map((entry) => entry.field)}
       const [response] = await Promise.all([
-        fetch(sorting.endpoint, {
+        fetch(endpoint, {
           method: 'POST',
+          redirect: 'error',
           headers: {'content-type': 'application/json', authorization: `Bearer ${token}`},
           body: JSON.stringify(request),
           signal: controller.signal,
@@ -285,8 +288,7 @@ export function Sorting({
         slugByHand: slugByHand.read(handle.documentId) ?? undefined,
         keyGenerator: randomKey,
       })
-      const message = sortedMessage(sorted)
-      if (!message || sorted.touched.length === 0) {
+      if (sorted.touched.length === 0) {
         setPhase('idle')
         show({text: NOTHING})
         return
@@ -323,7 +325,7 @@ export function Sorting({
         })
       }
       show({
-        text: message,
+        text: sortedMessage(sorted) ?? 'Sorted. Removed the duplicate headline.',
         done: true,
         stays: true,
         actions: [

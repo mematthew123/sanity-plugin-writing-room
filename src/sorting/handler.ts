@@ -23,7 +23,7 @@ export interface SortingHandlerOptions {
    */
   origins?: string[]
   floors?: Partial<SortingFloors>
-  /** How long the model gets, in milliseconds. Defaults to 10 seconds. */
+  /** Time for the membership check, upload and model, in milliseconds. Defaults to 10 seconds. */
   timeout?: number
   /** For tests. */
   fetch?: typeof fetch
@@ -47,23 +47,35 @@ async function isMember(token: string, projectId: string, doFetch: typeof fetch,
  * The request body as text, or null once it runs past `max` bytes. It stops reading there, so a
  * body with no content-length is never held in memory whole.
  */
-async function readBody(request: Request, max: number): Promise<string | null> {
+async function readBody(request: Request, max: number, signal: AbortSignal): Promise<string | null> {
   const reader = request.body?.getReader()
   if (!reader) return ''
   const decoder = new TextDecoder()
   let size = 0
   let text = ''
-  for (;;) {
-    const {done, value} = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > max) {
-      await reader.cancel().catch(() => undefined)
-      return null
-    }
-    text += decoder.decode(value, {stream: true})
+  const cancel = () => {
+    // Cancel settles a pending read immediately. The stream's cleanup may take longer.
+    void reader.cancel().catch(() => undefined)
   }
-  return text + decoder.decode()
+  signal.addEventListener('abort', cancel, {once: true})
+  try {
+    if (signal.aborted) cancel()
+    signal.throwIfAborted()
+    for (;;) {
+      const {done, value} = await reader.read()
+      signal.throwIfAborted()
+      if (done) return text + decoder.decode()
+      size += value.byteLength
+      if (size > max) {
+        cancel()
+        return null
+      }
+      text += decoder.decode(value, {stream: true})
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel)
+    reader.releaseLock()
+  }
 }
 
 /**
@@ -109,10 +121,11 @@ export function createSortingRoute(options: SortingHandlerOptions): (request: Re
 
     let body: unknown
     try {
-      const raw = await readBody(request, LIMITS.body)
+      const raw = await readBody(request, LIMITS.body, signal)
       if (raw === null) return answer(413, {error: 'too-large'})
       body = JSON.parse(raw)
     } catch {
+      if (signal.aborted) return answer(502, {error: 'unavailable'})
       return answer(400, {error: 'invalid', problem: 'The request is not JSON.'})
     }
     const parsed = parseSortingRequest(body)

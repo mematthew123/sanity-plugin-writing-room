@@ -191,6 +191,25 @@ describe('reading the answers', () => {
     })
   })
 
+  it.each(['By Sam Okafor and Ana Reis', 'By Sam Okafor, guest contributor', 'Author: Sam Okafor; Ana Reis'])(
+    'keeps a single pick line with extra text: %s',
+    (text) => {
+      const request = structuredClone(lisbon)
+      request.blocks[1].text = text
+      expect(readAnswers(request, good).picked[0]).toMatchObject({options: ['author-sam'], line: null})
+    },
+  )
+
+  it('fills known tags without claiming a line the route only saw in part', () => {
+    const request = structuredClone(lisbon)
+    const prefix = 'Tags: portugal, city breaks,'
+    request.blocks[3].text = prefix.padEnd(LIMITS.blockText, ' ') + 'unknown'
+    const parsed = parseSortingRequest(request)
+    if ('problem' in parsed) throw new Error(parsed.problem)
+    expect(parsed.request.blocks[3].truncated).toBe(true)
+    expect(readAnswers(parsed.request, good).picked[1]).toMatchObject({options: ['portugal', 'city-breaks'], line: null})
+  })
+
   it('reads whether a line names an answer', () => {
     expect(namesOption('By Sam Okafor', 'Sam Okafor')).toBe(true)
     expect(namesOption('Category:  NEWS.', 'news')).toBe(true)
@@ -334,6 +353,31 @@ describe('the route', () => {
     expect(sent).toBeLessThan(10)
     // Under the limit in characters, over it in bytes.
     expect((await route()(post('é'.repeat(LIMITS.body / 2 + 1)))).status).toBe(413)
+  })
+
+  it.each(['client abort', 'timeout'])('cancels a stalled upload on %s', async (cause) => {
+    const controller = new AbortController()
+    const cancel = vi.fn(() => new Promise<void>(() => {
+      // Simulate stream cleanup that never completes.
+    }))
+    let reading!: () => void
+    const pending = new Promise<void>((resolve) => { reading = resolve })
+    const body = new ReadableStream<Uint8Array>({pull: reading, cancel}, {highWaterMark: 0})
+    const request = new Request('https://site.example/api/sort', {
+      method: 'POST',
+      headers: {authorization: 'Bearer writer-token'},
+      body,
+      signal: controller.signal,
+      duplex: 'half',
+    } as RequestInit)
+    decide.mockClear()
+    const response = route({timeout: cause === 'timeout' ? 50 : 1000})(request)
+    await pending
+    if (cause === 'client abort') controller.abort()
+    expect((await response).status).toBe(502)
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(request.body?.locked).toBe(false)
+    expect(decide).not.toHaveBeenCalled()
   })
 
   it('reads nothing from a caller who is not a member', async () => {

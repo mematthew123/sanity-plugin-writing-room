@@ -1,4 +1,4 @@
-import {SORTING_VERSION, type SortingPickField, type SortingRequest, type SortingResponse} from './contract'
+import {SORTING_VERSION, type SortingPickField, type ParsedSortingRequest, type SortingResponse} from './contract'
 import {blockName, NONE, optionName, questionId} from './questions'
 
 export type SortingAnswer =
@@ -92,6 +92,21 @@ export function namesOption(line: string, label: string): boolean {
   return wanted !== '' && ` ${plain(line)} `.includes(` ${wanted} `)
 }
 
+/** A single pick may only take a bare answer or its complete label line out of the body. */
+export function namesOnlyOption(line: string, field: SortingPickField, label: string): boolean {
+  const normalize = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ')
+  const wanted = normalize(label)
+  const matches = (value: string) => value === wanted || value === `${wanted}.`
+  const full = normalize(line)
+  if (!wanted) return false
+  if (matches(full)) return true
+  const colon = full.indexOf(':')
+  if (colon !== -1 && [field.name, field.title, 'by'].some((prefix) => normalize(prefix) === full.slice(0, colon).trim())) {
+    return matches(full.slice(colon + 1).trim())
+  }
+  return full.startsWith('by ') && matches(full.slice(3))
+}
+
 type Picked = SortingResponse['picked'][number]
 type Claim = {block: number; confidence: number} & (
   | {what: 'headline'}
@@ -101,7 +116,7 @@ type Claim = {block: number; confidence: number} & (
 
 /** Turns the model's answers into what the room should do, holding each to its floor. */
 export function readAnswers(
-  request: SortingRequest,
+  request: ParsedSortingRequest,
   answers: Answers,
   options: {floors?: Partial<SortingFloors>; confidence?: Record<string, number>} = {},
 ): SortingResponse {
@@ -127,6 +142,7 @@ export function readAnswers(
 
     const found = chosen(answers, confidence, questionId.line(index), blockName, blocks)
     const line = found && found.confidence >= floors.line ? found : null
+    const block = line ? request.blocks[line.index] : null
 
     if (field.kind === 'list') {
       const values = line ? itemsInLine(request.blocks[line.index].text) : []
@@ -141,7 +157,7 @@ export function readAnswers(
       if (line && named && named.options.length > 0) {
         picked.set(index, {field: field.name, options: named.options, kind: 'stated', line: null, confidence: line.confidence})
         // The line leaves only when every answer it names was picked.
-        if (named.whole) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
+        if (named.whole && !block?.truncated) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
         return
       }
       const judged = field.options
@@ -177,7 +193,9 @@ export function readAnswers(
       line: null,
       confidence: pick.confidence,
     })
-    if (line && names) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
+    if (line && block && !block.truncated && names && namesOnlyOption(block.text, field, field.options[pick.index].label)) {
+      claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
+    }
   })
 
   // One place per block: the surest claim wins, the headline wins a tie.
