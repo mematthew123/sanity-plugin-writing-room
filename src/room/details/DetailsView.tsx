@@ -1,5 +1,5 @@
 import {type DocumentHandle} from '@sanity/sdk-react'
-import {useEffect, useMemo, useRef, useState} from 'react'
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {
   ALL_FIELDS_GROUP,
   ChangeIndicatorsTracker,
@@ -8,6 +8,7 @@ import {
   type ObjectMember,
   stringToPath,
   useDocumentForm,
+  VirtualizerScrollInstanceProvider,
 } from 'sanity'
 import styled from 'styled-components'
 import {type WritingFields} from '../fields'
@@ -32,11 +33,23 @@ export function DetailsView({
   focusField?: string
 }) {
   const root = useRef<HTMLDivElement>(null)
+  // Sanity's array input draws a long list a window at a time, and asks what it scrolls in. In
+  // Structure the document pane answers; here it is the room. Without an answer, an array with
+  // anything in it (a list of references, say) can't be drawn at all.
+  const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  const attach = useCallback((node: HTMLDivElement | null) => {
+    root.current = node
+    setScroller(node?.closest<HTMLElement>('[data-calm-surface]') ?? null)
+  }, [])
   const [patchChannel] = useState(() => createPatchChannel())
   const form = useDocumentForm({
     documentId: handle.documentId,
     documentType: handle.documentType,
-    ...(lockedRelease && {releaseId: lockedRelease, selectedPerspectiveName: lockedRelease, readOnly: true}),
+    ...(lockedRelease && {
+      releaseId: lockedRelease,
+      selectedPerspectiveName: lockedRelease,
+      readOnly: true,
+    }),
   })
   const {formState, onSetActiveFieldGroup, onProgrammaticFocus, ready} = form
 
@@ -68,9 +81,15 @@ export function DetailsView({
   )
 
   // Sanity moves focus by path: it opens a collapsed fieldset on the way, which a DOM focus wouldn't.
-  const firstField = members.flatMap((member) =>
-    member.kind === 'field' ? [member] : member.kind === 'fieldSet' ? member.fieldSet.members : [],
-  ).find((member) => member.kind === 'field')?.name
+  const firstField = members
+    .flatMap((member) =>
+      member.kind === 'field'
+        ? [member]
+        : member.kind === 'fieldSet'
+          ? member.fieldSet.members
+          : [],
+    )
+    .find((member) => member.kind === 'field')?.name
   useEffect(() => {
     if (!firstField) return undefined
     return onFirstDetailAsked(() => focusPath.current([firstField]))
@@ -81,35 +100,37 @@ export function DetailsView({
   return (
     <InRoomDetails.Provider value>
       <DetailsDocument.Provider value={handle.documentId}>
-        <Root ref={root} tabIndex={-1} data-calm-details="">
-          <ChangeIndicatorsTracker>
-            <FormBuilder
-              __internal_patchChannel={patchChannel}
-              id="writing-room-details"
-              changed={formState.changed}
-              collapsedFieldSets={form.collapsedFieldSets}
-              collapsedPaths={form.collapsedPaths}
-              focused={formState.focused}
-              focusPath={formState.focusPath}
-              groups={[]}
-              members={members}
-              onChange={form.onChange}
-              onFieldGroupSelect={onSetActiveFieldGroup}
-              onPathBlur={form.onBlur}
-              onPathFocus={form.onFocus}
-              onPathOpen={form.onPathOpen}
-              onSetFieldSetCollapsed={form.onSetCollapsedFieldSet}
-              onSetPathCollapsed={form.onSetCollapsedPath}
-              openPath={form.openPath}
-              presence={formState.presence}
-              readOnly={formState.readOnly}
-              schemaType={formState.schemaType}
-              validation={formState.validation}
-              value={form.value}
-              hasUpstreamVersion={false}
-              hasBaseVariant={false}
-            />
-          </ChangeIndicatorsTracker>
+        <Root ref={attach} tabIndex={-1} data-calm-details="">
+          <VirtualizerScrollInstanceProvider scrollElement={scroller} containerElement={root}>
+            <ChangeIndicatorsTracker>
+              <FormBuilder
+                __internal_patchChannel={patchChannel}
+                id="writing-room-details"
+                changed={formState.changed}
+                collapsedFieldSets={form.collapsedFieldSets}
+                collapsedPaths={form.collapsedPaths}
+                focused={formState.focused}
+                focusPath={formState.focusPath}
+                groups={[]}
+                members={members}
+                onChange={form.onChange}
+                onFieldGroupSelect={onSetActiveFieldGroup}
+                onPathBlur={form.onBlur}
+                onPathFocus={form.onFocus}
+                onPathOpen={form.onPathOpen}
+                onSetFieldSetCollapsed={form.onSetCollapsedFieldSet}
+                onSetPathCollapsed={form.onSetCollapsedPath}
+                openPath={form.openPath}
+                presence={formState.presence}
+                readOnly={formState.readOnly}
+                schemaType={formState.schemaType}
+                validation={formState.validation}
+                value={form.value}
+                hasUpstreamVersion={false}
+                hasBaseVariant={false}
+              />
+            </ChangeIndicatorsTracker>
+          </VirtualizerScrollInstanceProvider>
         </Root>
       </DetailsDocument.Provider>
     </InRoomDetails.Provider>
@@ -121,7 +142,9 @@ function withoutFields(members: ObjectMember[], names: string[]): ObjectMember[]
   return members.flatMap((member): ObjectMember[] => {
     if (member.kind === 'field') return names.includes(member.name) ? [] : [member]
     if (member.kind !== 'fieldSet') return [member]
-    const inside = member.fieldSet.members.filter((own) => !(own.kind === 'field' && names.includes(own.name)))
+    const inside = member.fieldSet.members.filter(
+      (own) => !(own.kind === 'field' && names.includes(own.name)),
+    )
     if (inside.length === member.fieldSet.members.length) return [member]
     return inside.length > 0 ? [{...member, fieldSet: {...member.fieldSet, members: inside}}] : []
   })
