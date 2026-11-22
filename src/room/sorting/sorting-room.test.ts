@@ -3,6 +3,7 @@ import {describe, expect, it} from 'vitest'
 import {type SortingResponse} from '../../sorting/contract'
 import {type WritingFields} from '../fields'
 import {applySorting, contentOf, sortedMessage, unmarked} from './apply'
+import {sortingMarks} from './marks'
 import {isEmptyValue, labelPaths, sortableFields} from './sortable-fields'
 import {bodyIsEmpty, isWholePiece, writtenBlocks} from './whole-piece'
 
@@ -146,6 +147,7 @@ describe('applying what the route answered', () => {
     })
     expect(sorted.touched.sort()).toEqual(['author', 'body', 'categories', 'excerpt', 'slug', 'tags', 'title'])
     expect(sorted.filled).toEqual(['Excerpt', 'Author', 'Categories', 'Tags'])
+    expect(sorted.filledNames).toEqual(['excerpt', 'author', 'categories', 'tags'])
     expect(sorted.titled).toBe(true)
   })
 
@@ -186,6 +188,17 @@ describe('applying what the route answered', () => {
   it('strips a Markdown heading mark from a placed line', () => {
     expect(unmarked('## Alfama, on foot')).toBe('Alfama, on foot')
     expect(unmarked('#hashtag stays')).toBe('#hashtag stays')
+  })
+
+  it('marks a field only while it holds what Sorting put there', () => {
+    sortingMarks.set('doc', {excerpt: 'Placed.', tags: ['a', 'b']})
+    expect(sortingMarks.has('doc', 'excerpt', 'Placed.')).toBe(true)
+    expect(sortingMarks.has('doc', 'tags', ['a', 'b'])).toBe(true)
+    expect(sortingMarks.has('doc', 'excerpt', 'Placed, then edited.')).toBe(false)
+    expect(sortingMarks.has('doc', 'title', 'Placed.')).toBe(false)
+    expect(sortingMarks.has('other', 'excerpt', 'Placed.')).toBe(false)
+    sortingMarks.clear('doc')
+    expect(sortingMarks.has('doc', 'excerpt', 'Placed.')).toBe(false)
   })
 
   it('compares content, not bookkeeping', () => {

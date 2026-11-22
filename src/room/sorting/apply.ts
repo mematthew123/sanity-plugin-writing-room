@@ -19,6 +19,8 @@ export interface Sorted {
   touched: string[]
   /** The titles of the Details fields that were filled, in schema order, to name in the message. */
   filled: string[]
+  /** The same fields by name, for the marks in Details. */
+  filledNames: string[]
   /** Whether the headline became the title. */
   titled: boolean
 }
@@ -114,10 +116,12 @@ export function applySorting({
 
   const touched = Object.keys(next).filter((key) => next[key] !== document[key])
   const order = sortable.map((entry) => entry.field.name)
+  filled.sort((a, b) => order.indexOf(a) - order.indexOf(b))
   return {
     next,
     touched,
-    filled: filled.sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((name) => byName.get(name)!.field.title),
+    filled: filled.map((name) => byName.get(name)!.field.title),
+    filledNames: filled,
     titled,
   }
 }

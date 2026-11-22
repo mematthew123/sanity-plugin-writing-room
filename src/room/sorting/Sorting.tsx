@@ -11,6 +11,7 @@ import {slugByHand} from '../details/slug-by-hand'
 import {type WritingFields} from '../fields'
 import {type RoomNotice} from '../room-status'
 import {applySorting, contentOf, sortedMessage} from './apply'
+import {sortingMarks} from './marks'
 import {labelPaths, type SortableField, sortableFields} from './sortable-fields'
 import {bodyIsEmpty, isWholePiece, writtenBlocks} from './whole-piece'
 
@@ -245,6 +246,7 @@ export function Sorting({
         for (const key of sorted.touched) next[key] = sorted.next[key]
         return next
       })
+      sortingMarks.set(handle.documentId, Object.fromEntries(sorted.filledNames.map((name) => [name, sorted.next[name]])))
       undo.current = {before: now, touched: sorted.touched}
       watched.current = contentOf(sorted.next)
       appliedAt.current = Date.now()
@@ -252,6 +254,7 @@ export function Sorting({
       const putBack = () => {
         const kept = undo.current
         undo.current = null
+        sortingMarks.clear(handle.documentId)
         setPhase('idle')
         onNotice(null)
         if (!kept) return
@@ -327,6 +330,9 @@ export function Sorting({
     setPhase('idle')
     onNotice(null)
   }, [phase, content, onNotice])
+
+  // The marks are for this visit to the room only.
+  useEffect(() => () => sortingMarks.clear(handle.documentId), [handle.documentId])
 
   // Esc ends the hold and nothing else: it mustn't also leave the room.
   useEffect(() => {

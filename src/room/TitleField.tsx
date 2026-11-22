@@ -14,12 +14,18 @@ export function TitleField({
   isPublished,
   readOnly = false,
   onEnter,
+  onPastePiece,
 }: {
   handle: DocumentHandle
   fields: WritingFields
   isPublished: boolean
   readOnly?: boolean
   onEnter: () => void
+  /**
+   * Offered every paste. True means the room has taken it to the body, because a title can't hold
+   * paragraphs; `asTitle` is for the room to call if the body turns out not to take it.
+   */
+  onPastePiece?: (data: DataTransfer, asTitle: () => void) => boolean
 }) {
   const {data: title} = useDocument<string>({...handle, path: fields.title})
   const editPost = useEditDocument<Record<string, unknown>>(handle)
@@ -94,6 +100,14 @@ export function TitleField({
         if (!readOnly) setTitle(event.currentTarget.value)
       }}
       onKeyDown={handleKeyDown}
+      onPaste={(event) => {
+        if (readOnly || !onPastePiece) return
+        const text = event.clipboardData.getData('text/plain')
+        const {selectionStart, selectionEnd, value} = event.currentTarget
+        // What the paste would have done by itself, should the body not take it.
+        const asTitle = () => setTitle(value.slice(0, selectionStart) + text + value.slice(selectionEnd))
+        if (onPastePiece(event.clipboardData, asTitle)) event.preventDefault()
+      }}
     />
   )
 }
