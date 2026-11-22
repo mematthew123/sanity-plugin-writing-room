@@ -1,5 +1,13 @@
 # sanity-plugin-writing-room
 
+## 0.5.0
+
+### Minor Changes
+
+- [#24](https://github.com/mematthew123/sanity-plugin-writing-room/pull/24) [`fefa67f`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/fefa67fcbae04a095d666b9d6e1d2c6c004d0b64) Thanks [@mematthew123](https://github.com/mematthew123)! - Schedule from the room. Where the Studio has Sanity's scheduled drafts, the panel that asks before publishing also offers **Schedule for later**: pick a time and the document goes live by itself, and a document with no published date gets that time as its date (a date the Writer set is left alone). A scheduled document is locked in the room and shows exactly what will go live; **Unlock** takes it off the schedule so the words or the time can be changed. Nothing to configure, and nothing changes in a Studio without scheduled drafts.
+
+- [#15](https://github.com/mematthew123/sanity-plugin-writing-room/pull/15) [`0dd4fb5`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/0dd4fb5608d710d67eda854c6a14970d2b9bb125) Thanks [@mematthew123](https://github.com/mematthew123)! - Typewriter scrolling and focus dimming are now on by default. Writers who already chose either way keep their choice; both can still be turned off in the `Aa` menu.
+
 ## 0.4.0
 
 ### Minor Changes
