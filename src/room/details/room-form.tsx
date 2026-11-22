@@ -200,7 +200,7 @@ function GrowingText(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & 
   return (
     <textarea
       {...rest}
-      className={cx(styles.textInput, styles.textArea)}
+      className={cx(styles.textInput, styles.textArea, rest.className)}
       rows={2}
       ref={(node) => {
         own.current = node
@@ -304,7 +304,7 @@ function TagsField({
       {!readOnly && (
         <input
           {...rest}
-          className={styles.tagInput}
+          className={cx(styles.tagInput, rest.className)}
           ref={ref}
           type="text"
           value={typed}
