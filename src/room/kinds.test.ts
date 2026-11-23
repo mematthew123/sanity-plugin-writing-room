@@ -1,6 +1,6 @@
 import {createSchema, type SchemaType} from 'sanity'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import {resolveConfig} from '../config'
+import {resolveConfig, resolveSortingEndpoint} from '../config'
 import {schemaTypes} from '../schema'
 import {pluralize, resolveKinds} from './kinds'
 
@@ -85,6 +85,27 @@ describe('resolveConfig', () => {
     expect(preview?.pathname('hello', 'post')).toBe('/posts/hello')
     expect(preview?.pathname('hello', 'caseStudy')).toBe('/caseStudy/hello')
   })
+
+  it('resolves a relative sorting endpoint against the Studio URL', () => {
+    vi.stubGlobal('location', new URL('https://studio.example/workspace/'))
+    try {
+      expect(resolveConfig({sorting: {endpoint: 'api/sort'}}).sorting?.endpoint).toBe(
+        'https://studio.example/workspace/api/sort',
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each(['http://localhost:3333/sort', 'http://127.0.0.1/sort', 'http://[::1]/sort'])(
+    'permits the loopback sorting endpoint %s',
+    (endpoint) => expect(resolveSortingEndpoint(endpoint)).toBe(endpoint),
+  )
+
+  it.each(['http://example.org/sort', 'http://localhost.example.org/sort', 'data:text/plain,sort', '/sort'])(
+    'rejects the sorting endpoint %s when the Studio is on ordinary HTTP',
+    (endpoint) => expect(resolveSortingEndpoint(endpoint, 'http://studio.example')).toBeNull(),
+  )
 
   it('changes only the accent, for the scheme given', () => {
     const {colors} = resolveConfig({accent: {light: '#2F6FA8'}})

@@ -223,6 +223,70 @@ Four things worth knowing:
 - A document unlocked in the room is not listed under Studio's Paused tab: the room removes the schedule rather than pausing it.
 - Scheduling takes three requests to Sanity. If your connection drops between them, the room tells the Writer the document isn't scheduled rather than guessing.
 
+## Sorting a pasted piece (experimental)
+
+Off unless you set it up. When a Writer pastes a whole piece written elsewhere (Google Docs, Notion, Word) into an empty document, the room offers once to sort it: the headline becomes the title, and the rest goes where it belongs in Details. Every field is a candidate except the published date.
+
+Sorting never writes. It moves the Writer's own words into fields, and for a field with set answers (an author, a category, a list of options) it picks among the answers that already exist. A field the paste has nothing for stays empty.
+
+It is experimental: the option, the route and the request between them may change in a minor release.
+
+### Setting it up
+
+The judging is done by TypeSafe's [Jev](https://vercel.com/ai-gateway/models/typesafe-ai/jev) through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), which needs a credential that can't live in the browser. So you host one route, and the plugin ships its handler.
+
+1. **Add the route** to a server you run. In a Next.js app:
+
+   ```ts
+   // app/api/sort/route.ts
+   import {createSortingHandler} from 'sanity-plugin-writing-room/sorting'
+
+   const handler = createSortingHandler({
+     projectId: 'your-project-id',
+     // Only when the Studio is on a different origin from the route:
+     origins: ['https://your-studio.sanity.studio'],
+   })
+
+   export {handler as POST, handler as OPTIONS}
+   ```
+
+   Install [`ai`](https://www.npmjs.com/package/ai) (7.0.128 or later) beside it. The handler takes a web `Request` and returns a `Response`, so it works anywhere those do.
+
+2. **Give it access to the gateway.** Deployed on Vercel, it uses the deployment's own token and needs nothing. Anywhere else, including locally, set `AI_GATEWAY_API_KEY`.
+
+3. **Tell the room where the route is:**
+
+   ```ts
+   writingRoom({types: ['post'], sorting: {endpoint: '/api/sort'}})
+   ```
+
+### What a Writer sees
+
+- **The paste lands as usual.** If the body was empty and the paste is a piece (three blocks and about 150 words, at least), a line at the foot offers to sort it. Ignoring it or typing on leaves an ordinary paste. The first time, the offer says the text will go to the AI service the Studio has set up.
+- **The page is held** for a moment while it's sorted, usually under a second. Esc stops it. If it can't be done, the paste is left exactly as it was.
+- **Then the room says what it filled**, with **See Details** and **Undo**. Filled fields are marked "From your paste" in Details. Undo puts the paste back as it landed, and lasts until the first edit.
+
+### What it fills
+
+| Field | How |
+| --- | --- |
+| Title | The headline, unless the Writer already typed a title. |
+| String and text fields | A block written to be that field: a standfirst for an excerpt. It is moved out of the body. |
+| A reference, or a string with a list of options | One of the existing answers: by what the paste states ("By Sam Okafor"), or by what the piece is about. |
+| An array of references, or of strings with a list | Several of the existing answers, the same way. |
+| Tags with no set list | The items of a label line ("Tags: portugal, city breaks"), as written. |
+
+Good to know:
+
+- **Field titles and descriptions matter.** They are what tells the model what a field is for. A text field described as "Not shown on the site" is left alone; an undescribed one is harder to judge.
+- **It leaves these alone:** the slug (it follows the title), the published date, images, booleans, numbers, dates, objects, a reference with a `filter`, a field with a `hidden` or `readOnly` rule or an input component of its own, a set of more than 254 answers, and any field that already has something in it.
+- **A line only leaves the body when it was used in full.** "By Dana Whitfield" stays if there is no such author; a tags line stays if it names a tag the field doesn't offer.
+- **Long lists of answers are filled from a label line only.** Judging an array field by what the piece is about costs one question per answer, and a sort spends at most 60 of them, on fields in schema order. A `tags` field with 200 tags is still filled from "Tags: portugal, city breaks", but not by judgement.
+- **It would rather leave a field empty than guess.** An empty field shows; a wrong one doesn't.
+- **Only members of your project can call the route.** The room sends the Writer's Sanity token and the route checks it with Sanity before asking the model. That means Sorting needs a sign-in that has a token: a Writer signed in by cookie isn't offered it (the browser console says so once). Setting `auth: {loginMethod: 'token'}` in your Studio config makes sure there is one.
+- **What reaches the model:** the first dozen and last few blocks of the paste, about 2,000 characters of what follows, your field titles and descriptions, and the names of the answers to pick from. Images are never sent, and neither are document ids: your route keeps those and hands the model short stand-ins.
+- **Cost.** A fraction of a cent per sort at the gateway's listed price for Jev.
+
 ## Preview on your site
 
 Preview opens the document on your site in draft mode, unpublished changes included. It's off until you give it your site's origin:
@@ -320,6 +384,8 @@ pnpm e2e         # Playwright: the room in a real, logged-in Studio
 ```
 
 `pnpm install` points git at `.githooks`, so a push first runs `pnpm check` and then `pnpm smoke` at the oldest Sanity the plugin supports. `git push --no-verify` skips it once.
+
+The dev Studio has Sorting turned on, and its dev server answers at `/api/sort`, so Sorting can be tried without a site: add `AI_GATEWAY_API_KEY` to `.env.local` and restart `pnpm dev`. Without the key the room still offers, and says it couldn't sort.
 
 ### Browser tests
 
