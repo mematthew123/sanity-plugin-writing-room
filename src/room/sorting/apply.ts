@@ -6,7 +6,9 @@ import {isEmptyValue, type SortableField} from './sortable-fields'
 import {type BodyBlock, blockText, unmarked} from './whole-piece'
 
 const sameWords = (a: string, b: string) => {
-  const plain = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+  // Spacing and the punctuation of a sentence don't count. Marks that change what is named, the
+  // `++` and `#` of "C++" and "C#", do.
+  const plain = (text: string) => text.toLowerCase().replace(/[\s.,!?;:…'"‘’“”()[\]–—-]+/gu, ' ').trim()
   return plain(a) === plain(b)
 }
 
@@ -92,11 +94,14 @@ export function applySorting({
     const options = picked.options.filter((id) => known.has(id))
     if (options.length === 0) continue
     // A named reference type is stored under its own name, or the form can't edit it.
-    const reference = (id: string) => ({
-      _type: entry.storedAs?.[entry.answerTypes?.[id] ?? ''] ?? 'reference',
-      _ref: id,
-      ...(entry.weak ? {_weak: true} : {}),
-    })
+    const reference = (id: string) => {
+      const to = entry.answerTypes?.[id] ?? ''
+      return {
+        _type: entry.storedAs?.[to] ?? 'reference',
+        _ref: id,
+        ...((entry.weakAs?.[to] ?? entry.weak) ? {_weak: true} : {}),
+      }
+    }
     if (entry.store === 'string') next[picked.field] = options[0]
     else if (entry.store === 'strings') next[picked.field] = options
     else if (entry.store === 'reference') next[picked.field] = reference(options[0]!)

@@ -140,7 +140,7 @@ describe('the fields Sorting may fill', () => {
     },
   )
 
-  it('keeps the name a reference is stored under', () => {
+  it('keeps the name a reference is stored under, and whether it is weak', () => {
     const named = createSchema({
       name: 'named',
       types: [
@@ -156,7 +156,7 @@ describe('the fields Sorting may fill', () => {
               name: 'related',
               type: 'array',
               of: [
-                {name: 'byline', type: 'reference', to: [{type: 'author'}]},
+                {name: 'byline', type: 'reference', weak: true, to: [{type: 'author'}]},
                 {type: 'reference', to: [{type: 'category'}]},
               ],
             },
@@ -168,6 +168,7 @@ describe('the fields Sorting may fill', () => {
     const byName = Object.fromEntries(fields.map((entry) => [entry.field.name, entry]))
     expect(byName.author!.storedAs).toEqual({author: 'authorRef'})
     expect(byName.related!.storedAs).toEqual({author: 'byline', category: 'reference'})
+    expect(byName.related!.weakAs).toEqual({author: true, category: false})
 
     const answered = fields.map((entry) =>
       entry.field.kind === 'pick'
@@ -198,7 +199,7 @@ describe('the fields Sorting may fill', () => {
     })
     expect(sorted.next.author).toEqual({_type: 'authorRef', _ref: 'a1'})
     expect(sorted.next.related).toEqual([
-      {_type: 'byline', _ref: 'a1', _key: 'key1'},
+      {_type: 'byline', _ref: 'a1', _weak: true, _key: 'key1'},
       {_type: 'reference', _ref: 'c1', _key: 'key2'},
     ])
   })
@@ -260,6 +261,9 @@ describe('applying what the route answered', () => {
     expect(same.touched).toEqual(['body'])
     const different = apply({title: 'Lisbon, slowly', body}, {...response, placed: [], picked: [], listed: []})
     expect(different.touched).toEqual([])
+    const marks = [block('k1', 'Writing C#'), ...body.slice(1)]
+    expect(apply({title: 'Writing C++', body: marks}, {...response, placed: [], picked: [], listed: []}).touched).toEqual([])
+    expect(apply({title: 'writing  c#.', body: marks}, {...response, placed: [], picked: [], listed: []}).touched).toEqual(['body'])
     expect(different.next.body).toBe(body)
   })
 

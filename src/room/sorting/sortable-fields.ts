@@ -14,6 +14,8 @@ export interface SortableField {
   /** For references: the type of each answer's document, by its id. Known once the answers are fetched. */
   answerTypes?: Record<string, string>
   weak?: boolean
+  /** For a list whose members differ: whether a reference is weak, by the type of the document it points to. */
+  weakAs?: Record<string, boolean>
 }
 
 type Loose = {
@@ -133,8 +135,12 @@ export function sortableFields(
     if (members.every((member): member is string[] => member !== null)) {
       // Where two members take the same document type, the first is the one the form would offer.
       const storedAs: Record<string, string> = {}
+      const weakAs: Record<string, boolean> = {}
       members.forEach((names, index) => {
-        for (const name of names) storedAs[name] ??= type.of[index]!.name
+        for (const name of names) {
+          storedAs[name] ??= type.of[index]!.name
+          weakAs[name] ??= Boolean(loose(type.of[index]!).weak)
+        }
       })
       sortable.push({
         field: {...base, kind: 'pick', many: true, options: []},
@@ -142,6 +148,7 @@ export function sortableFields(
         from: [...new Set(members.flat())],
         storedAs,
         weak: type.of.every((member) => loose(member).weak),
+        weakAs,
       })
     }
   }
