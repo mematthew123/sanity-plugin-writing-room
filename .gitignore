@@ -12,5 +12,7 @@ shots/out
 vrt/out
 fixtures
 
-docs
+# Local notes. The README's pictures are in docs/images and stay in the repo.
+docs/*
+!docs/images
 CONTEXT.md
