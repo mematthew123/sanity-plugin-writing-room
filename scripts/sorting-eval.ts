@@ -83,6 +83,15 @@ const parseHtml = (html: string) => new JSDOM(html).window.document
 
 const escapeHtml = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+function tableRow(cells: Array<string | number>): string {
+  const encoded = cells.map((cell) =>
+    String(cell)
+      .replace(/(\\*)\|/g, (_, slashes: string) => `${slashes.repeat(2)}\\|`)
+      .replace(/\r\n|\r|\n/g, ' '),
+  )
+  return `| ${encoded.join(' | ')} |`
+}
+
 /**
  * The blocks the room's editor would make of the paste. It uses `htmlToPortableText` for HTML;
  * for plain text it splits on blank lines first (as `@portabletext/editor`'s text/plain converter
@@ -176,7 +185,7 @@ test('Sorting against the fixtures', async () => {
     const started = Date.now()
     const {answers, confidence} = await decide({...decision, abortSignal: AbortSignal.timeout(30_000)})
     const top = request.blocks.filter((block) => block.edge === 'top').length
-    out.push(`| ${name} | ${blocks.length} | ${empty} | ${top} + ${request.blocks.length - top} | ${request.opening.length} chars | ${Object.keys(decision.questions).length} | ${Date.now() - started}ms |`)
+    out.push(tableRow([name, blocks.length, empty, `${top} + ${request.blocks.length - top}`, `${request.opening.length} chars`, Object.keys(decision.questions).length, `${Date.now() - started}ms`]))
     runs.push({name, blocks, request, expected, answers, confidence})
   }
 
@@ -186,9 +195,9 @@ test('Sorting against the fixtures', async () => {
   const fields = ['title', ...FIELDS.map((field) => field.name)]
   const mark: Record<Outcome, string> = {correct: 'correct', empty: '**empty**', wrong: '**WRONG**', 'rightly empty': '·'}
   const atDefault = report(DEFAULT_FLOORS)
-  out.push('', `## At the current floors (${JSON.stringify(DEFAULT_FLOORS)})`, '', `| Paste | ${fields.join(' | ')} | Lost from body | Left in body |`, `| --- | ${fields.map(() => '---').join(' | ')} | --- | --- |`)
+  out.push('', `## At the current floors (${JSON.stringify(DEFAULT_FLOORS)})`, '', tableRow(['Paste', ...fields, 'Lost from body', 'Left in body']), tableRow(['---', ...fields.map(() => '---'), '---', '---']))
   for (const row of atDefault) {
-    out.push(`| ${row.run.name} | ${fields.map((field) => mark[row.outcomes[field].outcome]).join(' | ')} | ${row.lost.join('; ') || '·'} | ${row.left.join('; ') || '·'} |`)
+    out.push(tableRow([row.run.name, ...fields.map((field) => mark[row.outcomes[field].outcome]), row.lost.join('; ') || '·', row.left.join('; ') || '·']))
   }
   const wrongs = atDefault.flatMap((row) => fields.filter((field) => row.outcomes[field].outcome === 'wrong').map((field) => `- ${row.run.name}, ${field}: got "${row.outcomes[field].got}"`))
   if (wrongs.length > 0) out.push('', 'Wrong fills:', '', ...wrongs)
@@ -204,14 +213,29 @@ test('Sorting against the fixtures', async () => {
       const label = answer.choice === 'none' ? 'none' : answer.choice.startsWith('b') ? `"${(run.request.blocks[Number(answer.choice.slice(1)) - 1]?.text ?? '?').slice(0, 18)}"` : (FIELDS[Number(id.split(':')[1])] as {options: Array<{label: string}>}).options[Number(answer.choice.slice(1)) - 1]?.label
       return `${label} ${sure === undefined ? '?' : sure.toFixed(2)}`
     }
-    out.push(`| ${run.name} | ${cell(questionId.headline)} | ${cell(questionId.place(index('excerpt')))} | ${cell(questionId.place(index('internalNotes')))} | ${cell(questionId.line(index('author')))} | ${cell(questionId.pick(index('author')))} | ${cell(questionId.stated(index('author')))} | ${cell(questionId.line(index('tags')))} | ${cell(questionId.applies(index('categories'), 0))} | ${cell(questionId.pick(index('section')))} | ${cell(questionId.settled(index('section')))} | ${cell(questionId.pick(index('layout')))} | ${cell(questionId.settled(index('layout')))} |`)
+    const cells = [
+      run.name,
+      cell(questionId.headline),
+      cell(questionId.place(index('excerpt'))),
+      cell(questionId.place(index('internalNotes'))),
+      cell(questionId.line(index('author'))),
+      cell(questionId.pick(index('author'))),
+      cell(questionId.stated(index('author'))),
+      cell(questionId.line(index('tags'))),
+      cell(questionId.applies(index('categories'), 0)),
+      cell(questionId.pick(index('section'))),
+      cell(questionId.settled(index('section'))),
+      cell(questionId.pick(index('layout'))),
+      cell(questionId.settled(index('layout'))),
+    ]
+    out.push(tableRow(cells))
   }
 
   out.push('', '## Trying other floors', '', 'All four floors set to the same value, over the same answers. A wrong fill is the outcome to avoid; an empty field is the price.', '', '| Floor | Correct | Empty (should have filled) | Wrong | Lines lost from body | Lines left in body |', '| --- | --- | --- | --- | --- | --- |')
   for (const floor of [0.5, 0.6, 0.7, 0.8, 0.9, 0.95]) {
     const rows = report({place: floor, line: floor, pick: floor, judged: floor})
     const count = (outcome: Outcome) => rows.reduce((sum, row) => sum + fields.filter((field) => row.outcomes[field].outcome === outcome).length, 0)
-    out.push(`| ${floor} | ${count('correct')} | ${count('empty')} | ${count('wrong')} | ${rows.reduce((sum, row) => sum + row.lost.length, 0)} | ${rows.reduce((sum, row) => sum + row.left.length, 0)} |`)
+    out.push(tableRow([floor, count('correct'), count('empty'), count('wrong'), rows.reduce((sum, row) => sum + row.lost.length, 0), rows.reduce((sum, row) => sum + row.left.length, 0)]))
   }
 
   const text = `${out.join('\n')}\n`
