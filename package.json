@@ -58,14 +58,17 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test && pnpm lint && pnpm build",
     "prepack": "tsdown",
+    "pack:local": "pnpm pack --out sanity-plugin-writing-room-local.tgz",
     "smoke": "node scripts/smoke-test.mjs",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "shots": "node scripts/shots.mjs",
     "vrt": "node scripts/vrt.mjs",
     "changeset": "changeset",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@portabletext/plugin-input-rule": "^7.0.26",

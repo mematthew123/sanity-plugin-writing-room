@@ -314,9 +314,12 @@ pnpm test        # Vitest
 pnpm typecheck
 pnpm lint
 pnpm build       # tsdown → dist/
+pnpm check       # the four above, as CI runs them
 pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 pnpm e2e         # Playwright: the room in a real, logged-in Studio
 ```
+
+`pnpm install` points git at `.githooks`, so a push first runs `pnpm check` and then `pnpm smoke` at the oldest Sanity the plugin supports. `git push --no-verify` skips it once.
 
 ### Browser tests
 
