@@ -134,6 +134,7 @@ function LoadedRoom({
     ...shown,
     projection: fields.slug ? `{"slug": ${fields.slug}.current}` : '{"slug": null}',
   })
+  const scrollContent = useRef<HTMLDivElement>(null)
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
   const [notice, setNotice] = useState<RoomNotice | null>(null)
@@ -193,7 +194,7 @@ function LoadedRoom({
   return (
     <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
       <RoomSyncProvider handle={handle}>
-        <Layout>
+        <Layout ref={scrollContent}>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
             receded={receded && !inDetails}
@@ -266,6 +267,7 @@ function LoadedRoom({
                 fields={fields}
                 scheme={scheme}
                 page={page}
+                scrollContent={scrollContent}
                 inDetails={inDetails}
                 focusField={view.field}
                 onProblem={onProblem}
@@ -321,6 +323,7 @@ function Pages({
   fields,
   scheme,
   page,
+  scrollContent,
   inDetails,
   focusField,
   onProblem,
@@ -330,6 +333,7 @@ function Pages({
   fields: WritingFields
   scheme: string
   page: RefObject<HTMLElement | null>
+  scrollContent: RefObject<HTMLDivElement | null>
   inDetails: boolean
   focusField: string | undefined
   onProblem: (problem: string | null) => void
@@ -360,6 +364,7 @@ function Pages({
               <DetailsView
                 handle={handle}
                 fields={fields}
+                scrollContent={scrollContent}
                 focusField={focusField}
                 lockedRelease={lockedRelease}
               />

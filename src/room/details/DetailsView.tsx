@@ -2,6 +2,7 @@ import {type DocumentHandle} from '@sanity/sdk-react'
 import {
   type ComponentProps,
   type HTMLAttributes,
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
@@ -49,11 +50,13 @@ const ReferenceFrame: ReferenceLink = ({
 export function DetailsView({
   handle,
   fields,
+  scrollContent,
   focusField,
   lockedRelease,
 }: {
   handle: DocumentHandle
   fields: WritingFields
+  scrollContent: RefObject<HTMLDivElement | null>
   lockedRelease?: string
   /** A publish problem or a nudge can send the Writer to one field, named by its path. */
   focusField?: string
@@ -125,7 +128,8 @@ export function DetailsView({
     <InRoomDetails.Provider value>
       <DetailsDocument.Provider value={handle.documentId}>
         <Root ref={attach} tabIndex={-1} data-calm-details="">
-          <VirtualizerScrollInstanceProvider scrollElement={scroller} containerElement={root}>
+          {/* Sanity measures list offsets from the top of the room's scrolling content. */}
+          <VirtualizerScrollInstanceProvider scrollElement={scroller} containerElement={scrollContent}>
             <ChangeIndicatorsTracker>
               {/* The items of a list of objects read this; without it they throw. */}
               <CopyPasteProvider>
