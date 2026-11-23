@@ -1,0 +1,8 @@
+#!/bin/sh
+# What CI runs, before it leaves this machine. Skip once with `git push --no-verify`.
+set -e
+pnpm check
+# The fresh-Studio install at the oldest Sanity the plugin supports: the CI job most easily missed.
+# Git hands a hook the refs being pushed on stdin, and `sanity build` would read them as its output
+# folder, so the smoke test gets none.
+pnpm smoke "$(node -p "require('./package.json').peerDependencies.sanity.replace(/^[^0-9]*/, '')")" </dev/null

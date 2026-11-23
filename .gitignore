@@ -10,3 +10,9 @@ test-results
 playwright-report
 shots/out
 vrt/out
+fixtures
+
+# Local notes. The README's pictures are in docs/images and stay in the repo.
+docs/*
+!docs/images
+CONTEXT.md
