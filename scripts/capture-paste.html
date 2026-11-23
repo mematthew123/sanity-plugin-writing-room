@@ -34,9 +34,12 @@
           text: data.getData('text/plain'),
         }
         const link = document.createElement('a')
-        link.href = URL.createObjectURL(new Blob([JSON.stringify(capture, null, 2)], {type: 'application/json'}))
+        const url = URL.createObjectURL(new Blob([JSON.stringify(capture, null, 2)], {type: 'application/json'}))
+        link.href = url
         link.download = `${capture.name}.json`
         link.click()
+        // Give the browser time to start the download before releasing the URL.
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
         document.getElementById('said').textContent =
           `Saved ${link.download}: ${capture.html.length} characters of HTML, ${capture.text.length} of text.`
         document.getElementById('seen').textContent = capture.html.slice(0, 3000)

@@ -141,7 +141,7 @@ function score(blocks: ReturnType<typeof blocksOf>['blocks'], response: SortingR
     /** Lines taken out of the body that should have stayed: the worst kind of mistake. */
     lost: removed.filter((line) => !expected.leavesBody.includes(line)),
     /** Lines left in the body that should have gone: the Writer deletes them by hand. */
-    left: expected.leavesBody.filter((line) => !removed.includes(line) && !(expected.either?.includes('title') && line === expected.place.title)),
+    left: expected.leavesBody.filter((line) => !removed.includes(line) && !expected.either?.some((field) => line === expected.place[field])),
   }
 }
 
