@@ -176,8 +176,9 @@ export function Sorting({
   /** The body as it was when the offer was made. */
   const watched = useRef('')
   /**
-   * The way back. `unsorted` and `sorted` are what Sorting touched, before and after; `landed` is
-   * whether the room has shown the sorted document yet, which it may not have on the first render.
+   * The way back. `touched` is what Undo puts back; `unsorted` and `sorted` are the whole document's
+   * content before and after, since any edit ends Undo; `landed` is whether the room has shown the
+   * sorted document yet, which it may not have on the first render.
    */
   const undo = useRef<{
     before: Record<string, unknown>
@@ -221,6 +222,10 @@ export function Sorting({
           if (bodyIsEmpty(snapshot.context.value)) {
             pastedAt.current = Date.now()
             queueMicrotask(() => setPastes((count) => count + 1))
+          } else {
+            // A paste into words already there is never a whole piece, even on the heels of one that
+            // went into an empty body and wasn't a piece itself.
+            pastedAt.current = 0
           }
           // Never handles the paste.
           return false
@@ -308,8 +313,8 @@ export function Sorting({
       undo.current = {
         before: now,
         touched: sorted.touched,
-        unsorted: contentOf(now, sorted.touched),
-        sorted: contentOf(sorted.next, sorted.touched),
+        unsorted: contentOf(now),
+        sorted: contentOf(sorted.next),
         landed: false,
       }
       setPhase('sorted')
@@ -322,7 +327,7 @@ export function Sorting({
         if (!kept) return
         edit((current) => {
           // Edited since, in a copy this component may not have rendered yet: leave it be.
-          if (contentOf(current, kept.touched) !== kept.sorted) return current ?? {}
+          if (contentOf(current) !== kept.sorted) return current ?? {}
           const restored: Record<string, unknown> = {...current}
           for (const key of kept.touched) {
             if (kept.before[key] === undefined) delete restored[key]
@@ -384,11 +389,13 @@ export function Sorting({
     dismiss()
   }, [phase, body, dismiss])
 
-  // An edit to what Sorting touched ends Undo, which would overwrite it. Told by content, not timing.
+  // The first edit, anywhere in the document, ends Undo and takes the message away: Undo is the
+  // way back to the paste as it landed, and the message mustn't sit there while the Writer writes.
+  // Told by content, not timing.
   useEffect(() => {
     const kept = undo.current
     if (phase !== 'sorted' || !kept) return
-    const now = contentOf(document, kept.touched)
+    const now = contentOf(document)
     if (now === kept.sorted) {
       kept.landed = true
       return

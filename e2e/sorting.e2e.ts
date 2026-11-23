@@ -103,6 +103,17 @@ test('offers nothing for a passage', async ({page, piece}) => {
   await expect(offer(page)).toHaveCount(0)
 })
 
+test('offers nothing when the rest of a piece is pasted after a passage', async ({page, piece}) => {
+  const room = await openEmpty(page, piece.note)
+  await paste(room, [HEADLINE, STANDFIRST])
+  // The body has words in it now, so this paste isn't one into an empty document.
+  await page.keyboard.press('ControlOrMeta+End')
+  await paste(room, DAYS)
+
+  await page.waitForTimeout(2500)
+  await expect(offer(page)).toHaveCount(0)
+})
+
 test('sorts the piece into the title and Details, and Details draws what was filled', async ({page, piece, content}) => {
   const sent = await answerFor(page, piece)
   const room = await openEmpty(page, piece.note)
@@ -154,6 +165,34 @@ test('puts everything back on Undo', async ({page, piece, content}) => {
     expect(draft.topics).toBeUndefined()
     expect(bodyText(draft)).toContain(HEADLINE)
   })
+})
+
+test('ends Undo at the first edit, even to something Sorting left alone', async ({page, piece}) => {
+  // Only a pick: no block leaves the body, so the body is not among what Sorting touched.
+  await page.route('**/api/sort', (route) => {
+    const response: SortingResponse = {
+      version: 1,
+      headline: null,
+      placed: [],
+      picked: [{field: 'mood', options: ['calm'], kind: 'judged', line: null, confidence: 0.95}],
+      listed: [],
+    }
+    return route.fulfill({json: response})
+  })
+  const room = await openEmpty(page, piece.note)
+  await paste(room, piece.blocks)
+  await page.getByRole('button', {name: 'Sort', exact: true}).click()
+  await expect(sorted(page)).toBeVisible()
+  // It stays while nothing is edited.
+  await page.waitForTimeout(3000)
+  await expect(page.getByRole('button', {name: 'Undo'})).toBeVisible()
+
+  await room.body.click()
+  await page.keyboard.press('ControlOrMeta+End')
+  await page.keyboard.type(' And one more thought.')
+
+  await expect(sorted(page)).toHaveCount(0)
+  await expect(page.getByRole('button', {name: 'Undo'})).toHaveCount(0)
 })
 
 test('says so, and keeps every word, when the route fails', async ({page, piece, content}) => {
