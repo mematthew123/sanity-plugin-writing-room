@@ -131,6 +131,11 @@ function score(blocks: ReturnType<typeof blocksOf>['blocks'], response: SortingR
     }
   }
 
+  // A line may stay when every field it could fill is one of `either`. A field that must be filled still needs it gone.
+  const onlyEither = (line: string) => {
+    const fields = Object.keys(expected.place).filter((field) => expected.place[field] === line)
+    return fields.length > 0 && fields.every((field) => expected.either?.includes(field))
+  }
   const removed = [
     ...(response.headline ? [response.headline.block] : []),
     ...response.placed.map((entry) => entry.block),
@@ -141,7 +146,7 @@ function score(blocks: ReturnType<typeof blocksOf>['blocks'], response: SortingR
     /** Lines taken out of the body that should have stayed: the worst kind of mistake. */
     lost: removed.filter((line) => !expected.leavesBody.includes(line)),
     /** Lines left in the body that should have gone: the Writer deletes them by hand. */
-    left: expected.leavesBody.filter((line) => !removed.includes(line) && !expected.either?.some((field) => line === expected.place[field])),
+    left: expected.leavesBody.filter((line) => !removed.includes(line) && !onlyEither(line)),
   }
 }
 
