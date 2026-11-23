@@ -145,8 +145,9 @@ export function readAnswers(
     const block = line ? request.blocks[line.index] : null
 
     if (field.kind === 'list') {
-      const values = line ? itemsInLine(request.blocks[line.index].text) : []
-      if (line && values.length > 0) {
+      if (!line || !block || block.truncated) return
+      const values = itemsInLine(block.text)
+      if (values.length > 0) {
         claims.push({what: 'list', field: index, block: line.index, confidence: line.confidence, values})
       }
       return

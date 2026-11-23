@@ -37,8 +37,11 @@ async function isMember(token: string, projectId: string, doFetch: typeof fetch,
     headers: {authorization: `Bearer ${token}`},
     signal,
   })
-  // No token at all is a 200 with an empty object, so check the body.
+  if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+    throw new Error('Sanity membership lookup is unavailable.')
+  }
   if (!response.ok) return false
+  // No token at all is a 200 with an empty object, so check the body.
   const user = (await response.json()) as {id?: unknown; roles?: unknown}
   return typeof user.id === 'string' && user.id !== '' && Array.isArray(user.roles) && user.roles.length > 0
 }

@@ -156,6 +156,15 @@ describe('reading the answers', () => {
     expect(readAnswers(request, {[questionId.line(0)]: choice('b2')}).listed).toEqual([])
   })
 
+  it('leaves a truncated list line unclaimed', () => {
+    const request = structuredClone(lisbon)
+    request.fields = [{kind: 'list', name: 'tags', title: 'Tags'}]
+    request.blocks[3].text = 'Tags: portugal, city breaks,'.padEnd(LIMITS.blockText, ' ') + 'food'
+    const parsed = parseSortingRequest(request)
+    if ('problem' in parsed) throw new Error(parsed.problem)
+    expect(readAnswers(parsed.request, {[questionId.line(0)]: choice('b4')}).listed).toEqual([])
+  })
+
   it('leaves a field empty under its floor', () => {
     const unsure = {...good, [questionId.place(0)]: choice('b3', 0.6), [questionId.applies(3, 0)]: yes(0.85)}
     const response = readAnswers(lisbon, unsure)
@@ -324,6 +333,14 @@ describe('the route', () => {
   ])('turns away %s without asking the model', async (_, answer) => {
     decide.mockClear()
     expect((await route({fetch: answer})(post())).status).toBe(403)
+    expect(decide).not.toHaveBeenCalled()
+  })
+
+  it.each([429, 503])('returns 502 when Sanity membership lookup returns %i', async (status) => {
+    decide.mockClear()
+    const response = await route({fetch: async () => new Response(null, {status})})(post())
+    expect(response.status).toBe(502)
+    expect(await response.json()).toEqual({error: 'unavailable'})
     expect(decide).not.toHaveBeenCalled()
   })
 
