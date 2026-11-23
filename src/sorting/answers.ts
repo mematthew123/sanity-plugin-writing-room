@@ -154,12 +154,18 @@ export function readAnswers(
     }
 
     if (field.many) {
-      const named = line ? namedInLine(request.blocks[line.index].text, field) : null
-      if (line && named && named.options.length > 0) {
-        picked.set(index, {field: field.name, options: named.options, kind: 'stated', line: null, confidence: line.confidence})
-        // The line leaves only when every answer it names was picked.
-        if (named.whole && !block?.truncated) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
-        return
+      if (line && block && line.confidence >= floors.pick) {
+        // On a truncated line, only a delimiter confirms the preceding item is complete.
+        const text = block.truncated
+          ? block.text.slice(0, Math.max(block.text.lastIndexOf(','), block.text.lastIndexOf(';')) + 1)
+          : block.text
+        const named = namedInLine(text, field)
+        if (named.options.length > 0) {
+          picked.set(index, {field: field.name, options: named.options, kind: 'stated', line: null, confidence: line.confidence})
+          // The line leaves only when every answer it names was picked.
+          if (named.whole && !block.truncated) claims.push({what: 'line', field: index, block: line.index, confidence: line.confidence})
+          return
+        }
       }
       const judged = field.options
         .map((option, optionIndex) => ({id: option.id, sure: probability(answers, questionId.applies(index, optionIndex))}))

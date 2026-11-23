@@ -211,12 +211,29 @@ describe('reading the answers', () => {
 
   it('fills known tags without claiming a line the route only saw in part', () => {
     const request = structuredClone(lisbon)
-    const prefix = 'Tags: portugal, city breaks,'
-    request.blocks[3].text = prefix.padEnd(LIMITS.blockText, ' ') + 'unknown'
+    const prefix = 'Tags: portugal; city breaks,'
+    request.blocks[3].text = prefix.padEnd(LIMITS.blockText - 'food'.length, ' ') + 'food markets'
     const parsed = parseSortingRequest(request)
     if ('problem' in parsed) throw new Error(parsed.problem)
     expect(parsed.request.blocks[3].truncated).toBe(true)
     expect(readAnswers(parsed.request, good).picked[1]).toMatchObject({options: ['portugal', 'city-breaks'], line: null})
+  })
+
+  it('uses the stated pick floor before filling tags or claiming their line', () => {
+    const options = {floors: {pick: 0.95}}
+    const belowFloor = {
+      ...good,
+      [questionId.line(2)]: choice('b4', 0.94),
+      [questionId.place(0)]: choice('b4', 0.9),
+    }
+    const response = readAnswers(lisbon, belowFloor, options)
+    expect(response.picked.find((pick) => pick.field === 'tags')).toBeUndefined()
+    expect(response.placed).toEqual([{field: 'excerpt', block: 'k-tags', confidence: 0.9}])
+    expect(readAnswers(lisbon, good, options).picked.find((pick) => pick.field === 'tags')).toMatchObject({
+      options: ['portugal', 'city-breaks'],
+      kind: 'stated',
+      line: 'k-tags',
+    })
   })
 
   it('reads whether a line names an answer', () => {
