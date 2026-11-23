@@ -23,6 +23,11 @@ const FORM_EXPORTS = [
   'FormBuilder',
   'createPatchChannel',
   'useDocumentForm',
+  // For arrays in Details.
+  'VirtualizerScrollInstanceProvider',
+  'CopyPasteProvider',
+  // For references in Details.
+  'ReferenceInputOptionsProvider',
   // For the image sources the Insert Menu offers.
   'useSource',
   'useSyncState',
