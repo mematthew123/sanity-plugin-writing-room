@@ -24,6 +24,7 @@ import {type WritingFields} from './fields'
 import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
+import {bodyIsEmpty} from './sorting/whole-piece'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
 import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
@@ -309,8 +310,38 @@ function Title({
     if (inDetails) askForFirstDetail()
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
+  // Paragraphs pasted into the title of an empty document go to the body.
+  const onPastePiece = useCallback(
+    (data: DataTransfer, asTitle: () => void) => {
+      const paragraphs = data.getData('text/plain').split(/\n+/).filter((line) => line.trim()).length
+      const editable = editor.dom.getEditorElement?.()
+      if (paragraphs < 2 || inDetails || !editable || !bodyIsEmpty(editor.getSnapshot().context.value)) return false
+      // Clipboard data can't be read after this event, so copy it.
+      const copy = new DataTransfer()
+      for (const type of ['text/html', 'text/plain']) {
+        const value = data.getData(type)
+        if (value) copy.setData(type, value)
+      }
+      editor.send({type: 'focus'})
+      requestAnimationFrame(() => {
+        const paste = new ClipboardEvent('paste', {clipboardData: copy, bubbles: true, cancelable: true})
+        editable.dispatchEvent(paste)
+        // The editor cancels a paste it took.
+        if (!paste.defaultPrevented) asTitle()
+      })
+      return true
+    },
+    [editor, inDetails],
+  )
   return (
-    <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={locked} onEnter={onEnter} />
+    <TitleField
+      handle={handle}
+      fields={fields}
+      isPublished={isPublished}
+      readOnly={locked}
+      onEnter={onEnter}
+      onPastePiece={onPastePiece}
+    />
   )
 }
 
