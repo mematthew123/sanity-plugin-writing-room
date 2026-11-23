@@ -318,7 +318,7 @@ function Title({
       if (paragraphs < 2 || inDetails || !editable || !bodyIsEmpty(editor.getSnapshot().context.value)) return false
       // Clipboard data can't be read after this event, so copy it.
       const copy = new DataTransfer()
-      for (const type of ['text/html', 'text/plain']) {
+      for (const type of data.types) {
         const value = data.getData(type)
         if (value) copy.setData(type, value)
       }
