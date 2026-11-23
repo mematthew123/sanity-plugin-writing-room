@@ -98,9 +98,19 @@ export function resolveSortingEndpoint(endpoint: string | undefined, studioUrl =
   }
 }
 
+let saidEndpointRefused = false
+
 export function resolveConfig(options: WritingRoomOptions = {}): WritingRoomConfig {
   const {preview} = options
   const endpoint = resolveSortingEndpoint(options.sorting?.endpoint)
+  // Tell whoever set Sorting up why it's silent, once. Only in a browser: the CLI reads this config
+  // too, with no address to resolve a relative endpoint against.
+  if (options.sorting && !endpoint && globalThis.location && !saidEndpointRefused) {
+    saidEndpointRefused = true
+    console.warn(
+      `[sanity-plugin-writing-room] Sorting is off: \`sorting.endpoint\` (${JSON.stringify(options.sorting.endpoint)}) isn’t an address the room will send to. It must be HTTPS, or HTTP on localhost, 127.0.0.1 or [::1]; a relative address takes the Studio’s own, so a Studio served over plain HTTP anywhere else can’t use one.`,
+    )
+  }
   return {
     types: resolveTypes(options.types),
     colors: resolvePalette(options.accent),

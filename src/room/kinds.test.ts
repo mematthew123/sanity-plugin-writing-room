@@ -107,6 +107,24 @@ describe('resolveConfig', () => {
     (endpoint) => expect(resolveSortingEndpoint(endpoint, 'http://studio.example')).toBeNull(),
   )
 
+  it('says once why Sorting is off when the endpoint is refused, and only in a browser', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      // The CLI reads the config with no address to resolve against: nothing to say.
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(warn).not.toHaveBeenCalled()
+
+      vi.stubGlobal('location', new URL('http://192.168.1.20:3333/'))
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]![0]).toContain('Sorting is off')
+    } finally {
+      vi.unstubAllGlobals()
+      warn.mockRestore()
+    }
+  })
+
   it('changes only the accent, for the scheme given', () => {
     const {colors} = resolveConfig({accent: {light: '#2F6FA8'}})
     expect(colors.light.accent).toBe('#2F6FA8')
