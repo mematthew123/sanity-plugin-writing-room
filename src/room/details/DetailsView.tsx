@@ -1,11 +1,21 @@
 import {type DocumentHandle} from '@sanity/sdk-react'
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {
+  type ComponentProps,
+  type HTMLAttributes,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import {
   ALL_FIELDS_GROUP,
   ChangeIndicatorsTracker,
+  CopyPasteProvider,
   createPatchChannel,
   FormBuilder,
   type ObjectMember,
+  ReferenceInputOptionsProvider,
   stringToPath,
   useDocumentForm,
   VirtualizerScrollInstanceProvider,
@@ -15,6 +25,22 @@ import {type WritingFields} from '../fields'
 import {onDetailsFocusAsked, onFirstDetailAsked} from '../navigation'
 import {Placeholder} from '../primitives'
 import {DetailsDocument, InRoomDetails} from './room-form'
+
+type ReferenceLink = NonNullable<
+  ComponentProps<typeof ReferenceInputOptionsProvider>['EditReferenceLinkComponent']
+>
+
+/**
+ * Sanity draws a reference's preview inside the link its host gives it, and nothing at all when
+ * there is none. In the room it isn't a link: the other document can't be opened without leaving.
+ */
+const ReferenceFrame: ReferenceLink = ({
+  documentId: _documentId,
+  documentType: _documentType,
+  parentRefPath: _parentRefPath,
+  template: _template,
+  ...rest
+}) => <div {...(rest as HTMLAttributes<HTMLDivElement>)} />
 
 /**
  * Every field but the title and the body, rendered by the Studio's own form,
@@ -101,32 +127,37 @@ export function DetailsView({
         <Root ref={attach} tabIndex={-1} data-calm-details="">
           <VirtualizerScrollInstanceProvider scrollElement={scroller} containerElement={root}>
             <ChangeIndicatorsTracker>
-              <FormBuilder
-                __internal_patchChannel={patchChannel}
-                id="writing-room-details"
-                changed={formState.changed}
-                collapsedFieldSets={form.collapsedFieldSets}
-                collapsedPaths={form.collapsedPaths}
-                focused={formState.focused}
-                focusPath={formState.focusPath}
-                groups={[]}
-                members={members}
-                onChange={form.onChange}
-                onFieldGroupSelect={onSetActiveFieldGroup}
-                onPathBlur={form.onBlur}
-                onPathFocus={form.onFocus}
-                onPathOpen={form.onPathOpen}
-                onSetFieldSetCollapsed={form.onSetCollapsedFieldSet}
-                onSetPathCollapsed={form.onSetCollapsedPath}
-                openPath={form.openPath}
-                presence={formState.presence}
-                readOnly={formState.readOnly}
-                schemaType={formState.schemaType}
-                validation={formState.validation}
-                value={form.value}
-                hasUpstreamVersion={false}
-                hasBaseVariant={false}
-              />
+              {/* The items of a list of objects read this; without it they throw. */}
+              <CopyPasteProvider>
+                <ReferenceInputOptionsProvider EditReferenceLinkComponent={ReferenceFrame}>
+                  <FormBuilder
+                    __internal_patchChannel={patchChannel}
+                    id="writing-room-details"
+                    changed={formState.changed}
+                    collapsedFieldSets={form.collapsedFieldSets}
+                    collapsedPaths={form.collapsedPaths}
+                    focused={formState.focused}
+                    focusPath={formState.focusPath}
+                    groups={[]}
+                    members={members}
+                    onChange={form.onChange}
+                    onFieldGroupSelect={onSetActiveFieldGroup}
+                    onPathBlur={form.onBlur}
+                    onPathFocus={form.onFocus}
+                    onPathOpen={form.onPathOpen}
+                    onSetFieldSetCollapsed={form.onSetCollapsedFieldSet}
+                    onSetPathCollapsed={form.onSetCollapsedPath}
+                    openPath={form.openPath}
+                    presence={formState.presence}
+                    readOnly={formState.readOnly}
+                    schemaType={formState.schemaType}
+                    validation={formState.validation}
+                    value={form.value}
+                    hasUpstreamVersion={false}
+                    hasBaseVariant={false}
+                  />
+                </ReferenceInputOptionsProvider>
+              </CopyPasteProvider>
             </ChangeIndicatorsTracker>
           </VirtualizerScrollInstanceProvider>
         </Root>

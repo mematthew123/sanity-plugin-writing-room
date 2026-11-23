@@ -156,7 +156,7 @@ export function sortedMessage({filled, titled}: Pick<Sorted, 'filled' | 'titled'
 }
 
 /** The same value whatever order its keys came back in: a save can return an object's keys reordered. */
-function inKeyOrder(value: unknown): unknown {
+export function inKeyOrder(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(inKeyOrder)
   if (typeof value !== 'object' || value === null) return value
   const record = value as Record<string, unknown>

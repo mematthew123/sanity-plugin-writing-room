@@ -318,6 +318,9 @@ describe('applying what the route answered', () => {
     expect(sortingMarks.has('doc', 'excerpt', 'Placed.')).toBe(true)
     expect(sortingMarks.has('doc', 'tags', ['a', 'b'])).toBe(true)
     expect(sortingMarks.has('doc', 'excerpt', 'Placed, then edited.')).toBe(false)
+    // A save can hand a reference back with its keys in another order.
+    sortingMarks.set('doc', {author: {_type: 'reference', _ref: 'sam'}})
+    expect(sortingMarks.has('doc', 'author', {_ref: 'sam', _type: 'reference'})).toBe(true)
     expect(sortingMarks.has('doc', 'title', 'Placed.')).toBe(false)
     expect(sortingMarks.has('other', 'excerpt', 'Placed.')).toBe(false)
     sortingMarks.clear('doc')

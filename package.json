@@ -63,6 +63,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test && pnpm lint && pnpm build",
     "sorting:eval": "node --env-file=.env.local node_modules/vitest/vitest.mjs run --config scripts/sorting-eval.config.ts",
     "prepack": "tsdown",
     "pack:local": "pnpm pack --out sanity-plugin-writing-room-local.tgz",
@@ -72,7 +73,8 @@
     "shots": "node scripts/shots.mjs",
     "vrt": "node scripts/vrt.mjs",
     "changeset": "changeset",
-    "release": "changeset publish"
+    "release": "changeset publish",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@portabletext/plugin-input-rule": "^7.0.26",

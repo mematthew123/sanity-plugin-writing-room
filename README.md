@@ -378,10 +378,15 @@ pnpm test        # Vitest
 pnpm typecheck
 pnpm lint
 pnpm build       # tsdown → dist/
+pnpm check       # the four above, as CI runs them
 pnpm smoke       # pack, install into a fresh Studio, type-check and build it
 pnpm e2e         # Playwright: the room in a real, logged-in Studio
 pnpm sorting:eval  # Sorting against recorded pastes you keep locally (they aren't in the repo); calls the model, needs AI_GATEWAY_API_KEY
 ```
+
+`pnpm install` points git at `.githooks`, so a push first runs `pnpm check` and then `pnpm smoke` at the oldest Sanity the plugin supports. `git push --no-verify` skips it once.
+
+The dev Studio has Sorting turned on, and its dev server answers at `/api/sort`, so Sorting can be tried without a site: add `AI_GATEWAY_API_KEY` to `.env.local` and restart `pnpm dev`. Without the key the room still offers, and says it couldn't sort.
 
 ### Browser tests
 

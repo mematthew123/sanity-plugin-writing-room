@@ -1,10 +1,13 @@
+import {inKeyOrder} from './apply'
+
 /**
  * Which Details fields Sorting filled, so each can say "From your paste" until the Writer changes
  * it. Kept only in memory and only for the visit: nothing about it is stored in the document.
  */
 const filledBySorting = new Map<string, Map<string, string>>()
 
-const sameAs = (value: unknown) => JSON.stringify(value ?? null)
+// A save can hand a reference back with its keys in another order.
+const sameAs = (value: unknown) => JSON.stringify(inKeyOrder(value ?? null))
 
 export const sortingMarks = {
   /** `values`: each filled field and what Sorting put in it. */
