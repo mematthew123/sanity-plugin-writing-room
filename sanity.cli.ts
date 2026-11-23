@@ -1,6 +1,8 @@
 import {existsSync} from 'node:fs'
+import {type IncomingMessage, type ServerResponse} from 'node:http'
 import {defineCliConfig} from 'sanity/cli'
 import {createSortingHandler} from './src/sorting'
+import {LIMITS} from './src/sorting/contract'
 
 // For AI_GATEWAY_API_KEY, which the CLI doesn't read from .env.local on its own.
 if (existsSync('.env.local')) process.loadEnvFile('.env.local')
@@ -25,8 +27,24 @@ export default defineCliConfig({
         configureServer(server) {
           const sort = projectId ? createSortingHandler({projectId}) : null
           server.middlewares.use('/api/sort', async (incoming, outgoing) => {
+            // Connect doesn't wait for this, so a rejection here would be unhandled and could stop the dev server.
+            try {
+              await answer(incoming, outgoing)
+            } catch (error) {
+              console.error('[writing-room] /api/sort', error)
+              if (outgoing.headersSent) outgoing.destroy()
+              else outgoing.writeHead(500).end()
+            }
+          })
+          const answer = async (incoming: IncomingMessage, outgoing: ServerResponse) => {
+            // The route reads no more than this, so nothing past it is kept. One byte over lets it say 413.
             const chunks: Buffer[] = []
-            for await (const chunk of incoming) chunks.push(chunk as Buffer)
+            let held = 0
+            for await (const chunk of incoming) {
+              if (held > LIMITS.body) continue
+              chunks.push(chunk as Buffer)
+              held += (chunk as Buffer).length
+            }
             const headers = new Headers()
             for (const [name, value] of Object.entries(incoming.headers)) {
               if (typeof value === 'string') headers.set(name, value)
@@ -44,7 +62,7 @@ export default defineCliConfig({
             outgoing.statusCode = response.status
             response.headers.forEach((value, name) => outgoing.setHeader(name, value))
             outgoing.end(Buffer.from(await response.arrayBuffer()))
-          })
+          }
         },
       },
     ],

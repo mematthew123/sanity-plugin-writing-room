@@ -32,7 +32,7 @@
 - [ ] **Scheduling, by hand and in the pictures.** The browser tests schedule, lock, unlock and go live against a real project. Still to do: try Preview on a locked document against a real site, and add the schedule panel and the locked room to `pnpm shots` and `pnpm vrt`.
 - [ ] **Details when scheduling from Structure.** Studio's "Schedule publish" doesn't settle the slug or stamp the date as the room does. A plugin can't wrap it (Studio's own scheduled drafts plugin runs after every other and puts its action back), so the choice is an action a Studio adds in its own config, or leaving it.
 - [ ] **Sorting, out of experimental.** Paste a whole piece into an empty document and the room offers to sort it into the title and Details (see "Sorting a pasted piece" in the README). Built and tried by hand in Calm Editor; still to do before the label comes off:
-  - Real clipboard captures from Notion and Word, and more pieces, so the confidence floors are measured and not guessed. `pnpm sorting:eval` runs them.
+  - Real clipboard captures from Notion and Word, and more pieces, so the confidence floors are measured and not guessed.
   - A way to prove who is calling the route for a Writer signed in by cookie. Today Sorting needs a token.
   - Browser tests for the offer, the hold, Undo and the paste into the title.
   - The offer, the hold and the sorted message in `pnpm shots` and `pnpm vrt`.
