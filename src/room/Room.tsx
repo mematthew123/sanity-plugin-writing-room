@@ -24,6 +24,7 @@ import {type WritingFields} from './fields'
 import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
+import {Sorting} from './sorting/Sorting'
 import {bodyIsEmpty} from './sorting/whole-piece'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
 import {type Schedule} from '../lib/schedule'
@@ -148,9 +149,12 @@ function LoadedRoom({
     rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
   }, [projectId, dataset, handle.documentId, handle.documentType])
 
+  // Held (blurred, read-only) while a piece is sorted.
+  const [holding, setHolding] = useState(false)
+
   useEffect(() => {
-    if (!notice) return undefined
-    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
+    if (!notice || notice.stays) return undefined
+    const visibleFor = notice.link || notice.action || notice.actions ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
     const timer = setTimeout(() => setNotice(null), visibleFor)
     return () => clearTimeout(timer)
   }, [notice])
@@ -254,7 +258,16 @@ function LoadedRoom({
             }
           />
           <Main>
-            <Page as="article" ref={page} $textSize={settings.textSize}>
+            <Sorting
+              handle={handle}
+              writing={fields}
+              locked={locked}
+              isPublished={isPublished}
+              onNotice={setNotice}
+              onHolding={setHolding}
+              onSeeDetails={() => view.openDetails()}
+            />
+            <Page as="article" ref={page} $textSize={settings.textSize} inert={holding} data-holding={holding}>
               <Title
                 handle={shown}
                 fields={fields}
@@ -497,6 +510,23 @@ const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
   font-size: ${({$textSize = 'medium'}) => `var(--calm-prose-size-${$textSize})`};
   font-weight: var(--calm-weight-prose);
   line-height: var(--calm-type-prose-leading);
+  transition:
+    filter var(--calm-motion-gentle) var(--calm-motion-easing),
+    opacity var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  /* The hold while a piece is sorted. A dim, not a blur, under reduced motion. */
+  &[data-holding='true'] {
+    opacity: 0.55;
+    filter: blur(3px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &[data-holding='true'] {
+      filter: none;
+    }
+  }
 `
 
 /** The room from top to bottom: Room Controls, the page, and a foot that stays in view. */

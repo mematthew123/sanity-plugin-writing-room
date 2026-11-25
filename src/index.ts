@@ -2,6 +2,7 @@ export {writingRoom} from './plugin'
 export type {
   WritingRoomAccent,
   WritingRoomScheme,
+  WritingRoomSortingOptions,
   WritingRoomOptions,
   WritingRoomPreviewOptions,
   WritingRoomTypeOptions,

@@ -24,6 +24,8 @@ export default defineConfig({
       preview: process.env.SANITY_STUDIO_PREVIEW_ORIGIN
         ? {origin: process.env.SANITY_STUDIO_PREVIEW_ORIGIN}
         : undefined,
+      // The dev server answers here (see sanity.cli.ts); the browser tests answer for it.
+      sorting: {endpoint: '/api/sort'},
     }),
   ],
   schema: {types: [...writingRoomSchemaTypes, fieldNote, topic]},
