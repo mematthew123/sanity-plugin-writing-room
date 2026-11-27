@@ -72,13 +72,9 @@ export function SectionLabel({children, className, ...props}: ComponentProps<'h2
   )
 }
 
-export function Placeholder({
-  height,
-  className,
-  style,
-  ...props
-}: {height: string} & ComponentProps<'div'>) {
-  return <div {...props} className={cx(styles.placeholder, className)} style={{...style, height}} />
+/** Holds the place of what's loading. Its height comes from the `className` it's given. */
+export function Placeholder({className, ...props}: ComponentProps<'div'>) {
+  return <div {...props} className={cx(styles.placeholder, className)} />
 }
 
 /** A checkbox drawn as a switch; give it `type="checkbox"` and `role="switch"`. */

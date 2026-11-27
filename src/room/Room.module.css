@@ -119,3 +119,11 @@
     pointer-events: auto;
   }
 }
+
+.titlePlaceholder {
+  height: 3.5rem;
+}
+
+.detailsPlaceholder {
+  height: 12rem;
+}

@@ -56,6 +56,16 @@ const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', studioDir
 const tarball = packOutput.trim().split('\n').pop().trim()
 if (!existsSync(tarball)) throw new Error(`pnpm pack didn't produce a tarball: ${packOutput}`)
 
+// The room's styles are plain CSS; `pnpm pack` has just rebuilt dist/.
+const distDir = join(pluginDir, 'dist')
+const styledIn = readdirSync(distDir).filter(
+  (file) => /\.(js|d\.ts)$/.test(file) && readFileSync(join(distDir, file), 'utf8').includes('styled-components'),
+)
+if (styledIn.length) {
+  console.error(`\n✗ The plugin reaches for styled-components again: ${styledIn.join(', ')}`)
+  process.exit(1)
+}
+
 // 2. A minimal Studio, following the README.
 const files = {
   'package.json': JSON.stringify(
@@ -68,6 +78,7 @@ const files = {
         'sanity-plugin-writing-room': `file:${tarball}`,
         'react': '^19.3.1',
         'react-dom': '^19.3.1',
+        // Sanity's own peer, not the plugin's.
         'styled-components': '^6.1.18',
         '@sanity/themer': '^0.10.6',
       },

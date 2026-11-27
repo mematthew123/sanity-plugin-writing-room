@@ -8,3 +8,7 @@
     outline: none;
   }
 }
+
+.placeholder {
+  height: 12rem;
+}

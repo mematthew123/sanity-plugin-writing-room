@@ -122,7 +122,7 @@ export function DetailsView({
     return onFirstDetailAsked(() => focusPath.current([firstField]))
   }, [firstField])
 
-  if (!formState || !ready) return <Placeholder height="12rem" />
+  if (!formState || !ready) return <Placeholder className={styles.placeholder} />
 
   return (
     <InRoomDetails.Provider value>

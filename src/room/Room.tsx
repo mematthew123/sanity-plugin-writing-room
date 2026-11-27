@@ -87,7 +87,7 @@ function LoadingRoom() {
         }
       />
       <Column className={styles.page}>
-        <Placeholder height="3.5rem" />
+        <Placeholder className={styles.titlePlaceholder} />
       </Column>
     </>
   )
@@ -409,7 +409,7 @@ function Pages({
       {shown === 'details' && (
         <div className={styles.swap} inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
           <DetailsBoundary onOpenInStructure={openInStructure}>
-            <Suspense fallback={<Placeholder height="12rem" />}>
+            <Suspense fallback={<Placeholder className={styles.detailsPlaceholder} />}>
               <DetailsView
                 handle={handle}
                 fields={fields}

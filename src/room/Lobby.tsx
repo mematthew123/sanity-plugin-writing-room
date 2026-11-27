@@ -241,7 +241,7 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
       {problem && <p className={styles.problem} role="alert">{problem}</p>}
       <section aria-labelledby="calm-continue">
         <SectionLabel id="calm-continue">Continue writing</SectionLabel>
-        <Suspense fallback={<Placeholder height="11rem" />}>
+        <Suspense fallback={<Placeholder className={styles.continuePlaceholder} />}>
           <Continue
             key={first.documentId}
             handle={first}
@@ -259,7 +259,7 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
           <ul className={styles.rows}>
             {others.map((handle) => (
               <li key={handle.documentId}>
-                <Suspense fallback={<Placeholder height="3.75rem" />}>
+                <Suspense fallback={<Placeholder className={styles.rowPlaceholder} />}>
                   <Row handle={handle} kinds={kinds} />
                 </Suspense>
               </li>
@@ -278,7 +278,7 @@ function DeskPlaceholder() {
       <header className={styles.header}>
         <Greeting />
       </header>
-      <Placeholder height="11rem" aria-hidden />
+      <Placeholder className={styles.continuePlaceholder} aria-hidden />
     </>
   )
 }

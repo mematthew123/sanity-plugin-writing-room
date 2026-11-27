@@ -331,3 +331,11 @@
 .browse {
   margin: var(--calm-space-lg) 0 0 calc(0.75rem * -1);
 }
+
+.continuePlaceholder {
+  height: 11rem;
+}
+
+.rowPlaceholder {
+  height: 3.75rem;
+}
