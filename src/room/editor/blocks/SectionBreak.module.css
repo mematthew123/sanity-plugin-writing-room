@@ -1,7 +1,3 @@
-.frame {
-  margin-block: var(--calm-space-xl);
-}
-
 .ornament {
   padding-block: var(--calm-space-xs);
   color: var(--calm-color-ink-faint);

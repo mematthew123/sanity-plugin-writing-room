@@ -3,7 +3,8 @@ import {isSelectionCollapsed} from '@portabletext/editor/selectors'
 import {useAnnotationPopover, useToolbarSchema} from '@portabletext/toolbar'
 import {LaunchIcon} from '@sanity/icons/Launch'
 import {useCallback, useEffect, useLayoutEffect, useState} from 'react'
-import {Floating, FloatingSurface, useViewportChanges} from './floating'
+import {Floating, FloatingInput, FloatingRow, FloatingSurface, useViewportChanges} from './floating'
+import {PillButton} from '../primitives'
 import {displayHref, normalizeHref} from './link'
 import styles from './LinkPopover.module.css'
 
@@ -78,8 +79,7 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
     >
       <FloatingSurface className={styles.surface} round>
         {editing ? (
-          <input
-            className={styles.input}
+          <FloatingInput
             autoFocus
             aria-label="Link address"
             value={draft}
@@ -93,17 +93,16 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
             onBlur={() => setDraft(null)}
           />
         ) : (
-          <div className={styles.row}>
+          <FloatingRow>
             <a className={styles.address} href={href} target="_blank" rel="noopener noreferrer" title={href}>
               {displayHref(href) || 'No address'}
               <LaunchIcon aria-hidden />
             </a>
-            <button className={styles.action} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setDraft(href)}>
+            <PillButton className={styles.action} onMouseDown={(event) => event.preventDefault()} onClick={() => setDraft(href)}>
               Edit
-            </button>
-            <button
+            </PillButton>
+            <PillButton
               className={styles.action}
-              type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
                 popover.send({type: 'remove', schemaType: link.schemaType})
@@ -111,8 +110,8 @@ export function LinkPopover({scheme, editorFocused}: {scheme: string; editorFocu
               }}
             >
               Remove
-            </button>
-          </div>
+            </PillButton>
+          </FloatingRow>
         )}
       </FloatingSurface>
     </Floating>

@@ -2,12 +2,6 @@
   max-width: min(28rem, calc(100vw - 2rem));
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
 .address {
   display: inline-flex;
   align-items: center;
@@ -34,33 +28,11 @@
   flex-shrink: 0;
   height: 2rem;
   padding: 0 var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
   color: var(--calm-color-ink-muted);
-  font: inherit;
-  cursor: pointer;
 
   &:hover,
   &:focus-visible {
     background: var(--calm-color-paper);
     color: var(--calm-color-ink);
   }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
-  }
-}
-
-.input {
-  width: min(22rem, 70vw);
-  height: 2rem;
-  padding: 0 var(--calm-space-md);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-paper);
-  color: var(--calm-color-ink);
-  font: inherit;
-  outline: none;
 }

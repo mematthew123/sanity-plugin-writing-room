@@ -2,7 +2,7 @@ import {useEditor, useEditorSelector} from '@portabletext/editor'
 import {type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react'
 import {useColorSchemeSetValue, useColorSchemeValue} from 'sanity'
 import {Floating, FloatingSurface} from './editor/floating'
-import {QuietButton, Switch} from './primitives'
+import {PillButton, QuietButton, Switch} from './primitives'
 import {type RoomSettings, useRoomSettings} from './room-settings'
 import {readingTime, wordCount} from './word-count'
 import styles from './comfort.module.css'
@@ -82,17 +82,16 @@ export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNo
               <span id="calm-text-size">Text size</span>
               <div className={styles.segments} role="radiogroup" aria-labelledby="calm-text-size">
                 {TEXT_SIZES.map((size) => (
-                  <button
+                  <PillButton
                     className={styles.segment}
                     key={size.value}
-                    type="button"
                     role="radio"
                     aria-checked={settings.textSize === size.value}
                     aria-label={size.value}
                     onClick={() => update({textSize: size.value})}
                   >
                     {size.label}
-                  </button>
+                  </PillButton>
                 ))}
               </div>
             </div>

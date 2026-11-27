@@ -47,22 +47,12 @@ label.setting {
 .segment {
   min-width: 2rem;
   height: 1.75rem;
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
   color: var(--calm-color-ink-muted);
-  font: inherit;
-  cursor: pointer;
 
   &[aria-checked='true'] {
     background: var(--calm-color-surface);
     color: var(--calm-color-ink);
     font-weight: var(--calm-weight-ui-strong);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
   }
 }
 

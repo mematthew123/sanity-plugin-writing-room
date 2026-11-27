@@ -11,7 +11,7 @@ import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useSt
 import {useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
 import {DetailsBoundary} from './details/DetailsBoundary'
-import {DetailsView} from './details/DetailsView'
+import {DetailsPlaceholder, DetailsView} from './details/DetailsView'
 import {useSwap} from './details/use-swap'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
@@ -409,7 +409,7 @@ function Pages({
       {shown === 'details' && (
         <div className={styles.swap} inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
           <DetailsBoundary onOpenInStructure={openInStructure}>
-            <Suspense fallback={<Placeholder className={styles.detailsPlaceholder} />}>
+            <Suspense fallback={<DetailsPlaceholder />}>
               <DetailsView
                 handle={handle}
                 fields={fields}

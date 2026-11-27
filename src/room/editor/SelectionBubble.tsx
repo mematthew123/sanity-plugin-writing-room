@@ -20,7 +20,8 @@ import {
   useState,
 } from 'react'
 import {useBodyAllows} from './allows'
-import {Floating, FloatingSurface, useViewportChanges} from './floating'
+import {Floating, FloatingInput, FloatingRow, FloatingSurface, useViewportChanges} from './floating'
+import {PillButton} from '../primitives'
 import {normalizeHref} from './link'
 import styles from './SelectionBubble.module.css'
 
@@ -115,7 +116,7 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
         }}
       >
         {linkDraft === null ? (
-          <div className={styles.row}>
+          <FloatingRow>
             {can.bold && (
               <BubbleButton label="Bold" icon={BoldIcon} active={bold} onPress={() => run({type: 'decorator.toggle', decorator: 'strong'})} />
             )}
@@ -150,10 +151,9 @@ export function SelectionBubble({scheme, editorFocused}: {scheme: string; editor
                 Quote
               </BubbleButton>
             )}
-          </div>
+          </FloatingRow>
         ) : (
-          <input
-            className={styles.linkInput}
+          <FloatingInput
              
             autoFocus
             aria-label="Link address"
@@ -194,9 +194,8 @@ function BubbleButton({
   children?: ReactNode
 }) {
   return (
-    <button
+    <PillButton
       className={styles.button}
-      type="button"
       aria-label={label}
       aria-pressed={active}
       title={label}
@@ -213,6 +212,6 @@ function BubbleButton({
       }}
     >
       {Icon ? <Icon aria-hidden /> : children}
-    </button>
+    </PillButton>
   )
 }

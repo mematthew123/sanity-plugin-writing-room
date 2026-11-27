@@ -22,9 +22,7 @@
   "type": "module",
   "sideEffects": [
     "./src/theme.ts",
-    "./dist/theme.js",
-    "./dist/index.js",
-    "**/*.module.css"
+    "./dist/theme.js"
   ],
   "exports": {
     ".": "./src/index.ts",

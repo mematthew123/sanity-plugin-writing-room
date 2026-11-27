@@ -1,6 +1,6 @@
+/* No margin of its own: the editor spaces every block alike (`.prose > *` in BodyEditor.module.css). */
 .frame {
   position: relative;
-  margin-block: var(--calm-type-prose-gap);
   border-radius: var(--calm-radius-large);
   outline: 2px solid transparent;
   outline-offset: 4px;

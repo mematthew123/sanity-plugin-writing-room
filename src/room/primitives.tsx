@@ -64,6 +64,11 @@ export function QuietButton({
   )
 }
 
+/** The small round button inside a floating panel. Its size and colours come from the `className` it's given. */
+export function PillButton({className, ...props}: ComponentProps<'button'>) {
+  return <button type="button" {...props} className={cx(styles.pillButton, className)} />
+}
+
 export function SectionLabel({children, className, ...props}: ComponentProps<'h2'>) {
   return (
     <h2 {...props} className={cx(styles.sectionLabel, className)}>

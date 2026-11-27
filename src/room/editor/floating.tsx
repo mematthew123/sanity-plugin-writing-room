@@ -71,3 +71,13 @@ export function useViewportChanges(onChange: () => void) {
 export function FloatingSurface({round, className, ...props}: {round?: boolean} & ComponentProps<'div'>) {
   return <div {...props} className={cx(styles.surface, className)} data-round={round || undefined} />
 }
+
+/** A line of buttons in a round {@link FloatingSurface}. */
+export function FloatingRow({className, ...props}: ComponentProps<'div'>) {
+  return <div {...props} className={cx(styles.row, className)} />
+}
+
+/** The one field a round {@link FloatingSurface} shows in place of its buttons. */
+export function FloatingInput({className, ...props}: ComponentProps<'input'>) {
+  return <input {...props} className={cx(styles.input, className)} />
+}

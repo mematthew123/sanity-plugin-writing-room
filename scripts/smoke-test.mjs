@@ -223,8 +223,9 @@ if (missing.length) {
 // 6. Types and bundle.
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
-expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
-expectRoomStyles(join(studioDir, 'dist'), 'the Studio bundle')
+const studioBundle = scripts(join(studioDir, 'dist'))
+expectOneSdk(studioBundle, 'the Studio bundle')
+expectRoomStyles(studioBundle, 'the Studio bundle')
 
 // 7. The same Studio embedded in a Next.js app.
 if (embedded) {
@@ -264,14 +265,16 @@ export default function StudioPage() {
     env: {...process.env, CI: 'true', NEXT_TELEMETRY_DISABLED: '1'},
   })
   // Browser bundle only: .next/server has its own copy.
-  expectOneSdk(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
-  expectRoomStyles(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
+  const nextBundle = scripts(join(studioDir, '.next', 'static'))
+  expectOneSdk(nextBundle, 'the Next.js browser bundle')
+  expectRoomStyles(nextBundle, 'the Next.js browser bundle')
 }
 
 console.log(
   `\n✓ sanity@${sanityVersion}: installed, deduped, type-checked and built${embedded ? ', standalone and embedded in Next.js' : ''}.`,
 )
 
+/** Every script under `dir`, read once for all the checks made of it. */
 function scripts(dir, found = []) {
   for (const entry of readdirSync(dir, {withFileTypes: true})) {
     const child = join(dir, entry.name)
@@ -285,9 +288,9 @@ function scripts(dir, found = []) {
 }
 
 /** Each copy of @sanity/sdk-react carries this error message, so two copies means it appears twice. */
-function expectOneSdk(dir, label) {
+function expectOneSdk(all, label) {
   const MESSAGE = 'wrapped in a ResourceProvider or a SanityApp component'
-  const count = scripts(dir).reduce((sum, script) => sum + script.split(MESSAGE).length - 1, 0)
+  const count = all.reduce((sum, script) => sum + script.split(MESSAGE).length - 1, 0)
   console.log(`App SDK copies in ${label}: ${count}`)
   if (count !== 1) {
     console.error(`\n✗ Expected one copy of @sanity/sdk-react in ${label}, found ${count}.`)
@@ -309,25 +312,30 @@ function animations(value) {
 }
 
 /** A bundler that dropped the room's CSS as unused would still build. */
-function expectRoomStyles(dir, label) {
-  const all = scripts(dir)
+function expectRoomStyles(all, label) {
   const rules = all.some((script) => /\.calm-[\w-]+\{/.test(script))
-  const added = all.some((script) => script.includes('calmStyles'))
+  // The `href` of the `<style>` the room renders them in (WritingRoomTool.tsx).
+  const added = all.some((script) => script.includes('sanity-plugin-writing-room/styles-'))
   console.log(`The room's styles in ${label}: ${rules && added ? 'present' : 'missing'}`)
   if (!rules || !added) {
     console.error(`\n✗ ${label} lost the room's CSS${rules ? "'s way onto the page" : ''}.`)
     process.exit(1)
   }
-  // Each animation must name a `@keyframes` the build renamed.
-  const css = all.join('\n')
-  const keyframes = new Set(Array.from(css.matchAll(/@keyframes (calm-[\w-]+)/g), (match) => match[1]))
+  // Each animation must name a `@keyframes` the build renamed. The stylesheet is one string, so
+  // both are in the same script.
+  const keyframes = new Set()
+  const used = new Set()
+  for (const css of all) {
+    for (const [, name] of css.matchAll(/@keyframes (calm-[\w-]+)/g)) keyframes.add(name)
+    for (const [, declarations] of css.matchAll(/\.calm-[\w-]+[^{}]*\{([^{}]*)\}/g)) {
+      for (const [, value] of declarations.matchAll(/(?:^|;)animation(?:-name)?:([^;]+)/g)) used.add(value)
+    }
+  }
   const stray = new Set()
-  for (const [, declarations] of css.matchAll(/\.calm-[\w-]+[^{}]*\{([^{}]*)\}/g)) {
-    for (const [, value] of declarations.matchAll(/(?:^|;)animation(?:-name)?:([^;]+)/g)) {
-      for (const animation of animations(value)) {
-        const names = animation.split(/[\s,()]+/)
-        if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
-      }
+  for (const value of used) {
+    for (const animation of animations(value)) {
+      const names = animation.split(/[\s,()]+/)
+      if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
     }
   }
   console.log(`The room's animations in ${label}: ${stray.size ? 'missing their keyframes' : 'matched'}`)

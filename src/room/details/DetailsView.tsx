@@ -47,6 +47,11 @@ const ReferenceFrame: ReferenceLink = ({
  * Every field but the title and the body, rendered by the Studio's own form,
  * on one page in schema order.
  */
+/** Holds the place of Details while it loads, here and in whatever suspends around it. */
+export function DetailsPlaceholder() {
+  return <Placeholder className={styles.placeholder} />
+}
+
 export function DetailsView({
   handle,
   fields,
@@ -122,7 +127,7 @@ export function DetailsView({
     return onFirstDetailAsked(() => focusPath.current([firstField]))
   }, [firstField])
 
-  if (!formState || !ready) return <Placeholder className={styles.placeholder} />
+  if (!formState || !ready) return <DetailsPlaceholder />
 
   return (
     <InRoomDetails.Provider value>

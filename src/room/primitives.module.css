@@ -133,6 +133,20 @@
   }
 }
 
+/* A button with no chrome of its own; what uses it adds its size and colours. */
+.pillButton {
+  border: 0;
+  border-radius: var(--calm-radius-pill);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--calm-color-accent);
+    outline-offset: 1px;
+  }
+}
+
 .recedes {
   display: flex;
   flex-shrink: 0;
