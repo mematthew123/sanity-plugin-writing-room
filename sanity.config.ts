@@ -1,7 +1,7 @@
 import {defineConfig} from 'sanity'
 import {structureTool} from 'sanity/structure'
 // From source, so edits reload live and the Studio shares one copy of the App SDK.
-import {fieldNote} from './e2e/field-note'
+import {fieldNote, topic} from './e2e/field-note'
 import {testPictures} from './e2e/test-pictures'
 import {writingRoom, writingRoomSchemaTypes} from './src'
 import {writingRoomTheme} from './src/theme'
@@ -24,9 +24,11 @@ export default defineConfig({
       preview: process.env.SANITY_STUDIO_PREVIEW_ORIGIN
         ? {origin: process.env.SANITY_STUDIO_PREVIEW_ORIGIN}
         : undefined,
+      // The dev server answers here (see sanity.cli.ts); the browser tests answer for it.
+      sorting: {endpoint: '/api/sort'},
     }),
   ],
-  schema: {types: [...writingRoomSchemaTypes, fieldNote]},
+  schema: {types: [...writingRoomSchemaTypes, fieldNote, topic]},
   // A second image source is there for the browser tests; see e2e/test-pictures.tsx.
   form: {image: {assetSources: (previous) => [...previous, testPictures]}},
   theme: writingRoomTheme,

@@ -23,6 +23,11 @@ const FORM_EXPORTS = [
   'FormBuilder',
   'createPatchChannel',
   'useDocumentForm',
+  // For arrays in Details.
+  'VirtualizerScrollInstanceProvider',
+  'CopyPasteProvider',
+  // For references in Details.
+  'ReferenceInputOptionsProvider',
   // For the image sources the Insert Menu offers.
   'useSource',
   'useSyncState',
@@ -149,8 +154,11 @@ if (duplicated) {
 }
 
 // A second copy means the plugin's range has drifted from Sanity's. Only reported with --loose.
+// Sanity's command-line tools keep copies of their own, which never reach the Studio's bundle.
+const TOOLING = ['@sanity/cli', '@sanity/runtime-cli']
+const inTheStudio = (copy) => !TOOLING.some((name) => copy.includes(`/node_modules/${name}/node_modules/`))
 const portableText = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
-  .map((name) => [`@portabletext/${name}`, findCopies(`@portabletext/${name}`)])
+  .map((name) => [`@portabletext/${name}`, findCopies(`@portabletext/${name}`).filter(inTheStudio)])
   .filter(([, copies]) => new Set(copies.map((copy) => copy.split(' ')[0])).size > 1)
 console.log(
   portableText.length

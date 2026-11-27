@@ -23,6 +23,7 @@ import {
   unset,
 } from 'sanity'
 import {Switch} from '../primitives'
+import {sortingMarks} from '../sorting/marks'
 import {addressKind, hasRoomChrome, roomInputKind} from './input-kind'
 import {slugByHand} from './slug-by-hand'
 import {addTags, fromLocalDateTime, parseNumber, removeTagAt, toLocalDateTime} from './values'
@@ -38,7 +39,19 @@ export const DetailsDocument = createContext<string | null>(null)
 /** The room's label, description and validation message for simple fields; the rest keep Sanity's. */
 export function RoomField(props: FieldProps) {
   const inRoom = useContext(InRoomDetails)
-  if (!inRoom || !hasRoomChrome(props.schemaType)) return props.renderDefault(props)
+  const documentId = useContext(DetailsDocument)
+  // Still holds what Sorting filled.
+  const fromPaste = inRoom && props.path.length === 1 && sortingMarks.has(documentId, props.name, props.value)
+  if (!inRoom) return props.renderDefault(props)
+  if (!hasRoomChrome(props.schemaType)) {
+    // Sanity draws the field; the room adds one line beneath.
+    return (
+      <div className={styles.field}>
+        {props.renderDefault(props)}
+        {fromPaste && <p className={styles.hint} data-calm-from-paste="">From your paste</p>}
+      </div>
+    )
+  }
 
   const problem = props.validation.find((marker) => marker.level === 'error') ?? props.validation[0]
   const isSwitch = roomInputKind(props.schemaType) === 'boolean'
@@ -52,6 +65,7 @@ export function RoomField(props: FieldProps) {
       ) : (
         <label className={styles.label} htmlFor={props.inputId}>{props.title}</label>
       )}
+      {fromPaste && <p className={styles.hint} data-calm-from-paste="">From your paste</p>}
       {props.description && <p className={styles.hint}>{props.description}</p>}
       {!isSwitch && props.children}
       {problem && <p className={styles.problem} data-level={problem.level}>{problem.message}</p>}

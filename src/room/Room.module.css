@@ -38,6 +38,9 @@
   font-size: var(--calm-prose-size-medium);
   font-weight: var(--calm-weight-prose);
   line-height: var(--calm-type-prose-leading);
+  transition:
+    filter var(--calm-motion-gentle) var(--calm-motion-easing),
+    opacity var(--calm-motion-gentle) var(--calm-motion-easing);
 
   &[data-text-size='small'] {
     font-size: var(--calm-prose-size-small);
@@ -45,6 +48,20 @@
 
   &[data-text-size='large'] {
     font-size: var(--calm-prose-size-large);
+  }
+
+  /* The hold while a piece is sorted. A dim, not a blur, under reduced motion. */
+  &[data-holding='true'] {
+    opacity: 0.55;
+    filter: blur(3px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &[data-holding='true'] {
+      filter: none;
+    }
   }
 }
 

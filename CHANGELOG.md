@@ -1,5 +1,17 @@
 # sanity-plugin-writing-room
 
+## 0.6.0
+
+### Minor Changes
+
+- [#35](https://github.com/mematthew123/sanity-plugin-writing-room/pull/35) [`df1a181`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/df1a181ca34deb277f7c94b6328c3dee5496c9ba) Thanks [@mematthew123](https://github.com/mematthew123)! - Sorting (experimental, off unless set up): paste a whole piece written elsewhere into an empty document and the room offers to sort it into the title and Details. It moves the Writer's own words into fields and picks among the answers a field already offers; it never writes. The judging is done by TypeSafe's Jev through Vercel AI Gateway, from a route you host with `createSortingHandler` from the new `sanity-plugin-writing-room/sorting` entry, turned on with `writingRoom({sorting: {endpoint}})`. See "Sorting a pasted piece" in the README.
+
+### Patch Changes
+
+- [#32](https://github.com/mematthew123/sanity-plugin-writing-room/pull/32) [`7a3d140`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/7a3d1401a2df624189d3a6c09dbf7414a95113ff) Thanks [@mematthew123](https://github.com/mematthew123)! - An array with items in it (a list of references, say) no longer breaks the Details view, and a reference there shows the document it points to.
+
+- [#34](https://github.com/mematthew123/sanity-plugin-writing-room/pull/34) [`58c8d68`](https://github.com/mematthew123/sanity-plugin-writing-room/commit/58c8d6829b9244c98769a1cbf6ea61814a0d344c) Thanks [@mematthew123](https://github.com/mematthew123)! - Paragraphs pasted into the title of a document with an empty body now go to the body: a title can't hold them.
+
 ## 0.5.0
 
 ### Minor Changes

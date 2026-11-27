@@ -21,6 +21,7 @@
     "e2e",
     "shots",
     "vrt",
+    "scripts/*.ts",
     "*.ts"
   ],
   "exclude": [

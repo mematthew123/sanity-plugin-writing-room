@@ -1,6 +1,6 @@
 import {createSchema, type SchemaType} from 'sanity'
 import {afterEach, describe, expect, it, vi} from 'vitest'
-import {resolveConfig} from '../config'
+import {resolveConfig, resolveSortingEndpoint} from '../config'
 import {schemaTypes} from '../schema'
 import {pluralize, resolveKinds} from './kinds'
 
@@ -84,6 +84,45 @@ describe('resolveConfig', () => {
     const {preview} = resolveConfig({preview: {origin: 'https://example.com'}})
     expect(preview?.pathname('hello', 'post')).toBe('/posts/hello')
     expect(preview?.pathname('hello', 'caseStudy')).toBe('/caseStudy/hello')
+  })
+
+  it('resolves a relative sorting endpoint against the Studio URL', () => {
+    vi.stubGlobal('location', new URL('https://studio.example/workspace/'))
+    try {
+      expect(resolveConfig({sorting: {endpoint: 'api/sort'}}).sorting?.endpoint).toBe(
+        'https://studio.example/workspace/api/sort',
+      )
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it.each(['http://localhost:3333/sort', 'http://127.0.0.1/sort', 'http://[::1]/sort'])(
+    'permits the loopback sorting endpoint %s',
+    (endpoint) => expect(resolveSortingEndpoint(endpoint)).toBe(endpoint),
+  )
+
+  it.each(['http://example.org/sort', 'http://localhost.example.org/sort', 'data:text/plain,sort', '/sort'])(
+    'rejects the sorting endpoint %s when the Studio is on ordinary HTTP',
+    (endpoint) => expect(resolveSortingEndpoint(endpoint, 'http://studio.example')).toBeNull(),
+  )
+
+  it('says once why Sorting is off when the endpoint is refused, and only in a browser', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      // The CLI reads the config with no address to resolve against: nothing to say.
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(warn).not.toHaveBeenCalled()
+
+      vi.stubGlobal('location', new URL('http://192.168.1.20:3333/'))
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(resolveConfig({sorting: {endpoint: '/api/sort'}}).sorting).toBeNull()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn.mock.calls[0]![0]).toContain('Sorting is off')
+    } finally {
+      vi.unstubAllGlobals()
+      warn.mockRestore()
+    }
   })
 
   it('changes only the accent, for the scheme given', () => {

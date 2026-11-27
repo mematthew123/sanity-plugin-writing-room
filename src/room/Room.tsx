@@ -23,6 +23,8 @@ import {type WritingFields} from './fields'
 import {askForFirstDetail, useOpenInStructure, useRoomView} from './navigation'
 import {RoomSettingsMenu, WordCount} from './comfort'
 import {describePostStatus} from './post-status'
+import {Sorting} from './sorting/Sorting'
+import {bodyIsEmpty} from './sorting/whole-piece'
 import {useSchedule, useSchedulingEnabled, useShownHandle} from './use-schedule'
 import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
@@ -132,6 +134,7 @@ function LoadedRoom({
     ...shown,
     projection: fields.slug ? `{"slug": ${fields.slug}.current}` : '{"slug": null}',
   })
+  const scrollContent = useRef<HTMLDivElement>(null)
   const page = useRef<HTMLElement>(null)
   const receded = useRecede(page)
   const [notice, setNotice] = useState<RoomNotice | null>(null)
@@ -144,9 +147,12 @@ function LoadedRoom({
     rememberLastOpened(projectId, dataset, {documentId: handle.documentId, documentType: handle.documentType})
   }, [projectId, dataset, handle.documentId, handle.documentType])
 
+  // Held (blurred, read-only) while a piece is sorted.
+  const [holding, setHolding] = useState(false)
+
   useEffect(() => {
-    if (!notice) return undefined
-    const visibleFor = notice.link || notice.action ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
+    if (!notice || notice.stays) return undefined
+    const visibleFor = notice.link || notice.action || notice.actions ? NOTICE_WITH_NEXT_STEP_MS : NOTICE_VISIBLE_MS
     const timer = setTimeout(() => setNotice(null), visibleFor)
     return () => clearTimeout(timer)
   }, [notice])
@@ -191,7 +197,7 @@ function LoadedRoom({
   return (
     <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
       <RoomSyncProvider handle={handle}>
-        <div className={styles.layout}>
+        <div className={styles.layout} ref={scrollContent}>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
             receded={receded && !inDetails}
@@ -250,7 +256,23 @@ function LoadedRoom({
             }
           />
           <div className={styles.main}>
-            <Column as="article" className={styles.page} ref={page} data-text-size={settings.textSize}>
+            <Sorting
+              handle={handle}
+              writing={fields}
+              locked={locked}
+              isPublished={isPublished}
+              onNotice={setNotice}
+              onHolding={setHolding}
+              onSeeDetails={() => view.openDetails()}
+            />
+            <Column
+              as="article"
+              className={styles.page}
+              ref={page}
+              data-text-size={settings.textSize}
+              inert={holding}
+              data-holding={holding}
+            >
               <Title
                 handle={shown}
                 fields={fields}
@@ -264,6 +286,7 @@ function LoadedRoom({
                 fields={fields}
                 scheme={scheme}
                 page={page}
+                scrollContent={scrollContent}
                 inDetails={inDetails}
                 focusField={view.field}
                 onProblem={onProblem}
@@ -307,8 +330,38 @@ function Title({
     if (inDetails) askForFirstDetail()
     else editor.send({type: 'focus'})
   }, [editor, inDetails])
+  // Paragraphs pasted into the title of an empty document go to the body.
+  const onPastePiece = useCallback(
+    (data: DataTransfer, asTitle: () => void) => {
+      const paragraphs = data.getData('text/plain').split(/\n+/).filter((line) => line.trim()).length
+      const editable = editor.dom.getEditorElement?.()
+      if (paragraphs < 2 || inDetails || !editable || !bodyIsEmpty(editor.getSnapshot().context.value)) return false
+      // Clipboard data can't be read after this event, so copy it.
+      const copy = new DataTransfer()
+      for (const type of data.types) {
+        const value = data.getData(type)
+        if (value) copy.setData(type, value)
+      }
+      editor.send({type: 'focus'})
+      requestAnimationFrame(() => {
+        const paste = new ClipboardEvent('paste', {clipboardData: copy, bubbles: true, cancelable: true})
+        editable.dispatchEvent(paste)
+        // The editor cancels a paste it took.
+        if (!paste.defaultPrevented) asTitle()
+      })
+      return true
+    },
+    [editor, inDetails],
+  )
   return (
-    <TitleField handle={handle} fields={fields} isPublished={isPublished} readOnly={locked} onEnter={onEnter} />
+    <TitleField
+      handle={handle}
+      fields={fields}
+      isPublished={isPublished}
+      readOnly={locked}
+      onEnter={onEnter}
+      onPastePiece={onPastePiece}
+    />
   )
 }
 
@@ -319,6 +372,7 @@ function Pages({
   fields,
   scheme,
   page,
+  scrollContent,
   inDetails,
   focusField,
   onProblem,
@@ -328,6 +382,7 @@ function Pages({
   fields: WritingFields
   scheme: string
   page: RefObject<HTMLElement | null>
+  scrollContent: RefObject<HTMLDivElement | null>
   inDetails: boolean
   focusField: string | undefined
   onProblem: (problem: string | null) => void
@@ -358,6 +413,7 @@ function Pages({
               <DetailsView
                 handle={handle}
                 fields={fields}
+                scrollContent={scrollContent}
                 focusField={focusField}
                 lockedRelease={lockedRelease}
               />

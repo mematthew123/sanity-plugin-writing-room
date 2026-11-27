@@ -41,6 +41,10 @@ export interface RoomNotice {
   /** Somewhere to go next, in a new tab: the published page. */
   link?: {label: string; href: string}
   action?: {label: string; onClick: () => void}
+  /** More than one thing to do next: "See Details" and "Undo" after Sorting. */
+  actions?: Array<{label: string; onClick: () => void}>
+  /** Doesn't pass by itself: whoever showed it takes it away. Only for Sorting's hold and its way back. */
+  stays?: boolean
 }
 
 function subscribeOnline(onChange: () => void) {
@@ -146,6 +150,11 @@ export function RoomMessage({
           </a>
         )}
         {notice.action && <QuietButton onClick={notice.action.onClick}>{notice.action.label}</QuietButton>}
+        {notice.actions?.map((action) => (
+          <QuietButton key={action.label} onClick={action.onClick}>
+            {action.label}
+          </QuietButton>
+        ))}
       </p>
     )
   }
