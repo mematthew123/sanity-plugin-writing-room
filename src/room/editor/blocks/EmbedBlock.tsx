@@ -1,14 +1,14 @@
 import {type BlockObjectRenderProps, useEditor} from '@portabletext/editor'
 import {useState} from 'react'
-import styled from 'styled-components'
 import {EMBED_PROVIDER_NAMES, embedPlayerUrl, parseEmbedUrl} from '../../../embed'
 import {useBlockField} from '../use-block-field'
 import {BlockFrame, Caution, Controls, FieldInput} from './frame'
+import styles from './EmbedBlock.module.css'
 
 export function EmbedBlock({attributes, children, node, selected, focused}: BlockObjectRenderProps) {
   const url = typeof node.url === 'string' ? node.url : ''
   return (
-    <BlockFrame {...attributes} data-calm-block={node._key} $selected={selected}>
+    <BlockFrame {...attributes} data-calm-block={node._key} selected={selected}>
       {children}
       {url ? (
         <EmbedCard blockKey={node._key} url={url} caption={node.caption} />
@@ -35,7 +35,7 @@ function EmbedLinkPrompt({blockKey, autoFocus}: {blockKey: string; autoFocus: bo
   }
 
   return (
-    <Card>
+    <div className={styles.card}>
       <Controls>
         <FieldInput
            
@@ -58,7 +58,7 @@ function EmbedLinkPrompt({blockKey, autoFocus}: {blockKey: string; autoFocus: bo
         />
         {problem && <Caution role="alert">{problem}</Caution>}
       </Controls>
-    </Card>
+    </div>
   )
 }
 
@@ -68,20 +68,21 @@ function EmbedCard({blockKey, url, caption}: {blockKey: string; url: string; cap
   const embed = parseEmbedUrl(url)
 
   return (
-    <Card>
+    <div className={styles.card}>
       <Controls>
-        <Header>
-          <Provider>{embed ? EMBED_PROVIDER_NAMES[embed.provider] : 'Embed'}</Provider>
+        <div className={styles.header}>
+          <span className={styles.provider}>{embed ? EMBED_PROVIDER_NAMES[embed.provider] : 'Embed'}</span>
           {embed && (
-            <PreviewToggle type="button" onClick={() => setPreviewing((on) => !on)}>
+            <button className={styles.previewToggle} type="button" onClick={() => setPreviewing((on) => !on)}>
               {previewing ? 'Hide preview' : 'Preview'}
-            </PreviewToggle>
+            </button>
           )}
-        </Header>
-        <Link title={url}>{url}</Link>
+        </div>
+        <div className={styles.link} title={url}>{url}</div>
         {previewing && embed && (
-          <Player
-            $audio={embed.provider === 'spotify'}
+          <iframe
+            className={styles.player}
+            data-audio={embed.provider === 'spotify' || undefined}
             src={embedPlayerUrl(embed)}
             title={`${EMBED_PROVIDER_NAMES[embed.provider]} preview`}
             allow="encrypted-media; picture-in-picture; fullscreen"
@@ -97,61 +98,6 @@ function EmbedCard({blockKey, url, caption}: {blockKey: string; url: string; cap
           onBlur={captionField.onBlur}
         />
       </Controls>
-    </Card>
+    </div>
   )
 }
-
-const Card = styled.div`
-  padding: var(--calm-space-md);
-  border-radius: var(--calm-radius-large);
-  background: var(--calm-color-surface);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-`
-
-const Header = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-md);
-`
-
-const Provider = styled.span`
-  color: var(--calm-color-ink);
-  font-weight: var(--calm-weight-ui-strong);
-`
-
-const PreviewToggle = styled.button`
-  padding: var(--calm-space-xs) var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
-  color: var(--calm-color-ink-muted);
-  font: inherit;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--calm-color-paper);
-    color: var(--calm-color-ink);
-  }
-`
-
-const Link = styled.div`
-  overflow: hidden;
-  margin-top: var(--calm-space-xs);
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
-const Player = styled.iframe<{$audio: boolean}>`
-  display: block;
-  width: 100%;
-  height: ${({$audio}) => ($audio ? '152px' : 'auto')};
-  aspect-ratio: ${({$audio}) => ($audio ? 'auto' : '16 / 9')};
-  margin-top: var(--calm-space-sm);
-  border: 0;
-  border-radius: var(--calm-radius);
-`

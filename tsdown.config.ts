@@ -1,4 +1,5 @@
 import {defineConfig} from 'tsdown'
+import {roomStyles} from './css-modules.config.ts'
 
 export default defineConfig([
   {
@@ -11,6 +12,9 @@ export default defineConfig([
     clean: true,
     // Inlined so Studios need no font packages or font loader.
     loader: {'.woff2': 'dataurl'},
+    // The plugin handles CSS; tsdown's own would emit a stylesheet.
+    css: false,
+    plugins: [roomStyles()],
   },
   {
     // Server-only. `ai` stays an import: an optional peer.

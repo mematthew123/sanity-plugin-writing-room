@@ -9,7 +9,6 @@ import {SDKPortableTextEditable} from '@portabletext/plugin-sdk-value'
 import {type DocumentHandle} from '@sanity/sdk-react'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useClient} from 'sanity'
-import styled from 'styled-components'
 import {API_VERSION} from '../../lib/api-version'
 import {useRoomSettings} from '../room-settings'
 import {
@@ -29,6 +28,7 @@ import {LinkPopover} from './LinkPopover'
 import {bodyNodes} from './nodes'
 import {RoomDocumentContext} from './room-document'
 import {SelectionBubble} from './SelectionBubble'
+import styles from './BodyEditor.module.css'
 
 const inputRules = [codeFenceRule]
 
@@ -147,13 +147,14 @@ export function BodyEditor({
       {dimming && (
         <style>{`[data-pt-editor] [data-calm-block]:not([data-calm-block="${CSS.escape(focusKey)}"]) { opacity: 0.35; }`}</style>
       )}
-      <Prose
+      <SDKPortableTextEditable
+        className={styles.prose}
         {...handle}
         path={path}
         renderCursor={null}
         spellCheck
         aria-label="Body"
-        renderPlaceholder={() => (readOnly ? null : <Placeholder>Start writing…</Placeholder>)}
+        renderPlaceholder={() => (readOnly ? null : <span className={styles.placeholder}>Start writing…</span>)}
       />
       <SelectionBubble scheme={scheme} editorFocused={focused && !readOnly} />
       <LinkPopover scheme={scheme} editorFocused={focused && !readOnly} />
@@ -269,114 +270,3 @@ function useImageInsert(onProblem: (message: string) => void) {
 
   return {upload, place}
 }
-
-const Placeholder = styled.span`
-  color: var(--calm-color-ink-muted);
-`
-
-const Prose = styled(SDKPortableTextEditable)`
-  min-height: 40vh;
-  outline: none;
-  caret-color: var(--calm-color-accent);
-  text-wrap: pretty;
-  counter-reset: calm-l1 calm-l2;
-
-  & > * {
-    margin-block: 0 var(--calm-type-prose-gap);
-  }
-
-  [data-calm-block] {
-    transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    [data-calm-block] {
-      transition: none;
-    }
-  }
-
-  h2,
-  h3 {
-    margin-top: calc(var(--calm-type-prose-gap) * 2);
-    font-weight: var(--calm-weight-heading);
-    line-height: var(--calm-type-heading-leading);
-    text-wrap: balance;
-  }
-
-  h2 {
-    font-size: var(--calm-type-heading);
-  }
-
-  h3 {
-    font-size: var(--calm-type-subheading);
-  }
-
-  blockquote {
-    margin-inline: 0;
-    padding-inline-start: var(--calm-space-md);
-    border-inline-start: 2px solid var(--calm-color-accent);
-    color: var(--calm-color-ink-muted);
-  }
-
-  strong {
-    font-weight: var(--calm-weight-heading);
-  }
-
-  [data-link] {
-    color: var(--calm-color-accent);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.2em;
-  }
-
-  /* Each list item is its own block, so markers and numbering are drawn here. */
-  [data-list-item] {
-    position: relative;
-    margin-bottom: calc(var(--calm-type-prose-gap) * 0.4);
-    padding-inline-start: 1.5em;
-  }
-
-  [data-list-item][data-level='2'] {
-    margin-inline-start: 1.5em;
-  }
-
-  [data-list-item]::before {
-    position: absolute;
-    left: 0;
-    color: var(--calm-color-ink-muted);
-  }
-
-  [data-list-item='bullet']::before {
-    content: '•';
-  }
-
-  [data-list-item='bullet'][data-level='2']::before {
-    content: '◦';
-  }
-
-  /* Set, not reset: a reset here starts a counter the items after this one don't count on ("1, 1, 2"). */
-  :not([data-list-item='number']) + [data-list-item='number'][data-level='1'] {
-    counter-set: calm-l1 1;
-  }
-
-  [data-list-item='number'][data-level='1'] {
-    counter-increment: calm-l1;
-    counter-reset: calm-l2;
-  }
-
-  [data-list-item='number'][data-level='1']::before {
-    content: counter(calm-l1) '.';
-  }
-
-  [data-list-item='number'][data-level='2'] {
-    counter-increment: calm-l2;
-  }
-
-  [data-list-item='number'][data-level='2']::before {
-    content: counter(calm-l2, lower-alpha) '.';
-  }
-
-  [data-list-item] + :not([data-list-item]) {
-    margin-top: calc(var(--calm-type-prose-gap) * 0.6);
-  }
-`

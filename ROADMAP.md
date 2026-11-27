@@ -12,7 +12,7 @@
   - "All …" links that work with any Structure.
   - Prefixed block types the plugin registers itself.
   - Setup problems that explain themselves.
-- **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest. See `docs/adr/0001-details-use-the-studio-form.md`.
+- **Details in the room** (November 2026): every field that isn't the title or the body, edited without leaving. The room's own inputs for simple fields; Sanity's form for the rest.
 - **Scheduling** (November 2026): publish at a time chosen in the room, through Sanity's Scheduled Drafts. It's offered in the panel that asks before publishing; a scheduled document is locked, shows what will go live, and is unlocked to change it or its time. Nothing to configure: the room offers it wherever the Studio has scheduled drafts.
 - **Look and feel:**
   - Fonts shipped with the plugin.

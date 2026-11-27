@@ -306,10 +306,11 @@ The Lobby never grows a search box, filters, pagination or tabs. Structure has t
 
 ### Widths
 
-The room is designed for every width, phone included. Two breakpoints, both in `src/room/primitives.tsx`:
+The room is designed for every width, phone included. Three breakpoints, written out in the CSS where they're used:
 
-- **`NARROW`** (40rem and under): the bar keeps Leave (as an arrow), presence, save state, Aa and Publish. Status is dropped (Publish's label already says it); Details and Preview move into Room Settings.
-- **`NO_MARGIN`** (64rem and under): there's no margin beside the column, so the word count moves into Room Settings.
+- **Narrow** (`40rem` and under): the bar keeps Leave (as an arrow), presence, save state, Aa and Publish. Status is dropped (Publish's label already says it); Details and Preview move into Room Settings.
+- **No margin** (`64rem` and under): there's no margin beside the column wide enough for the word count, so it moves into Room Settings.
+- **No room for the `+`** (`45rem` and under): the column's own padding is all the margin left, so the Insert Menu's `+` moves to the far end of the empty line. The `+` is small enough to stay in the margin longer than the word count does.
 
 Things that live in the margin (the Insert Menu's `+`) move inside the column when the margin runs out, and grow to a size a thumb can hit. Floating things never extend past the window; they scroll inside themselves instead. Nothing ever wraps onto a second row of controls: when the bar runs short, text shortens, then things move into Room Settings.
 
@@ -421,11 +422,20 @@ For any styling value, work down this list and stop at the first that applies:
 
 1. **A CSS custom property** — `var(--calm-color-ink)`, `var(--calm-font-prose)`, `var(--calm-radius-large)`, `var(--calm-motion-recede)`. Colour properties re-resolve per scheme, so the component works in light and dusk with no extra work.
 2. **The TypeScript export** — `import {palette, fonts} from './tokens'` — only where CSS variables can't reach: the Studio theme (`buildTheme` needs literal colours) and the accent maths.
-3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the two breakpoints, which are named constants.
+3. **A literal** — not for colour, type, spacing, radius or motion. Add a token instead, update this file, and let the tests confirm contrast. The exceptions are a control's own dimensions (a 2.25rem button, a switch's track) and the three breakpoints (below).
 
 Naming in CSS is `--calm-{group}-{token}` in kebab-case: `--calm-color-ink-muted`, `--calm-type-heading`, `--calm-space-lg`, `--calm-weight-title`.
 
 **The room's styles never leave the room.** The tokens are rendered as a `<style>` scoped to the room's own elements (`[data-calm-surface]`, and `[data-calm-floating]` for panels portaled to the body), never to `:root`. A Studio that installs the plugin must look exactly as it did everywhere outside the room, and needs no CSS loader.
+
+**The room's styles are plain CSS, and the room carries them itself.** Each component has a CSS Module beside it (`Lobby.tsx`, `Lobby.module.css`), and four rules follow:
+
+- **Write CSS, not a styling library.** A rule is selectors and declarations over the tokens above: no values computed in JavaScript, no theme object, no `@sanity/ui` primitives. The room doesn't use styled-components, which the Studio is leaving.
+- **State is an attribute, not a class or a prop.** A control that is active, selected or receded says so in the markup and the CSS selects on it: an ARIA state where one exists (`aria-pressed`, `aria-selected`, `aria-checked`), otherwise a `data-` attribute (`data-selected`, `data-receded`, `data-text-size`).
+- **Nothing for the Studio to import.** The build compiles every module into one stylesheet, carried as a string in the room's JavaScript, and the room renders it in a `<style>` when it opens, as it does the tokens and fonts. Installing the plugin is one import; there is never a stylesheet to add beside it, and nothing is added to a page the room isn't on. `sanity dev` compiles the modules with the same plugin as the build (`css-modules.config.ts`), so the browser tests run the CSS that is published. `pnpm smoke` checks that the styles survive a Studio's own build and that every animation still has its keyframes.
+- **A component that others build on is listed first.** A component that renders one element takes a `className` and adds it to its own (`FloatingSurface`, `BlockFrame`, `Column`, `Controls`, `PillButton`). Its module is named in `SHARED_FIRST` in `css-modules.config.ts`, which puts its rules ahead of every other module's, so the rule of the component that builds on it wins whatever order the files are imported in. Add a module to that list when its components start taking a `className`.
+
+A CSS file can't read a constant, so the three breakpoints are written out where they're used: `40rem`, a phone or a window about that narrow; `45rem`, too narrow for the Insert Menu's `+` to sit beside the column; and `64rem`, too narrow for the word count to sit there. Use those three and no others.
 
 ## Do's and Don'ts
 

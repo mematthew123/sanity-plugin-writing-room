@@ -308,7 +308,7 @@ function writeArtifacts(result, capturesDir, runDir) {
 // --- The report ---
 
 const percent = (ratio) => `${(ratio * 100).toFixed(ratio > 0 && ratio < 0.0001 ? 4 : 2)}%`
-const cell = (text) => String(text).replace(/\|/g, '\\|').replace(/\n/g, ' ')
+const cell = (text) => String(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ')
 
 function summarise(results, {baseLabel, candidateLabel, limits}) {
   const failing = results.filter((result) => !isClean(result, limits))

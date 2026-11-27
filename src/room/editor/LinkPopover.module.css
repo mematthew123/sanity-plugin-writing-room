@@ -1,0 +1,38 @@
+.surface {
+  max-width: min(28rem, calc(100vw - 2rem));
+}
+
+.address {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--calm-space-xs);
+  min-width: 0;
+  padding: 0 var(--calm-space-sm) 0 var(--calm-space-md);
+  overflow: hidden;
+  color: var(--calm-color-accent);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  svg {
+    flex-shrink: 0;
+    font-size: 1rem;
+  }
+}
+
+.action {
+  flex-shrink: 0;
+  height: 2rem;
+  padding: 0 var(--calm-space-sm);
+  color: var(--calm-color-ink-muted);
+
+  &:hover,
+  &:focus-visible {
+    background: var(--calm-color-paper);
+    color: var(--calm-color-ink);
+  }
+}

@@ -10,9 +10,8 @@ import {
 import {type RefObject, Suspense, useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {useColorSchemeValue, useDataset, useEditState, useProjectId} from 'sanity'
 import {useRouter} from 'sanity/router'
-import styled, {keyframes} from 'styled-components'
 import {DetailsBoundary} from './details/DetailsBoundary'
-import {DetailsView} from './details/DetailsView'
+import {DetailsPlaceholder, DetailsView} from './details/DetailsView'
 import {useSwap} from './details/use-swap'
 import {BodyEditor} from './editor/BodyEditor'
 import {useBodySchema} from './editor/schema'
@@ -31,8 +30,6 @@ import {type Schedule} from '../lib/schedule'
 import {PreviewButton} from './PreviewButton'
 import {
   Column,
-  NARROW,
-  NO_MARGIN,
   Placeholder,
   QuietButton,
   Recedes,
@@ -53,6 +50,7 @@ import {useRoomSettings} from './room-settings'
 import {TitleField} from './TitleField'
 import {useEscape} from './use-escape'
 import {useRecede} from './use-recede'
+import styles from './Room.module.css'
 
 export function Room({documentId, documentType}: {documentId: string; documentType: string}) {
   const handle = useMemo<DocumentHandle>(() => ({documentId, documentType}), [documentId, documentType])
@@ -88,9 +86,9 @@ function LoadingRoom() {
           </QuietButton>
         }
       />
-      <Page>
-        <Placeholder $height="3.5rem" />
-      </Page>
+      <Column className={styles.page}>
+        <Placeholder className={styles.titlePlaceholder} />
+      </Column>
     </>
   )
 }
@@ -199,7 +197,7 @@ function LoadedRoom({
   return (
     <EditorProvider key={lockedRelease ?? 'draft'} initialConfig={{schemaDefinition, readOnly: locked}}>
       <RoomSyncProvider handle={handle}>
-        <Layout ref={scrollContent}>
+        <div className={styles.layout} ref={scrollContent}>
           {/* Leave on one side; status, Aa, Details, Preview and Publish on the other. Nothing else. */}
           <RoomControls
             receded={receded && !inDetails}
@@ -257,7 +255,7 @@ function LoadedRoom({
               </>
             }
           />
-          <Main>
+          <div className={styles.main}>
             <Sorting
               handle={handle}
               writing={fields}
@@ -267,7 +265,14 @@ function LoadedRoom({
               onHolding={setHolding}
               onSeeDetails={() => view.openDetails()}
             />
-            <Page as="article" ref={page} $textSize={settings.textSize} inert={holding} data-holding={holding}>
+            <Column
+              as="article"
+              className={styles.page}
+              ref={page}
+              data-text-size={settings.textSize}
+              inert={holding}
+              data-holding={holding}
+            >
               <Title
                 handle={shown}
                 fields={fields}
@@ -286,21 +291,21 @@ function LoadedRoom({
                 focusField={view.field}
                 onProblem={onProblem}
               />
-            </Page>
-          </Main>
-          <Foot>
-            <Count data-receded={receded && !inDetails}>
+            </Column>
+          </div>
+          <footer className={styles.foot}>
+            <div className={styles.count} data-receded={receded && !inDetails}>
               <WordCount />
-            </Count>
-            <Messages>
+            </div>
+            <div className={styles.messages}>
               <RoomMessage
                 problem={problem}
                 onDismissProblem={() => onProblem(null)}
                 notice={notice}
               />
-            </Messages>
-          </Foot>
-        </Layout>
+            </div>
+          </footer>
+        </div>
       </RoomSyncProvider>
     </EditorProvider>
   )
@@ -392,7 +397,7 @@ function Pages({
   return (
     <>
       {/* Inert as soon as it starts to go, so nothing typed lands in an editor that can't be seen. */}
-      <Swap hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
+      <div className={styles.swap} hidden={shown !== 'prose'} inert={inDetails} data-leaving={leaving} data-entering={entering}>
         <BodyEditor
           handle={handle}
           path={fields.body}
@@ -400,11 +405,11 @@ function Pages({
           readOnly={!!lockedRelease}
           onProblem={onProblem}
         />
-      </Swap>
+      </div>
       {shown === 'details' && (
-        <Swap inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
+        <div className={styles.swap} inert={leaving} data-leaving={leaving} data-entering={entering} data-rises="">
           <DetailsBoundary onOpenInStructure={openInStructure}>
-            <Suspense fallback={<Placeholder $height="12rem" />}>
+            <Suspense fallback={<DetailsPlaceholder />}>
               <DetailsView
                 handle={handle}
                 fields={fields}
@@ -414,7 +419,7 @@ function Pages({
               />
             </Suspense>
           </DetailsBoundary>
-        </Swap>
+        </div>
       )}
     </>
   )
@@ -468,124 +473,3 @@ function BackToProse({onBack}: {onBack: () => void}) {
     </QuietButton>
   )
 }
-
-const fadeIn = keyframes`
-  from {
-    opacity: 0;
-  }
-`
-
-const rise = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-`
-
-/** Out over `press`, then in over `gentle`; Details rises 4px as it arrives. Instant under reduced motion. */
-const Swap = styled.div`
-  &[hidden] {
-    display: none;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    transition: opacity var(--calm-motion-press) var(--calm-motion-easing);
-
-    &[data-leaving='true'] {
-      opacity: 0;
-    }
-
-    &[data-entering='true'] {
-      animation: ${fadeIn} var(--calm-motion-gentle) var(--calm-motion-easing) both;
-    }
-
-    &[data-entering='true'][data-rises] {
-      animation-name: ${rise};
-    }
-  }
-`
-
-const Page = styled(Column)<{$textSize?: 'small' | 'medium' | 'large'}>`
-  font-family: var(--calm-font-prose);
-  font-size: ${({$textSize = 'medium'}) => `var(--calm-prose-size-${$textSize})`};
-  font-weight: var(--calm-weight-prose);
-  line-height: var(--calm-type-prose-leading);
-  transition:
-    filter var(--calm-motion-gentle) var(--calm-motion-easing),
-    opacity var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  /* The hold while a piece is sorted. A dim, not a blur, under reduced motion. */
-  &[data-holding='true'] {
-    opacity: 0.55;
-    filter: blur(3px);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-
-    &[data-holding='true'] {
-      filter: none;
-    }
-  }
-`
-
-/** The room from top to bottom: Room Controls, the page, and a foot that stays in view. */
-const Layout = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-`
-
-const Main = styled.div`
-  flex: 1;
-`
-
-/**
- * The foot of the room: the word count in the margin, and the room's one message slot in the
- * middle. Clicks pass through everywhere but the message.
- */
-const Foot = styled.footer`
-  position: sticky;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: 1fr minmax(0, auto) 1fr;
-  align-items: end;
-  gap: var(--calm-space-md);
-  padding: var(--calm-space-md) var(--calm-space-lg);
-  pointer-events: none;
-
-  ${NO_MARGIN} {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  ${NARROW} {
-    padding-inline: var(--calm-space-sm);
-  }
-`
-
-/** Recedes with the Room Controls. Without a margin to sit in, it's in the `Aa` menu instead. */
-const Count = styled.div`
-  transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
-
-  &[data-receded='true'] {
-    opacity: 0.08;
-  }
-
-  ${NO_MARGIN} {
-    display: none;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const Messages = styled.div`
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-
-  & > * {
-    pointer-events: auto;
-  }
-`

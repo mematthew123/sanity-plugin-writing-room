@@ -1,9 +1,9 @@
 import {type DocumentHandle, useDocument, useEditDocument} from '@sanity/sdk-react'
 import {type KeyboardEvent, useLayoutEffect, useRef} from 'react'
-import styled from 'styled-components'
 import {followingSlug} from '../lib/slug'
 import {slugByHand} from './details/slug-by-hand'
 import {type WritingFields} from './fields'
+import styles from './TitleField.module.css'
 
 type Slug = {_type: 'slug'; current?: string}
 
@@ -100,7 +100,8 @@ export function TitleField({
   }
 
   return (
-    <Title
+    <textarea
+      className={styles.title}
       ref={ref}
       rows={1}
       value={title ?? ''}
@@ -135,28 +136,3 @@ export function TitleField({
     />
   )
 }
-
-const Title = styled.textarea`
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  margin: 0 0 var(--calm-space-lg);
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--calm-color-ink);
-  caret-color: var(--calm-color-accent);
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-type-title);
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-  text-wrap: balance;
-  resize: none;
-  outline: none;
-
-  &::placeholder {
-    color: var(--calm-color-ink-muted);
-    opacity: 1;
-  }
-`

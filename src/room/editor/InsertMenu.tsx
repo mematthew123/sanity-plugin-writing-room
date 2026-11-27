@@ -16,11 +16,11 @@ import {
   useState,
 } from 'react'
 import {type AssetSource, useTranslation} from 'sanity'
-import styled from 'styled-components'
 import {type BodyAllows, useBodyAllows} from './allows'
 import {commandEvents, type InsertCommand, type InsertCommandId, matchCommands} from './commands'
 import {Floating, FloatingSurface, useViewportChanges} from './floating'
 import {type BodyImages} from './image-sources'
+import styles from './InsertMenu.module.css'
 
 /** Built per body type, since the picker's matcher only sees what was typed. */
 const slashPicker = (allows: BodyAllows, images: BodyImages) =>
@@ -178,7 +178,8 @@ export function InsertMenu({
 
   return (
     <>
-      <PlusButton
+      <button
+        className={styles.plusButton}
         type="button"
         aria-label="Insert"
         aria-expanded={menuOpen}
@@ -196,7 +197,7 @@ export function InsertMenu({
         }}
       >
         <AddIcon aria-hidden />
-      </PlusButton>
+      </button>
       {menuOpen && (
         <Floating
           anchor={lineRect}
@@ -269,9 +270,10 @@ function Menu({
   return (
     <FloatingSurface>
       {empty ? (
-        <NoMatches>Nothing matches that</NoMatches>
+        <p className={styles.noMatches}>Nothing matches that</p>
       ) : (
-        <List
+        <ul
+          className={styles.list}
           ref={list}
           role="listbox"
           aria-label={label}
@@ -290,106 +292,22 @@ function Menu({
           }}
         >
           {commands.map((command, index) => (
-            <Option
+            <li
+              className={styles.option}
               key={command.id}
               id={`calm-insert-${command.id}`}
               role="option"
               aria-selected={index === activeIndex}
-              $active={index === activeIndex}
               onMouseEnter={() => onHover(index)}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onChoose(index)}
             >
               <command.icon aria-hidden />
               {command.label}
-            </Option>
+            </li>
           ))}
-        </List>
+        </ul>
       )}
     </FloatingSurface>
   )
 }
-
-/** Below this the column's own padding is all the margin there is, and the `+` wouldn't fit in it. */
-const NO_PLUS_MARGIN = '@media (max-width: 45rem)'
-
-const PlusButton = styled.button`
-  position: fixed;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  left: var(--calm-line-start);
-  width: 1.75rem;
-  height: 1.75rem;
-  margin-left: calc(-1.75rem - var(--calm-space-md));
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
-  color: var(--calm-color-ink-faint);
-  cursor: pointer;
-  transform: translateY(-50%);
-  transition:
-    color var(--calm-motion-gentle) var(--calm-motion-easing),
-    background-color var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  &:hover,
-  &:focus-visible,
-  &[aria-expanded='true'] {
-    background: var(--calm-color-surface);
-    color: var(--calm-color-ink);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-
-  svg {
-    font-size: 1.25rem;
-  }
-
-  /* No margin to sit in: move to the far end of the (empty) line, at a size a thumb can hit. */
-  ${NO_PLUS_MARGIN} {
-    left: calc(var(--calm-line-end) - 2.25rem);
-    width: 2.25rem;
-    height: 2.25rem;
-    margin-left: 0;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const List = styled.ul`
-  display: grid;
-  min-width: 13rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  outline: none;
-`
-
-const Option = styled.li<{$active: boolean}>`
-  display: flex;
-  align-items: center;
-  gap: var(--calm-space-sm);
-  padding: var(--calm-space-sm) var(--calm-space-md) var(--calm-space-sm) var(--calm-space-sm);
-  border-radius: var(--calm-radius);
-  background: ${({$active}) => ($active ? 'var(--calm-color-paper)' : 'transparent')};
-  color: var(--calm-color-ink);
-  cursor: pointer;
-
-  svg {
-    flex-shrink: 0;
-    color: var(--calm-color-ink-muted);
-    font-size: 1.25rem;
-  }
-`
-
-const NoMatches = styled.p`
-  margin: 0;
-  padding: var(--calm-space-sm) var(--calm-space-md);
-  color: var(--calm-color-ink-muted);
-`

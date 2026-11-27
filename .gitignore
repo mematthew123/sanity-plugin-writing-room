@@ -9,6 +9,8 @@ dist
 test-results
 playwright-report
 shots/out
+docs/adr
+CONTEXT.md
 vrt/out
 fixtures
 

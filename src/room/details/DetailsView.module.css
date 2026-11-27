@@ -1,0 +1,14 @@
+.root {
+  margin-top: var(--calm-space-xl);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+  line-height: 1.4;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.placeholder {
+  height: 12rem;
+}

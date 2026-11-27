@@ -1,10 +1,10 @@
 import {type BlockObjectRenderProps} from '@portabletext/editor'
 import {useDataset, useProjectId} from 'sanity'
-import styled, {keyframes} from 'styled-components'
 import {imageUrl} from '../../../lib/image-url'
 import {useBodyAllows} from '../allows'
 import {useBlockField} from '../use-block-field'
 import {BlockFrame, Controls, FieldInput} from './frame'
+import styles from './ImageBlock.module.css'
 
 const ROOM_IMAGE_WIDTH = 1520
 
@@ -21,13 +21,13 @@ export function ImageBlock({attributes, children, node, selected}: BlockObjectRe
   const hasCaption = allows.blockField(node._type, 'caption')
 
   return (
-    <BlockFrame {...attributes} data-calm-block={node._key} $selected={selected}>
+    <BlockFrame {...attributes} data-calm-block={node._key} selected={selected}>
       {children}
       <Controls>
         {src ? (
-          <Picture src={src} alt={alt.value} draggable={false} />
+          <img className={styles.picture} src={src} alt={alt.value} draggable={false} />
         ) : (
-          <Shimmer role="status" aria-label="Uploading image" />
+          <div className={styles.shimmer} role="status" aria-label="Uploading image" />
         )}
         {hasAlt && (
           <FieldInput
@@ -52,28 +52,3 @@ export function ImageBlock({attributes, children, node, selected}: BlockObjectRe
     </BlockFrame>
   )
 }
-
-const Picture = styled.img`
-  display: block;
-  width: 100%;
-  height: auto;
-  margin-bottom: var(--calm-space-xs);
-  border-radius: var(--calm-radius);
-`
-
-const shimmer = keyframes`
-  from { opacity: 0.45; }
-  to { opacity: 0.8; }
-`
-
-const Shimmer = styled.div`
-  aspect-ratio: 3 / 2;
-  margin-bottom: var(--calm-space-xs);
-  border-radius: var(--calm-radius);
-  background: var(--calm-color-surface);
-  animation: ${shimmer} 1.2s var(--calm-motion-easing) infinite alternate;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-`

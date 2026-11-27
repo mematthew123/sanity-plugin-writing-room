@@ -12,7 +12,6 @@ import {
 import {Suspense, useEffect, useMemo, useRef, useState} from 'react'
 import {useColorSchemeValue, useCurrentUser, useDataset, useProjectId} from 'sanity'
 import {StateLink, useRouter} from 'sanity/router'
-import styled from 'styled-components'
 import {cameFromLobby} from './came-from'
 import {Floating, FloatingSurface} from './editor/floating'
 import {isEmptyPost} from './empty-post'
@@ -22,9 +21,10 @@ import {useLeaveToStudio} from './navigation'
 import {NOT_SCHEDULED, type Schedule} from '../lib/schedule'
 import {describePostStatus, type DocumentEditStatus, type PostStatus, statusText, timeAgo} from './post-status'
 import {useSchedule} from './use-schedule'
-import {Column, NARROW, Placeholder, QuietButton, SectionLabel} from './primitives'
+import {Column, Placeholder, QuietButton, SectionLabel} from './primitives'
 import {roomState} from './room-route'
 import {countWords} from './word-count'
+import styles from './Lobby.module.css'
 
 /** One to continue, and a few more: the Lobby is a doorway, and Structure is the archive. */
 const RECENT = 5
@@ -39,10 +39,10 @@ export function Lobby() {
     <Column as="main">
       {kinds.length === 0 ? (
         <>
-          <Header>
+          <header className={styles.header}>
             <Greeting />
-          </Header>
-          <Quiet>None of the Writing Room’s document types are in this Studio’s schema.</Quiet>
+          </header>
+          <p className={styles.quiet}>None of the Writing Room’s document types are in this Studio’s schema.</p>
         </>
       ) : (
         <Suspense fallback={<DeskPlaceholder />}>
@@ -64,38 +64,8 @@ function Greeting() {
   const user = useCurrentUser()
   const firstName = user?.name?.split(' ')[0]
   const greeting = partOfDay(new Date().getHours())
-  return <GreetingText>{firstName ? `${greeting}, ${firstName}` : greeting}</GreetingText>
+  return <p className={styles.greeting}>{firstName ? `${greeting}, ${firstName}` : greeting}</p>
 }
-
-const Header = styled.header`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-md);
-  min-height: 2.5rem;
-  margin-bottom: var(--calm-space-xl);
-`
-
-const GreetingText = styled.p`
-  margin: 0;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-prose-size-medium);
-`
-
-const Quiet = styled.p`
-  margin: 0;
-  color: var(--calm-color-ink-muted);
-`
-
-const Problem = styled.p`
-  margin: calc(var(--calm-space-lg) * -1) 0 var(--calm-space-lg);
-  color: var(--calm-color-caution);
-`
-
-const BlankProblem = styled(Problem)`
-  margin: 0;
-`
 
 /** Starts a document and opens it. With several kinds of writing, asks which first. */
 function StartNew({
@@ -125,21 +95,20 @@ function StartNew({
   }, [anchor])
 
   const label = only ? `New ${only.singular}` : 'New'
-  const Button = prominent ? StartFirst : StartButton
 
   return (
     <>
       {only ? (
         <StartKind kind={only} onStarting={setStarting} onProblem={onProblem}>
           {(start) => (
-            <Button ref={button} type="button" onClick={start} disabled={starting} aria-busy={starting}>
+            <button className={styles.startButton} data-prominent={prominent || undefined} ref={button} type="button" onClick={start} disabled={starting} aria-busy={starting}>
               <AddIcon aria-hidden />
               {starting ? 'Starting…' : prominent ? `Start your first ${only.singular}` : label}
-            </Button>
+            </button>
           )}
         </StartKind>
       ) : (
-        <Button
+        <button className={styles.startButton} data-prominent={prominent || undefined}
           ref={button}
           type="button"
           disabled={starting}
@@ -150,7 +119,7 @@ function StartNew({
         >
           <AddIcon aria-hidden />
           {starting ? 'Starting…' : prominent ? 'Start writing' : label}
-        </Button>
+        </button>
       )}
       {anchor && (
         <Floating
@@ -165,7 +134,7 @@ function StartNew({
             }
           }}
         >
-          <KindMenu ref={menu} role="menu" aria-label="New">
+          <FloatingSurface className={styles.kindMenu} ref={menu} role="menu" aria-label="New">
             {kinds.map((kind) => (
               <StartKind
                 key={kind.type}
@@ -177,13 +146,13 @@ function StartNew({
                 onProblem={onProblem}
               >
                 {(start) => (
-                  <KindOption type="button" role="menuitem" onClick={start}>
+                  <button className={styles.kindOption} type="button" role="menuitem" onClick={start}>
                     {kind.singular}
-                  </KindOption>
+                  </button>
                 )}
               </StartKind>
             ))}
-          </KindMenu>
+          </FloatingSurface>
         </Floating>
       )}
     </>
@@ -226,99 +195,6 @@ function StartKind({
   return <>{children(() => void start())}</>
 }
 
-const StartButton = styled.button`
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  min-height: 2.5rem;
-  padding: var(--calm-space-sm) var(--calm-space-md) var(--calm-space-sm) 0.75rem;
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--calm-color-rule);
-  color: var(--calm-color-ink);
-  font: inherit;
-  font-weight: var(--calm-weight-ui-strong);
-  cursor: pointer;
-  transition:
-    background-color var(--calm-motion-gentle) var(--calm-motion-easing),
-    transform var(--calm-motion-press) var(--calm-motion-easing);
-
-  &:hover:not(:disabled) {
-    background: var(--calm-color-surface);
-  }
-
-  &:disabled {
-    color: var(--calm-color-ink-muted);
-    cursor: default;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    &:active {
-      transform: scale(0.97);
-    }
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-
-  svg {
-    flex-shrink: 0;
-    color: var(--calm-color-ink-muted);
-    font-size: 1.25rem;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-/** The same button when it's the only thing to do: nothing has been written yet. */
-const StartFirst = styled(StartButton)`
-  background: var(--calm-color-accent);
-  box-shadow: none;
-  color: var(--calm-color-on-accent);
-
-  &:hover:not(:disabled) {
-    background: var(--calm-color-accent);
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    color: var(--calm-color-on-accent);
-    opacity: 0.7;
-  }
-
-  svg {
-    color: inherit;
-  }
-`
-
-const KindMenu = styled(FloatingSurface)`
-  display: grid;
-  min-width: 11rem;
-`
-
-const KindOption = styled.button`
-  padding: var(--calm-space-sm) var(--calm-space-md);
-  border: 0;
-  border-radius: var(--calm-radius);
-  background: transparent;
-  color: var(--calm-color-ink);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    background: var(--calm-color-paper);
-    outline: none;
-  }
-`
-
 /** What's on the Writer's desk: the one to continue, a few more, and the way to everything else. */
 function Desk({kinds}: {kinds: WritingKind[]}) {
   const projectId = useProjectId()
@@ -340,15 +216,15 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
     const names = listOfKinds.format(kinds.map((kind) => kind.singular))
     return (
       <>
-        <Header>
+        <header className={styles.header}>
           <Greeting />
-        </Header>
-        <Blank>
-          <BlankTitle>Nothing written yet</BlankTitle>
-          <Quiet>Your first {names} starts with a title.</Quiet>
-          {problem && <BlankProblem role="alert">{problem}</BlankProblem>}
+        </header>
+        <div className={styles.blank}>
+          <h1 className={styles.blankTitle}>Nothing written yet</h1>
+          <p className={styles.quiet}>Your first {names} starts with a title.</p>
+          {problem && <p className={styles.blankProblem} role="alert">{problem}</p>}
           <StartNew kinds={kinds} onProblem={setProblem} prominent />
-        </Blank>
+        </div>
       </>
     )
   }
@@ -358,14 +234,14 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
 
   return (
     <>
-      <Header>
+      <header className={styles.header}>
         <Greeting />
         <StartNew kinds={kinds} onProblem={setProblem} />
-      </Header>
-      {problem && <Problem role="alert">{problem}</Problem>}
+      </header>
+      {problem && <p className={styles.problem} role="alert">{problem}</p>}
       <section aria-labelledby="calm-continue">
         <SectionLabel id="calm-continue">Continue writing</SectionLabel>
-        <Suspense fallback={<Placeholder $height="11rem" />}>
+        <Suspense fallback={<Placeholder className={styles.continuePlaceholder} />}>
           <Continue
             key={first.documentId}
             handle={first}
@@ -378,18 +254,18 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
         </Suspense>
       </section>
       {others.length > 0 && (
-        <Recent aria-labelledby="calm-recent">
+        <section className={styles.recent} aria-labelledby="calm-recent">
           <SectionLabel id="calm-recent">Recent</SectionLabel>
-          <Rows>
+          <ul className={styles.rows}>
             {others.map((handle) => (
               <li key={handle.documentId}>
-                <Suspense fallback={<Placeholder $height="3.75rem" />}>
+                <Suspense fallback={<Placeholder className={styles.rowPlaceholder} />}>
                   <Row handle={handle} kinds={kinds} />
                 </Suspense>
               </li>
             ))}
-          </Rows>
-        </Recent>
+          </ul>
+        </section>
       )}
       <BrowseLink />
     </>
@@ -399,37 +275,16 @@ function Desk({kinds}: {kinds: WritingKind[]}) {
 function DeskPlaceholder() {
   return (
     <>
-      <Header>
+      <header className={styles.header}>
         <Greeting />
-      </Header>
-      <Placeholder $height="11rem" aria-hidden />
+      </header>
+      <Placeholder className={styles.continuePlaceholder} aria-hidden />
     </>
   )
 }
 
 /** "Post", "Post or Case Study", "Post, Note, or Case Study". */
 const listOfKinds = new Intl.ListFormat('en', {type: 'disjunction'})
-
-const Blank = styled.div`
-  display: grid;
-  justify-items: start;
-  gap: var(--calm-space-sm);
-  padding: var(--calm-space-xl);
-  border-radius: var(--calm-radius-large);
-  background: var(--calm-color-surface);
-
-  button {
-    margin-top: var(--calm-space-md);
-  }
-`
-
-const BlankTitle = styled.h1`
-  margin: 0;
-  font-family: var(--calm-font-prose);
-  font-size: calc(var(--calm-prose-size-medium) * 1.5);
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-`
 
 interface Glimpse {
   title?: string
@@ -461,27 +316,13 @@ const STATUS: Record<PostStatus['label'], string> = {
 function Status({status, schedule}: {status: PostStatus; schedule: Schedule}) {
   return (
     <span>
-      <StatusText>
-        {(status.label !== 'Published' || schedule.kind !== 'none') && <Dot aria-hidden />}
+      <span className={styles.statusText}>
+        {(status.label !== 'Published' || schedule.kind !== 'none') && <span className={styles.dot} aria-hidden />}
         {schedule.kind === 'none' ? STATUS[status.label] : statusText(status, schedule, {short: true})}
-      </StatusText>
+      </span>
     </span>
   )
 }
-
-const StatusText = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-`
-
-const Dot = styled.span`
-  width: 0.45em;
-  height: 0.45em;
-  border-radius: 50%;
-  /* Muted, not clay: "Continue" is the Lobby's one accent. The word beside it carries the meaning. */
-  background: var(--calm-color-ink-muted);
-`
 
 /** The one large thing in the Lobby: the document to pick back up, with enough of it to recognise. */
 function Continue({
@@ -506,11 +347,11 @@ function Continue({
 
   return (
     <div>
-      <ContinueLink state={roomState(handle.documentId, handle.documentType, types)}>
-        <ContinueTitle>{data?.title || 'Untitled'}</ContinueTitle>
-        <Excerpt>{text || 'Nothing written yet.'}</Excerpt>
-        <ContinueFoot>
-          <Meta>
+      <StateLink className={styles.continueLink} state={roomState(handle.documentId, handle.documentType, types)}>
+        <span className={styles.continueTitle}>{data?.title || 'Untitled'}</span>
+        <span className={styles.excerpt}>{text || 'Nothing written yet.'}</span>
+        <span className={styles.continueFoot}>
+          <span className={styles.meta}>
             {kinds.length > 1 && kind && <span>{kind.singular}</span>}
             <Status status={status} schedule={schedule} />
             {words > 0 && (
@@ -519,120 +360,16 @@ function Continue({
               </span>
             )}
             {status.lastEditedAt && <span>Edited {timeAgo(status.lastEditedAt)}</span>}
-          </Meta>
-          <Go aria-hidden>
+          </span>
+          <span className={styles.go} aria-hidden>
             {schedule.kind === 'none' ? 'Continue' : 'Open'}
             <ArrowRightIcon />
-          </Go>
-        </ContinueFoot>
-      </ContinueLink>
+          </span>
+        </span>
+      </StateLink>
     </div>
   )
 }
-
-const ContinueLink = styled(StateLink)`
-  display: block;
-  padding: var(--calm-space-lg) var(--calm-space-lg) var(--calm-space-md);
-  border-radius: var(--calm-radius-large);
-  background: var(--calm-color-surface);
-  color: inherit;
-  text-decoration: none;
-  transition:
-    box-shadow var(--calm-motion-gentle) var(--calm-motion-easing),
-    transform var(--calm-motion-press) var(--calm-motion-easing);
-
-  &:hover {
-    box-shadow: inset 0 0 0 1px var(--calm-color-rule);
-  }
-
-  /* Any deeper and a card this size visibly pulls in, and its text reads as moving. */
-  @media (prefers-reduced-motion: no-preference) {
-    &:active {
-      transform: scale(0.99);
-    }
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const ContinueTitle = styled.span`
-  display: block;
-  font-family: var(--calm-font-prose);
-  font-size: calc(var(--calm-prose-size-medium) * 1.6);
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-  text-wrap: balance;
-`
-
-const Excerpt = styled.span`
-  display: -webkit-box;
-  margin-top: var(--calm-space-sm);
-  overflow: hidden;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-prose-size-small);
-  line-height: 1.55;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-`
-
-const ContinueFoot = styled.span`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-sm) var(--calm-space-md);
-  margin-top: var(--calm-space-md);
-`
-
-/** Facts about a document, separated by middle dots. */
-const Meta = styled.span`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
-
-  & > * + *::before {
-    content: '·';
-    margin-inline: 0.5em;
-  }
-`
-
-const Go = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  min-height: 2.25rem;
-  color: var(--calm-color-accent);
-  font-weight: var(--calm-weight-ui-strong);
-
-  svg {
-    font-size: 1.25rem;
-  }
-`
-
-const Recent = styled.section`
-  margin-top: var(--calm-space-xl);
-`
-
-const Rows = styled.ul`
-  display: grid;
-  margin: 0 calc(var(--calm-space-md) * -1);
-  padding: 0;
-  list-style: none;
-
-  ${NARROW} {
-    margin-inline: calc(var(--calm-space-sm) * -1);
-  }
-`
 
 function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
   const ref = useRef<HTMLDivElement>(null)
@@ -643,21 +380,21 @@ function Row({handle, kinds}: {handle: DocumentHandle; kinds: WritingKind[]}) {
     status.label === 'Draft' && scheduleKnown && schedule.kind === 'none' && !data?.title?.trim() && !data?.text?.trim()
 
   return (
-    <RowRoot ref={ref}>
-      <RowLink state={roomState(handle.documentId, handle.documentType, types)}>
-        <RowTitle $untitled={!data?.title}>{data?.title || 'Untitled'}</RowTitle>
-        <Meta>
+    <div className={styles.row} ref={ref}>
+      <StateLink className={styles.rowLink} state={roomState(handle.documentId, handle.documentType, types)}>
+        <span className={styles.rowTitle} data-untitled={!data?.title || undefined}>{data?.title || 'Untitled'}</span>
+        <span className={styles.meta}>
           {kinds.length > 1 && kind && <span>{kind.singular}</span>}
           <Status status={status} schedule={schedule} />
           {status.lastEditedAt && <span>{timeAgo(status.lastEditedAt)}</span>}
-        </Meta>
-      </RowLink>
+        </span>
+      </StateLink>
       {maybeEmpty && kind && (
         <Suspense fallback={null}>
           <DiscardEmpty handle={handle} kind={kind} />
         </Suspense>
       )}
-    </RowRoot>
+    </div>
   )
 }
 
@@ -680,84 +417,16 @@ function DiscardEmpty({handle, kind}: {handle: DocumentHandle; kind: WritingKind
   )
 }
 
-const RowRoot = styled.div`
-  display: flex;
-  align-items: center;
-  gap: var(--calm-space-sm);
-  border-radius: var(--calm-radius-large);
-  transition: background-color var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  &:hover {
-    background: var(--calm-color-surface);
-  }
-
-  & > button {
-    flex-shrink: 0;
-    margin-inline-end: var(--calm-space-sm);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const RowLink = styled(StateLink)`
-  display: block;
-  flex: 1;
-  min-width: 0;
-  padding: 0.75rem var(--calm-space-md);
-  border-radius: var(--calm-radius-large);
-  color: inherit;
-  text-decoration: none;
-  transition: transform var(--calm-motion-press) var(--calm-motion-easing);
-
-  /* Any deeper and the title and meta read as moving text. */
-  @media (prefers-reduced-motion: no-preference) {
-    &:active {
-      transform: scale(0.99);
-    }
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 2px;
-  }
-
-  ${NARROW} {
-    padding-inline: var(--calm-space-sm);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const RowTitle = styled.span<{$untitled: boolean}>`
-  display: block;
-  margin-bottom: 2px;
-  overflow: hidden;
-  color: ${({$untitled}) => ($untitled ? 'var(--calm-color-ink-muted)' : 'inherit')};
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-prose-size-medium);
-  font-weight: var(--calm-weight-title);
-  line-height: var(--calm-type-heading-leading);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`
-
 /** The one way to everything else: Structure has the search, the filters and the full list. */
 function BrowseLink() {
   const toStudio = useLeaveToStudio()
   return (
-    <Browse>
+    <p className={styles.browse}>
       <QuietButton onClick={toStudio}>
         Browse everything in Structure
         <ArrowRightIcon aria-hidden />
       </QuietButton>
-    </Browse>
+    </p>
   )
 }
 
-const Browse = styled.p`
-  margin: var(--calm-space-lg) 0 0 calc(0.75rem * -1);
-`

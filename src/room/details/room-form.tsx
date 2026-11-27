@@ -22,12 +22,13 @@ import {
   setIfMissing,
   unset,
 } from 'sanity'
-import styled, {css} from 'styled-components'
 import {Switch} from '../primitives'
 import {sortingMarks} from '../sorting/marks'
 import {addressKind, hasRoomChrome, roomInputKind} from './input-kind'
 import {slugByHand} from './slug-by-hand'
 import {addTags, fromLocalDateTime, parseNumber, removeTagAt, toLocalDateTime} from './values'
+import {cx} from '../../lib/cx'
+import styles from './room-form.module.css'
 
 /** True only inside the room's Details view, so the overrides below leave the Structure form alone. */
 export const InRoomDetails = createContext(false)
@@ -45,30 +46,30 @@ export function RoomField(props: FieldProps) {
   if (!hasRoomChrome(props.schemaType)) {
     // Sanity draws the field; the room adds one line beneath.
     return (
-      <Field>
+      <div className={styles.field}>
         {props.renderDefault(props)}
-        {fromPaste && <Hint data-calm-from-paste="">From your paste</Hint>}
-      </Field>
+        {fromPaste && <p className={styles.hint} data-calm-from-paste="">From your paste</p>}
+      </div>
     )
   }
 
   const problem = props.validation.find((marker) => marker.level === 'error') ?? props.validation[0]
   const isSwitch = roomInputKind(props.schemaType) === 'boolean'
   return (
-    <Field data-calm-details-field={props.name}>
+    <div className={styles.field} data-calm-details-field={props.name}>
       {isSwitch ? (
-        <SwitchRow>
-          <Label htmlFor={props.inputId}>{props.title}</Label>
+        <div className={styles.switchRow}>
+          <label className={styles.label} htmlFor={props.inputId}>{props.title}</label>
           {props.children}
-        </SwitchRow>
+        </div>
       ) : (
-        <Label htmlFor={props.inputId}>{props.title}</Label>
+        <label className={styles.label} htmlFor={props.inputId}>{props.title}</label>
       )}
-      {fromPaste && <Hint data-calm-from-paste="">From your paste</Hint>}
-      {props.description && <Hint>{props.description}</Hint>}
+      {fromPaste && <p className={styles.hint} data-calm-from-paste="">From your paste</p>}
+      {props.description && <p className={styles.hint}>{props.description}</p>}
       {!isSwitch && props.children}
-      {problem && <Problem data-level={problem.level}>{problem.message}</Problem>}
-    </Field>
+      {problem && <p className={styles.problem} data-level={problem.level}>{problem.message}</p>}
+    </div>
   )
 }
 
@@ -211,8 +212,9 @@ function GrowingText(props: React.TextareaHTMLAttributes<HTMLTextAreaElement> & 
   }, [fit])
 
   return (
-    <TextArea
+    <textarea
       {...rest}
+      className={cx(styles.textInput, styles.textArea, rest.className)}
       rows={2}
       ref={(node) => {
         own.current = node
@@ -296,25 +298,27 @@ function TagsField({
   }
 
   return (
-    <Tags>
+    <div className={styles.tags}>
       {tags.map((tag, index) => (
         // eslint-disable-next-line @eslint-react/no-array-index-key -- a tag has no identity but its place
-        <Tag key={`${index}:${tag}`}>
+        <span className={styles.tag} key={`${index}:${tag}`}>
           {tag}
           {!readOnly && (
-            <RemoveTag
+            <button
+              className={styles.removeTag}
               type="button"
               aria-label={`Remove ${tag}`}
               onClick={() => onChange(removeTagAt(tags, index))}
             >
               <CloseIcon aria-hidden />
-            </RemoveTag>
+            </button>
           )}
-        </Tag>
+        </span>
       ))}
       {!readOnly && (
-        <TagInput
+        <input
           {...rest}
+          className={cx(styles.tagInput, rest.className)}
           ref={ref}
           type="text"
           value={typed}
@@ -326,144 +330,13 @@ function TagsField({
           }}
         />
       )}
-    </Tags>
+    </div>
   )
 }
 
-const Field = styled.div`
-  display: grid;
-  gap: var(--calm-space-xs);
-`
-
-const SwitchRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-md);
-`
-
-const Label = styled.label`
-  color: var(--calm-color-ink);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-  font-weight: var(--calm-weight-ui-strong);
-`
-
-const Hint = styled.p`
-  margin: 0;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size-small);
-`
-
-const Problem = styled.p`
-  margin: 0;
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size-small);
-
-  &[data-level='error'] {
-    color: var(--calm-color-caution);
-  }
-`
-
-/** How anything typed in Details looks: the prose face, on the paper, with the room's caret. */
-const entry = css`
-  border: 0;
-  background: transparent;
-  color: var(--calm-color-ink);
-  color-scheme: inherit;
-  font-family: var(--calm-font-prose);
-  font-size: var(--calm-prose-size-medium);
-  caret-color: var(--calm-color-accent);
-
-  &:read-only {
-    color: var(--calm-color-ink-muted);
-  }
-`
-
-const TextInput = styled.input`
-  ${entry}
-  box-sizing: border-box;
-  width: 100%;
-  padding: var(--calm-space-sm) 0;
-  border-bottom: 1px solid var(--calm-color-rule);
-  border-radius: 0;
-  transition: border-color var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  &:focus {
-    outline: none;
-    border-bottom-color: var(--calm-color-accent);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const TextArea = styled(TextInput).attrs({as: 'textarea'})`
-  display: block;
-  overflow: hidden;
-  resize: none;
-  line-height: var(--calm-type-prose-leading);
-`
-
-const Tags = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--calm-space-xs);
-  padding: var(--calm-space-xs) 0;
-  border-bottom: 1px solid var(--calm-color-rule);
-  transition: border-color var(--calm-motion-gentle) var(--calm-motion-easing);
-
-  &:focus-within {
-    border-bottom-color: var(--calm-color-accent);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`
-
-const Tag = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px var(--calm-space-xs) 2px var(--calm-space-sm);
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-surface);
-  color: var(--calm-color-ink);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-`
-
-const RemoveTag = styled.button`
-  display: inline-flex;
-  padding: 2px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--calm-color-ink-muted);
-  cursor: pointer;
-
-  &:hover {
-    color: var(--calm-color-ink);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
-  }
-`
-
-const TagInput = styled.input`
-  ${entry}
-  flex: 1;
-  min-width: 6rem;
-  padding: var(--calm-space-xs) 0;
-
-  &:focus {
-    outline: none;
-  }
-`
+function TextInput({
+  className,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & {ref?: React.Ref<HTMLInputElement>}) {
+  return <input {...props} className={cx(styles.textInput, className)} />
+}

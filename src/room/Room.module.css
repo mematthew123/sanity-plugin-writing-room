@@ -1,0 +1,125 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.swap {
+  &[hidden] {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity var(--calm-motion-press) var(--calm-motion-easing);
+
+    &[data-leaving='true'] {
+      opacity: 0;
+    }
+
+    &[data-entering='true'] {
+      animation: fadeIn var(--calm-motion-gentle) var(--calm-motion-easing) both;
+    }
+
+    &[data-entering='true'][data-rises] {
+      animation-name: rise;
+    }
+  }
+}
+
+.page {
+  font-family: var(--calm-font-prose);
+  font-size: var(--calm-prose-size-medium);
+  font-weight: var(--calm-weight-prose);
+  line-height: var(--calm-type-prose-leading);
+  transition:
+    filter var(--calm-motion-gentle) var(--calm-motion-easing),
+    opacity var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &[data-text-size='small'] {
+    font-size: var(--calm-prose-size-small);
+  }
+
+  &[data-text-size='large'] {
+    font-size: var(--calm-prose-size-large);
+  }
+
+  /* The hold while a piece is sorted. A dim, not a blur, under reduced motion. */
+  &[data-holding='true'] {
+    opacity: 0.55;
+    filter: blur(3px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &[data-holding='true'] {
+      filter: none;
+    }
+  }
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.main {
+  flex: 1;
+}
+
+.foot {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, auto) 1fr;
+  align-items: end;
+  gap: var(--calm-space-md);
+  padding: var(--calm-space-md) var(--calm-space-lg);
+  pointer-events: none;
+
+  @media (max-width: 64rem) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (max-width: 40rem) {
+    padding-inline: var(--calm-space-sm);
+  }
+}
+
+.count {
+  transition: opacity var(--calm-motion-recede) var(--calm-motion-easing);
+
+  &[data-receded='true'] {
+    opacity: 0.08;
+  }
+
+  @media (max-width: 64rem) {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.messages {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+
+  & > * {
+    pointer-events: auto;
+  }
+}
+
+.titlePlaceholder {
+  height: 3.5rem;
+}

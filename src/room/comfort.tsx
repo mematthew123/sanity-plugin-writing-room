@@ -1,11 +1,11 @@
 import {useEditor, useEditorSelector} from '@portabletext/editor'
 import {type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore} from 'react'
 import {useColorSchemeSetValue, useColorSchemeValue} from 'sanity'
-import styled from 'styled-components'
 import {Floating, FloatingSurface} from './editor/floating'
-import {NARROW, NO_MARGIN, QuietButton, Switch} from './primitives'
+import {PillButton, QuietButton, Switch} from './primitives'
 import {type RoomSettings, useRoomSettings} from './room-settings'
 import {readingTime, wordCount} from './word-count'
+import styles from './comfort.module.css'
 
 export function WordCount() {
   const editor = useEditor()
@@ -14,9 +14,9 @@ export function WordCount() {
   const time = readingTime(words)
   if (!time) return null
   return (
-    <Quiet>
+    <span className={styles.quiet}>
       {words.toLocaleString()} {words === 1 ? 'word' : 'words'} · {time}
-    </Quiet>
+    </span>
   )
 }
 
@@ -57,7 +57,7 @@ export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNo
           setAnchor(anchor ? null : event.currentTarget.getBoundingClientRect())
         }
       >
-        <Glyph aria-hidden>Aa</Glyph>
+        <span className={styles.glyph} aria-hidden>Aa</span>
       </QuietButton>
       {anchor && (
         <Floating
@@ -74,28 +74,27 @@ export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNo
             }
           }}
         >
-          <Panel ref={panel} role="dialog" aria-label="Room settings">
-            <PanelCount>
+          <FloatingSurface className={styles.panel} ref={panel} role="dialog" aria-label="Room settings">
+            <div className={styles.panelCount}>
               <WordCount />
-            </PanelCount>
-            <Setting>
+            </div>
+            <div className={styles.setting}>
               <span id="calm-text-size">Text size</span>
-              <Segments role="radiogroup" aria-labelledby="calm-text-size">
+              <div className={styles.segments} role="radiogroup" aria-labelledby="calm-text-size">
                 {TEXT_SIZES.map((size) => (
-                  <Segment
+                  <PillButton
+                    className={styles.segment}
                     key={size.value}
-                    type="button"
                     role="radio"
                     aria-checked={settings.textSize === size.value}
                     aria-label={size.value}
-                    $active={settings.textSize === size.value}
                     onClick={() => update({textSize: size.value})}
                   >
                     {size.label}
-                  </Segment>
+                  </PillButton>
                 ))}
-              </Segments>
-            </Setting>
+              </div>
+            </div>
             <Toggle
               label="Typewriter scrolling"
               hint="Keeps the line you’re writing at the same height"
@@ -124,8 +123,8 @@ export function RoomSettingsMenu({scheme, more}: {scheme: string; more?: ReactNo
                 onChange={() => void toggleFullscreen()}
               />
             )}
-            {more && <More>{more}</More>}
-          </Panel>
+            {more && <div className={styles.more}>{more}</div>}
+          </FloatingSurface>
         </Floating>
       )}
     </>
@@ -144,10 +143,10 @@ function Toggle({
   onChange: (checked: boolean) => void
 }) {
   return (
-    <Setting as="label">
+    <label className={styles.setting}>
       <span>
         {label}
-        <Hint>{hint}</Hint>
+        <span className={styles.hint}>{hint}</span>
       </span>
       <Switch
         type="checkbox"
@@ -155,7 +154,7 @@ function Toggle({
         checked={checked}
         onChange={(event) => onChange(event.currentTarget.checked)}
       />
-    </Setting>
+    </label>
   )
 }
 
@@ -191,105 +190,3 @@ async function toggleFullscreen() {
     // Some browsers refuse fullscreen, e.g. inside an iframe.
   }
 }
-
-const Quiet = styled.span`
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
-  white-space: nowrap;
-`
-
-const Glyph = styled.span`
-  font-family: var(--calm-font-prose);
-  font-size: 1rem;
-`
-
-const Panel = styled(FloatingSurface)`
-  display: grid;
-  gap: var(--calm-space-xs);
-  width: 18rem;
-  padding: var(--calm-space-sm);
-`
-
-const Setting = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-md);
-  padding: var(--calm-space-sm);
-  border-radius: var(--calm-radius);
-  cursor: default;
-
-  label& {
-    cursor: pointer;
-  }
-`
-
-const Hint = styled.span`
-  display: block;
-  margin-top: 2px;
-  color: var(--calm-color-ink-muted);
-  font-size: var(--calm-type-ui-size-small);
-`
-
-const Segments = styled.div`
-  display: flex;
-  padding: 2px;
-  border-radius: var(--calm-radius-pill);
-  background: var(--calm-color-paper);
-`
-
-const Segment = styled.button<{$active: boolean}>`
-  min-width: 2rem;
-  height: 1.75rem;
-  border: 0;
-  border-radius: var(--calm-radius-pill);
-  background: ${({$active}) => ($active ? 'var(--calm-color-surface)' : 'transparent')};
-  color: ${({$active}) => ($active ? 'var(--calm-color-ink)' : 'var(--calm-color-ink-muted)')};
-  font: inherit;
-  font-weight: ${({$active}) => ($active ? 'var(--calm-weight-ui-strong)' : 'inherit')};
-  cursor: pointer;
-
-  &:focus-visible {
-    outline: 2px solid var(--calm-color-accent);
-    outline-offset: 1px;
-  }
-`
-
-/** The word count, here only when there's no margin for it at the foot of the room. */
-const PanelCount = styled.div`
-  display: none;
-
-  ${NO_MARGIN} {
-    display: block;
-    padding: var(--calm-space-xs) var(--calm-space-sm);
-
-    &:empty {
-      display: none;
-    }
-  }
-`
-
-/** Room Controls that moved out of the bar on a narrow screen. */
-const More = styled.div`
-  display: none;
-
-  ${NARROW} {
-    display: grid;
-    margin-top: var(--calm-space-xs);
-    padding-top: var(--calm-space-xs);
-    border-top: 1px solid var(--calm-color-rule);
-
-    button {
-      justify-content: flex-start;
-      width: 100%;
-      padding-inline: var(--calm-space-sm);
-      border-radius: var(--calm-radius);
-      color: var(--calm-color-ink);
-    }
-
-    button:hover,
-    button:focus-visible {
-      background: var(--calm-color-paper);
-    }
-  }
-`

@@ -1,0 +1,49 @@
+/* No margin of its own: the editor spaces every block alike (`.prose > *` in BodyEditor.module.css). */
+.frame {
+  position: relative;
+  border-radius: var(--calm-radius-large);
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+  transition: outline-color var(--calm-motion-gentle) var(--calm-motion-easing);
+
+  &[data-selected] {
+    outline-color: var(--calm-color-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--calm-space-xs) 0;
+  border: 0;
+  background: transparent;
+  color: var(--calm-color-ink-muted);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size);
+  outline: none;
+
+  &::placeholder {
+    color: var(--calm-color-ink-muted);
+    opacity: 0.85;
+  }
+
+  &:focus {
+    color: var(--calm-color-ink);
+  }
+}
+
+.controls {
+  margin-top: var(--calm-space-sm);
+}
+
+.caution {
+  margin: var(--calm-space-xs) 0 0;
+  color: var(--calm-color-caution);
+  font-family: var(--calm-font-ui);
+  font-size: var(--calm-type-ui-size-small);
+}

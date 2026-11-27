@@ -1,0 +1,8 @@
+.ornament {
+  padding-block: var(--calm-space-xs);
+  color: var(--calm-color-ink-faint);
+  font-family: var(--calm-font-prose);
+  letter-spacing: 0.5em;
+  text-align: center;
+  user-select: none;
+}

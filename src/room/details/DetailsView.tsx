@@ -21,11 +21,11 @@ import {
   useDocumentForm,
   VirtualizerScrollInstanceProvider,
 } from 'sanity'
-import styled from 'styled-components'
 import {type WritingFields} from '../fields'
 import {onDetailsFocusAsked, onFirstDetailAsked} from '../navigation'
 import {Placeholder} from '../primitives'
 import {DetailsDocument, InRoomDetails} from './room-form'
+import styles from './DetailsView.module.css'
 
 type ReferenceLink = NonNullable<
   ComponentProps<typeof ReferenceInputOptionsProvider>['EditReferenceLinkComponent']
@@ -47,6 +47,11 @@ const ReferenceFrame: ReferenceLink = ({
  * Every field but the title and the body, rendered by the Studio's own form,
  * on one page in schema order.
  */
+/** Holds the place of Details while it loads, here and in whatever suspends around it. */
+export function DetailsPlaceholder() {
+  return <Placeholder className={styles.placeholder} />
+}
+
 export function DetailsView({
   handle,
   fields,
@@ -122,12 +127,12 @@ export function DetailsView({
     return onFirstDetailAsked(() => focusPath.current([firstField]))
   }, [firstField])
 
-  if (!formState || !ready) return <Placeholder $height="12rem" />
+  if (!formState || !ready) return <DetailsPlaceholder />
 
   return (
     <InRoomDetails.Provider value>
       <DetailsDocument.Provider value={handle.documentId}>
-        <Root ref={attach} tabIndex={-1} data-calm-details="">
+        <div className={styles.root} ref={attach} tabIndex={-1} data-calm-details="">
           {/* Sanity measures list offsets from the top of the room's scrolling content. */}
           <VirtualizerScrollInstanceProvider scrollElement={scroller} containerElement={scrollContent}>
             <ChangeIndicatorsTracker>
@@ -164,7 +169,7 @@ export function DetailsView({
               </CopyPasteProvider>
             </ChangeIndicatorsTracker>
           </VirtualizerScrollInstanceProvider>
-        </Root>
+        </div>
       </DetailsDocument.Provider>
     </InRoomDetails.Provider>
   )
@@ -182,14 +187,3 @@ function withoutFields(members: ObjectMember[], names: string[]): ObjectMember[]
     return inside.length > 0 ? [{...member, fieldSet: {...member.fieldSet, members: inside}}] : []
   })
 }
-
-const Root = styled.div`
-  margin-top: var(--calm-space-xl);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-  line-height: 1.4;
-
-  &:focus {
-    outline: none;
-  }
-`

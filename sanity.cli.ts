@@ -1,6 +1,7 @@
 import {existsSync} from 'node:fs'
 import {type IncomingMessage, type ServerResponse} from 'node:http'
 import {defineCliConfig} from 'sanity/cli'
+import {roomStylesInDev} from './css-modules.config.ts'
 import {createSortingHandler} from './src/sorting'
 import {LIMITS} from './src/sorting/contract'
 
@@ -17,11 +18,13 @@ export default defineCliConfig({
   },
   // Required by the plugin (see the README's Install section).
   deployment: {autoUpdates: false},
-  // The Sorting route, at /api/sort on the dev server, so Sorting can be tried without a site.
   vite: (config) => ({
     ...config,
     plugins: [
       ...(config.plugins ?? []),
+      // The room's CSS, compiled exactly as the build compiles it.
+      roomStylesInDev(),
+      // The Sorting route, at /api/sort on the dev server, so Sorting can be tried without a site.
       {
         name: 'writing-room-sorting-route',
         configureServer(server) {

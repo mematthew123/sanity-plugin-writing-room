@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Installs the packed plugin into a fresh Studio and checks it installs, dedupes, type-checks and
- * builds (also inside Next.js with `--embedded`).
+ * builds with its styles (also inside Next.js with `--embedded`).
  *
  * Usage: node scripts/smoke-test.mjs [sanity-version] [--loose] [--embedded]
  * `--loose` ignores the plugin's peer range, to test whether it could be widened.
@@ -41,7 +41,7 @@ const FORM_EXPORTS = [
   'useFeatureEnabled',
   'useScheduledDraftsEnabled',
 ]
-const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react', 'styled-components']
+const SHARED = ['@sanity/sdk-react', '@sanity/sdk', '@portabletext/editor', 'react']
 
 function run(command, args, cwd) {
   console.log(`\n$ ${command} ${args.join(' ')}`)
@@ -56,6 +56,16 @@ const packOutput = execFileSync('pnpm', ['pack', '--pack-destination', studioDir
 const tarball = packOutput.trim().split('\n').pop().trim()
 if (!existsSync(tarball)) throw new Error(`pnpm pack didn't produce a tarball: ${packOutput}`)
 
+// The room's styles are plain CSS; `pnpm pack` has just rebuilt dist/.
+const distDir = join(pluginDir, 'dist')
+const styledIn = readdirSync(distDir).filter(
+  (file) => /\.(js|d\.ts)$/.test(file) && readFileSync(join(distDir, file), 'utf8').includes('styled-components'),
+)
+if (styledIn.length) {
+  console.error(`\n✗ The plugin reaches for styled-components again: ${styledIn.join(', ')}`)
+  process.exit(1)
+}
+
 // 2. A minimal Studio, following the README.
 const files = {
   'package.json': JSON.stringify(
@@ -68,6 +78,7 @@ const files = {
         'sanity-plugin-writing-room': `file:${tarball}`,
         'react': '^19.3.1',
         'react-dom': '^19.3.1',
+        // Sanity's own peer, not the plugin's.
         'styled-components': '^6.1.18',
         '@sanity/themer': '^0.10.6',
       },
@@ -153,17 +164,43 @@ if (duplicated) {
   process.exit(1)
 }
 
-// A second copy means the plugin's range has drifted from Sanity's. Only reported with --loose.
+// A version Sanity doesn't install itself means the plugin's range has drifted from Sanity's.
 // Sanity's command-line tools keep copies of their own, which never reach the Studio's bundle.
 const TOOLING = ['@sanity/cli', '@sanity/runtime-cli']
 const inTheStudio = (copy) => !TOOLING.some((name) => copy.includes(`/node_modules/${name}/node_modules/`))
-const portableText = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
+
+/** Every `name@version` that `from` loads, found the way Node would. */
+function reachable(from, seen = new Set(), visited = new Set()) {
+  if (visited.has(from)) return seen
+  visited.add(from)
+  const pkg = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8'))
+  seen.add(`${pkg.name}@${pkg.version}`)
+  for (const name of Object.keys({...pkg.dependencies, ...pkg.peerDependencies})) {
+    for (let dir = from; dir.startsWith(studioDir); dir = dirname(dir)) {
+      const candidate = join(dir, 'node_modules', name)
+      if (existsSync(join(candidate, 'package.json'))) {
+        reachable(candidate, seen, visited)
+        break
+      }
+    }
+  }
+  return seen
+}
+
+// Sanity can be at two versions of a package by itself; that isn't the plugin's to fix.
+const sanityLoads = reachable(join(studioDir, 'node_modules', 'sanity'))
+const split = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
   .map((name) => [`@portabletext/${name}`, findCopies(`@portabletext/${name}`).filter(inTheStudio)])
   .filter(([, copies]) => new Set(copies.map((copy) => copy.split(' ')[0])).size > 1)
+const list = (packages) => packages.map(([name, copies]) => `  ${name}: ${copies.join(', ')}`).join('\n')
+const isSanitys = ([name, copies]) => copies.every((copy) => sanityLoads.has(`${name}@${copy.split(' ')[0]}`))
+const sanitys = split.filter(isSanitys)
+const portableText = split.filter((entry) => !isSanitys(entry))
+if (sanitys.length) console.log(`\nSanity itself installs two versions of:\n${list(sanitys)}`)
 console.log(
   portableText.length
-    ? `\n@portabletext packages at more than one version:\n${portableText.map(([name, copies]) => `  ${name}: ${copies.join(', ')}`).join('\n')}`
-    : '\nEvery @portabletext package is at a single version.',
+    ? `\n@portabletext packages at a version Sanity doesn't install:\n${list(portableText)}`
+    : '\nEvery @portabletext package is at a version Sanity installs.',
 )
 if (portableText.length && !loose) {
   console.error('\n✗ Widen the plugin\'s range for these so it can share Sanity\'s copy.')
@@ -186,7 +223,9 @@ if (missing.length) {
 // 6. Types and bundle.
 run('npx', ['tsc', '--noEmit'], studioDir)
 run('npx', ['sanity', 'build', '--yes'], studioDir)
-expectOneSdk(join(studioDir, 'dist'), 'the Studio bundle')
+const studioBundle = scripts(join(studioDir, 'dist'))
+expectOneSdk(studioBundle, 'the Studio bundle')
+expectRoomStyles(studioBundle, 'the Studio bundle')
 
 // 7. The same Studio embedded in a Next.js app.
 if (embedded) {
@@ -226,31 +265,82 @@ export default function StudioPage() {
     env: {...process.env, CI: 'true', NEXT_TELEMETRY_DISABLED: '1'},
   })
   // Browser bundle only: .next/server has its own copy.
-  expectOneSdk(join(studioDir, '.next', 'static'), 'the Next.js browser bundle')
+  const nextBundle = scripts(join(studioDir, '.next', 'static'))
+  expectOneSdk(nextBundle, 'the Next.js browser bundle')
+  expectRoomStyles(nextBundle, 'the Next.js browser bundle')
 }
 
 console.log(
   `\n✓ sanity@${sanityVersion}: installed, deduped, type-checked and built${embedded ? ', standalone and embedded in Next.js' : ''}.`,
 )
 
-/** Each copy of @sanity/sdk-react carries this error message, so two copies means it appears twice. */
-function expectOneSdk(dir, label) {
-  const MESSAGE = 'wrapped in a ResourceProvider or a SanityApp component'
-  let count = 0
-  const walk = (path) => {
-    for (const entry of readdirSync(path, {withFileTypes: true})) {
-      const child = join(path, entry.name)
-      if (entry.isDirectory()) {
-        if (entry.name !== 'cache') walk(child)
-      } else if (entry.name.endsWith('.js')) {
-        count += readFileSync(child, 'utf8').split(MESSAGE).length - 1
-      }
+/** Every script under `dir`, read once for all the checks made of it. */
+function scripts(dir, found = []) {
+  for (const entry of readdirSync(dir, {withFileTypes: true})) {
+    const child = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (entry.name !== 'cache') scripts(child, found)
+    } else if (entry.name.endsWith('.js')) {
+      found.push(readFileSync(child, 'utf8'))
     }
   }
-  walk(dir)
+  return found
+}
+
+/** Each copy of @sanity/sdk-react carries this error message, so two copies means it appears twice. */
+function expectOneSdk(all, label) {
+  const MESSAGE = 'wrapped in a ResourceProvider or a SanityApp component'
+  const count = all.reduce((sum, script) => sum + script.split(MESSAGE).length - 1, 0)
   console.log(`App SDK copies in ${label}: ${count}`)
   if (count !== 1) {
     console.error(`\n✗ Expected one copy of @sanity/sdk-react in ${label}, found ${count}.`)
+    process.exit(1)
+  }
+}
+
+/** Splits at the commas between animations, not those inside a `cubic-bezier()` or a `var()`. */
+function animations(value) {
+  const found = ['']
+  let depth = 0
+  for (const char of value) {
+    if (char === '(') depth++
+    if (char === ')') depth--
+    if (char === ',' && depth === 0) found.push('')
+    else found[found.length - 1] += char
+  }
+  return found
+}
+
+/** A bundler that dropped the room's CSS as unused would still build. */
+function expectRoomStyles(all, label) {
+  const rules = all.some((script) => /\.calm-[\w-]+\{/.test(script))
+  // The `href` of the `<style>` the room renders them in (WritingRoomTool.tsx).
+  const added = all.some((script) => script.includes('sanity-plugin-writing-room/styles-'))
+  console.log(`The room's styles in ${label}: ${rules && added ? 'present' : 'missing'}`)
+  if (!rules || !added) {
+    console.error(`\n✗ ${label} lost the room's CSS${rules ? "'s way onto the page" : ''}.`)
+    process.exit(1)
+  }
+  // Each animation must name a `@keyframes` the build renamed. The stylesheet is one string, so
+  // both are in the same script.
+  const keyframes = new Set()
+  const used = new Set()
+  for (const css of all) {
+    for (const [, name] of css.matchAll(/@keyframes (calm-[\w-]+)/g)) keyframes.add(name)
+    for (const [, declarations] of css.matchAll(/\.calm-[\w-]+[^{}]*\{([^{}]*)\}/g)) {
+      for (const [, value] of declarations.matchAll(/(?:^|;)animation(?:-name)?:([^;]+)/g)) used.add(value)
+    }
+  }
+  const stray = new Set()
+  for (const value of used) {
+    for (const animation of animations(value)) {
+      const names = animation.split(/[\s,()]+/)
+      if (!names.includes('none') && !names.some((name) => keyframes.has(name))) stray.add(value)
+    }
+  }
+  console.log(`The room's animations in ${label}: ${stray.size ? 'missing their keyframes' : 'matched'}`)
+  if (stray.size) {
+    console.error(`\n✗ ${label} has animations with no @keyframes: ${[...stray].join(' | ')}`)
     process.exit(1)
   }
 }

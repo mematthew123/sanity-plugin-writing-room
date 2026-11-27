@@ -1,6 +1,6 @@
 import {Component, type ReactNode} from 'react'
-import styled from 'styled-components'
 import {QuietButton} from '../primitives'
+import styles from './DetailsBoundary.module.css'
 
 /** Fails soft: a form that can't render never takes the Prose down with it. */
 export class DetailsBoundary extends Component<
@@ -20,25 +20,10 @@ export class DetailsBoundary extends Component<
   render() {
     if (!this.state.failed) return this.props.children
     return (
-      <Card role="alert">
+      <div className={styles.card} role="alert">
         Details couldn’t open here.
         <QuietButton onClick={this.props.onOpenInStructure}>Open in Structure</QuietButton>
-      </Card>
+      </div>
     )
   }
 }
-
-const Card = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--calm-space-sm);
-  margin-top: var(--calm-space-xl);
-  padding: var(--calm-space-md) var(--calm-space-lg);
-  border-radius: var(--calm-radius-large);
-  background: var(--calm-color-surface);
-  color: var(--calm-color-ink-muted);
-  font-family: var(--calm-font-ui);
-  font-size: var(--calm-type-ui-size);
-`

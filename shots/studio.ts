@@ -123,6 +123,6 @@ export async function select(page: Page, words: string) {
   const box = await find(page, words)
   await page.mouse.move(box.left + 1, box.y)
   await page.mouse.down()
-  await page.mouse.move(box.right - 1, box.y, {steps: 12})
+  await page.mouse.move(box.end - 1, box.endY, {steps: 12})
   await page.mouse.up()
 }
