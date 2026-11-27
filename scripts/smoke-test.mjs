@@ -164,17 +164,43 @@ if (duplicated) {
   process.exit(1)
 }
 
-// A second copy means the plugin's range has drifted from Sanity's. Only reported with --loose.
+// A version Sanity doesn't install itself means the plugin's range has drifted from Sanity's.
 // Sanity's command-line tools keep copies of their own, which never reach the Studio's bundle.
 const TOOLING = ['@sanity/cli', '@sanity/runtime-cli']
 const inTheStudio = (copy) => !TOOLING.some((name) => copy.includes(`/node_modules/${name}/node_modules/`))
-const portableText = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
+
+/** Every `name@version` that `from` loads, found the way Node would. */
+function reachable(from, seen = new Set(), visited = new Set()) {
+  if (visited.has(from)) return seen
+  visited.add(from)
+  const pkg = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8'))
+  seen.add(`${pkg.name}@${pkg.version}`)
+  for (const name of Object.keys({...pkg.dependencies, ...pkg.peerDependencies})) {
+    for (let dir = from; dir.startsWith(studioDir); dir = dirname(dir)) {
+      const candidate = join(dir, 'node_modules', name)
+      if (existsSync(join(candidate, 'package.json'))) {
+        reachable(candidate, seen, visited)
+        break
+      }
+    }
+  }
+  return seen
+}
+
+// Sanity can be at two versions of a package by itself; that isn't the plugin's to fix.
+const sanityLoads = reachable(join(studioDir, 'node_modules', 'sanity'))
+const split = readdirSync(join(studioDir, 'node_modules', '@portabletext'))
   .map((name) => [`@portabletext/${name}`, findCopies(`@portabletext/${name}`).filter(inTheStudio)])
   .filter(([, copies]) => new Set(copies.map((copy) => copy.split(' ')[0])).size > 1)
+const list = (packages) => packages.map(([name, copies]) => `  ${name}: ${copies.join(', ')}`).join('\n')
+const isSanitys = ([name, copies]) => copies.every((copy) => sanityLoads.has(`${name}@${copy.split(' ')[0]}`))
+const sanitys = split.filter(isSanitys)
+const portableText = split.filter((entry) => !isSanitys(entry))
+if (sanitys.length) console.log(`\nSanity itself installs two versions of:\n${list(sanitys)}`)
 console.log(
   portableText.length
-    ? `\n@portabletext packages at more than one version:\n${portableText.map(([name, copies]) => `  ${name}: ${copies.join(', ')}`).join('\n')}`
-    : '\nEvery @portabletext package is at a single version.',
+    ? `\n@portabletext packages at a version Sanity doesn't install:\n${list(portableText)}`
+    : '\nEvery @portabletext package is at a version Sanity installs.',
 )
 if (portableText.length && !loose) {
   console.error('\n✗ Widen the plugin\'s range for these so it can share Sanity\'s copy.')
